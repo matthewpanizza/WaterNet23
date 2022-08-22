@@ -375,7 +375,7 @@ bool getGPSLatLon(){
 
 void statusUpdate(){
     char updateStr[10];
-    snprintf(updateStr,"B%dABsup%s%s",BOTNUM,(char)battPercent,(char)statusFlags);
+    //snprintf(updateStr,"B%dABsup%s%s",BOTNUM,(char)battPercent,(char)statusFlags);
 
 }
 
@@ -400,7 +400,7 @@ void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee
         Serial1.println(dataOut);
     }
 }
-void statusHandler(){
+void StatusHandler(){
     statusFlags = LTEAvail;
     statusFlags |= XBeeAvail << 1;
     statusFlags |= BLEAvail << 2;

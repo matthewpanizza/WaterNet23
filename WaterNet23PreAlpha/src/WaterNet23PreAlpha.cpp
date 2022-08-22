@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -23,11 +23,12 @@ void cmdLTEHandler(const char *event, const char *data);
 void setup();
 void loop();
 void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee, bool &sendLTE);
+void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void wdogHandler();
 void LEDHandler();
-#line 17 "c:/Users/mligh/OneDrive/Particle/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 17 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
 
@@ -39,6 +40,7 @@ void LEDHandler();
 #define SENS_DATA_DLY       825
 
 #define WATCHDOG_PD         15000           //Watchdog timer period in milliseconds
+#define STATUS_PD           5000            //Time between status updates published to CC Hub
 #define XBEE_WDOG_AVAIL     30000           //Watchdog interval between XBee messages for availablility check
 #define BLE_WDOG_AVAIL      30000           //Watchdog interval between BLE messages for availability check
 
@@ -105,10 +107,12 @@ void XBeeHandler();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void sensorHandler();
 void dataOffloader();
+void statusUpdate();
 
 //Tmers
 Timer watchdog(WATCHDOG_PD, wdogHandler);   //Create timer object for watchdog
 Timer ledTimer(1000,LEDHandler);
+Timer statusPD(STATUS_PD,StatusHandler);
 
 //LED Control
 LEDStatus status;
@@ -125,6 +129,8 @@ uint8_t rightMotorSpeed, setRSpeed;
 bool updateMotorControl;
 bool manualRC;
 bool lowBattery;
+bool statusReady;
+uint8_t statusFlags;
 bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
@@ -317,9 +323,9 @@ void loop(){
         //sendData(latLonBuf, UART_TX_BUF_SIZE, true, true, sendLatLonLTE);
     }
     else GPSAvail = false;
-    //Serial.println("bing bong");
-    //sensorHandler();
-    //XBeeHandler();
+    sensorHandler();
+    XBeeHandler();
+    statusUpdate();
     //updateMotors();
     if(offloadMode) dataOffloader();
     delay(100);
@@ -382,6 +388,12 @@ bool getGPSLatLon(){
   return false;
 }
 
+void statusUpdate(){
+    char updateStr[10];
+    //snprintf(updateStr,"B%dABsup%s%s",BOTNUM,(char)battPercent,(char)statusFlags);
+
+}
+
 void updateMotors(){
     if(updateMotorControl){
         updateMotorControl = false;        
@@ -402,6 +414,15 @@ void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee
     if(sendXBee){
         Serial1.println(dataOut);
     }
+}
+void StatusHandler(){
+    statusFlags = LTEAvail;
+    statusFlags |= XBeeAvail << 1;
+    statusFlags |= BLEAvail << 2;
+    statusFlags |= offloadMode << 3;
+    statusFlags |= manualRC << 4;
+    statusFlags |= lowBattery << 5;
+    statusReady = true;
 }
 void sensorHandler(){
     
