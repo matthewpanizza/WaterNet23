@@ -1,0 +1,10 @@
+{
+    "extensions.ignoreRecommendations": true,
+    "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
+    "files.associations": {
+        "*.ino": "cpp"
+    },
+    "particle.targetPlatform": "bsom",
+    "particle.firmwareVersion": "1.5.2",
+    "particle.targetDevice": "burrito_sniper"
+}
