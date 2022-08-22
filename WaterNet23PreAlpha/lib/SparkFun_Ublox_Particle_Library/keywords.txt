@@ -1,0 +1,45 @@
+#######################################
+# Syntax Coloring Map 
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SFE_UBLOX_GPS	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+isConnected	KEYWORD2
+checkUblox	KEYWORD2
+checkUbloxI2C	KEYWORD2
+checkUbloxSerial	KEYWORD2
+process	KEYWORD2
+processUBX	KEYWORD2
+processRTCMframe	KEYWORD2
+processRTCM	KEYWORD2
+__attribute__	KEYWORD2
+processUBXpacket	KEYWORD2
+processNMEA	KEYWORD2
+__attribute__	KEYWORD2
+calcChecksum	KEYWORD2
+sendCommand	KEYWORD2
+setI2CReadAddress	KEYWORD2
+setNMEAOutputPort	KEYWORD2
+waitForResponse	KEYWORD2
+getSurveyMode	KEYWORD2
+setSurveyMode	KEYWORD2
+enableSurveyMode	KEYWORD2
+disableSurveyMode	KEYWORD2
+getSurveyStatus	KEYWORD2
+enableRTCMmessage	KEYWORD2
+disableRTCMmessage	KEYWORD2
+setRTCMport	KEYWORD2
+getPortSettings	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
