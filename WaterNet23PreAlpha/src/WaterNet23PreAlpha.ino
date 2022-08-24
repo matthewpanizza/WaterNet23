@@ -80,14 +80,14 @@ unsigned long lastScan = 0;
 
 //Function prototypes
 void setupSPI();
-void setupMotors();
 void setupLTE();
 void setupXBee();
 void setupGPS();
 bool getGPSLatLon();
+void sendResponseData();
 void timeInterval();
 void updateMotors();
-void sendData(const char *event, uint8_t dataSize, bool sendBLE, bool sendXBee, bool &sendLTE);
+void sendData(const char *event, uint8_t dataSize, bool sendBLE, bool sendXBee, bool sendLTE);
 void XBeeHandler();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void sensorHandler();
@@ -106,17 +106,17 @@ LEDStatus status;
 // Global Variables //
 //////////////////////
 
-long latitude_mdeg;
-long longitude_mdeg;
-bool sendLatLonLTE;
+long latitude_mdeg, longitude_mdeg;
+float latitude, longitude;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
 bool updateMotorControl;
 bool manualRC;
 bool lowBattery;
 bool statusReady;
+uint8_t requestActive;
 uint8_t statusFlags;
-bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail;     //Flags for communicaton keep-alives/available
+bool LTEAvail, XBeeAvail, BLEAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 uint32_t senseTimer, dataTimer;
@@ -145,6 +145,7 @@ int i = 0;
 
 };*/
 
+//Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
@@ -155,10 +156,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             else dataStr[i-7] = command[i];
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
-            if(mode == 1){  //Acknowledge from XBee
+            if(mode == 2){  //Acknowledge from XBee
 
             }
-            else if(mode == 2){ //Acknowledge from BLE
+            else if(mode == 1){ //Acknowledge from BLE
                 
             }
             return;
@@ -169,23 +170,17 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             setLSpeed = atoi(lSpd);
             setLSpeed = atoi(rSpd);
         }
-        else if(!strcmp(cmdStr,"gps")){  //Received GPS data
-            digitalWrite(D7, HIGH);
-        }
-        else if(!strcmp(cmdStr,"sns")){  //Received Sensor data 
-            digitalWrite(D7, LOW);
-        }
         else if(!strcmp(cmdStr,"req")){  //Data Request
-            
+            requestActive = mode;
         }
         else if(!strcmp(cmdStr,"pts")){
             Serial.println(dataStr);
-            myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
-            String modeStr[3] = {"LTE", "XBee", "Bluetooth"};
-            myFile.printf("New string from %s: ", modeStr[mode]);
-            myFile.println(dataStr);
-            delay(5);
-            myFile.close();
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+                logFile.close();
+            }
+            else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
         else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
             
@@ -216,10 +211,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
 }
 
 void cmdLTEHandler(const char *event, const char *data){
-    processCommand(data, 0,false);
+    processCommand(data, 4,false);
     if(logMessages){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-        logFile.printlnf("[INFO] Received BLE Message: %s",data);
+        logFile.printlnf("[INFO] Received LTE Message: %s",data);
         logFile.close();
     }
 }
@@ -235,7 +230,6 @@ void setup(){
     Serial1.begin(9600, SERIAL_PARITY_EVEN);                        //Start serial for XBee module
     setupSPI();                                 //Setup SPI for BeagleBone
     setupXBee();                                //Setup XBee module
-    setupMotors();                              //Setup Motor controller chips over I2C
     setupGPS();                                 //Setup GPS module
     setupLTE();                                 //Initialize LTE Flags
 
@@ -247,6 +241,7 @@ void setup(){
     logSensors = true;
     logMessages = true;
     offloadMode = false;
+    requestActive = false;
 
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -291,7 +286,7 @@ void setup(){
     }
     if(logMessages){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-        logFile.printlnf("[INFO] WaterBot %d: Started Logging",BOTNUM);
+        logFile.printlnf("[INFO] WaterBot %d: Started Logging!",BOTNUM);
         logFile.close();
     }
     // delete possible existing file
@@ -299,20 +294,18 @@ void setup(){
 
 void loop(){
     if(getGPSLatLon()){
-        //Log.info("Latitude (deg): %0.6f", ((float)latitude_mdeg/1000000.0));
-        //Log.info("Longitude (deg): %0.6f", ((float)longitude_mdeg/1000000.0));
-        GPSAvail = true;
         char latLonBuf[UART_TX_BUF_SIZE];
-        sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", ((float)latitude_mdeg/1000000.0),((float)longitude_mdeg/1000000.0));
-        Serial.println(latLonBuf);
-        //sendData(latLonBuf, UART_TX_BUF_SIZE, true, true, sendLatLonLTE);
+        latitude = ((float)latitude_mdeg/1000000.0);
+        longitude = ((float)longitude_mdeg/1000000.0);
+        //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
+        //Serial.println(latLonBuf);
+        //sendData(latLonBuf, UART_TX_BUF_SIZE, true, true, false);
     }
-    else GPSAvail = false;
     sensorHandler();
     XBeeHandler();
     statusUpdate();
-    //updateMotors();
     if(offloadMode) dataOffloader();
+    sendResponseData();
     delay(100);
 }
 
@@ -325,14 +318,9 @@ void SFE_UBLOX_GPS::processNMEA(char incoming){
   //for sentence cracking
   nmea.process(incoming);
 }
-
-void setupMotors(){
-    updateMotorControl = false;
-}
 //Initialization for LTE events and flags
 void setupLTE(){
     Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
-    sendLatLonLTE = false;                      //Set LTE flags initially false
     LTEAvail = false;
 }
 
@@ -373,6 +361,17 @@ bool getGPSLatLon(){
   return false;
 }
 
+//Function to check if response data to a request needs to be sent out
+void sendResponseData(){
+    if(requestActive){
+        char responseStr[50];
+        memcpy(responseStr,0,50);
+        sprintf(responseStr,"GL%0.6f,GO%0.6f,DO%0.4f,PH%0.4f,CA%0.4f,CB%0.4f,TP%0.4f",latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
+        sendData(responseStr,strlen(responseStr),requestActive & 1, requestActive & 2, requestActive & 4);
+        requestActive = 0;
+    }
+}
+
 void statusUpdate(){
     char updateStr[10];
     //snprintf(updateStr,"B%dABsup%s%s",BOTNUM,(char)battPercent,(char)statusFlags);
@@ -385,7 +384,7 @@ void updateMotors(){
     }
 }
 
-void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee, bool &sendLTE){
+void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee, bool sendLTE){
     if(sendLTE){
         Particle.publish("Bot1dat", dataOut, PRIVATE);
         sendLTE = false;
@@ -400,6 +399,7 @@ void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee
         Serial1.println(dataOut);
     }
 }
+
 void StatusHandler(){
     statusFlags = LTEAvail;
     statusFlags |= XBeeAvail << 1;
@@ -409,6 +409,7 @@ void StatusHandler(){
     statusFlags |= lowBattery << 5;
     statusReady = true;
 }
+
 void sensorHandler(){
     
     if(dataTimer < millis() && dataWait){
@@ -479,12 +480,13 @@ void sensorHandler(){
         dataWait = true;
     }
 }
+
 void XBeeHandler(){  
     while(Serial1.available()){
         String data = Serial1.readStringUntil('\n');
         char buffer[data.length()];
         for(int i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
-        processCommand(buffer,1,true);
+        processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
         XBeeRxTime = millis();
@@ -518,7 +520,7 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
     Serial.println("New BT Command:");
     Serial.println(btBuf);
-    processCommand(btBuf,2,true);
+    processCommand(btBuf,1,true);
     BLERxTime = millis();
     if(logMessages){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
