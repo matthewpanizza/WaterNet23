@@ -16,6 +16,7 @@
 
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
+#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
 
 #define PHADDR              99               //default I2C ID number for EZO pH Circuit.
 #define MCOND               100               //default I2C ID number for EZO Mini-Conductivity (0.1)
@@ -127,6 +128,8 @@ uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
+char errBuf[MAX_ERR_BUF_SIZE];
+uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
@@ -509,7 +512,7 @@ void XBeeHandler(){
         processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
-        if(buffer[0] == 'A' || buffer[0] == 'C') XBeeRxTime = millis();
+        if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis();
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[INFO] Received XBee Message: %s",data);
