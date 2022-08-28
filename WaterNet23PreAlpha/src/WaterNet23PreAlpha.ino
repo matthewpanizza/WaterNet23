@@ -16,6 +16,7 @@
 
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
+#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
 
 #define PHADDR              99               //default I2C ID number for EZO pH Circuit.
 #define MCOND               100               //default I2C ID number for EZO Mini-Conductivity (0.1)
@@ -28,6 +29,8 @@
 #define STATUS_PD           5000            //Time between status updates published to CC Hub
 #define XBEE_WDOG_AVAIL     30000           //Watchdog interval between XBee messages for availablility check
 #define BLE_WDOG_AVAIL      30000           //Watchdog interval between BLE messages for availability check
+#define LTE_MAX_STATUS      480             // (Divided by LTE STAT PD) Maximum number of status messages to send over LTE if other methods are unavailable
+#define LTE_STAT_PD         4               //Divider for sending status via LTE to reduce data usage
 
 #define DEF_FILENAME        "WaterBot"
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
@@ -110,11 +113,13 @@ long latitude_mdeg, longitude_mdeg;
 float latitude, longitude;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
+uint8_t battPercent;
 bool updateMotorControl;
 bool manualRC;
 bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
+uint16_t LTEStatusCount;
 uint8_t statusFlags;
 bool LTEAvail, XBeeAvail, BLEAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
@@ -123,6 +128,8 @@ uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
+char errBuf[MAX_ERR_BUF_SIZE];
+uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
@@ -149,11 +156,30 @@ int i = 0;
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
+        uint8_t checksum = (uint8_t)command[strlen(command)-1];
         char dataStr[strlen(command)-7];
         char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command);i++){
+        for(uint8_t i = 4; i < strlen(command)-1;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
+        }
+        if(checksum != strlen(command)){
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+                logFile.close();
+            }
+            else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+            memcpy(errBuf,0,MAX_ERR_BUF_SIZE);
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                strncpy(rxBotNum,command,2);
+                snprintf("B%d%snak%3s",BOTNUM,rxBotNum,cmdStr);
+            }
+            else{
+                snprintf("B%dABnak%3s",BOTNUM,cmdStr);
+            }
+            errModeReply = mode;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 2){  //Acknowledge from XBee
@@ -242,6 +268,7 @@ void setup(){
     logMessages = true;
     offloadMode = false;
     requestActive = false;
+    LTEStatusCount = LTE_MAX_STATUS;
 
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -373,9 +400,15 @@ void sendResponseData(){
 }
 
 void statusUpdate(){
-    char updateStr[10];
-    //snprintf(updateStr,"B%dABsup%s%s",BOTNUM,(char)battPercent,(char)statusFlags);
-
+    char updateStr[22];
+    sprintf(updateStr,"B%dABsup%s%s%0.6f%0.6f",BOTNUM,(char)battPercent,(char)statusFlags,latitude,longitude);
+    if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD) == 0){
+        sendData(updateStr,22,false,false,true);
+    }
+    else{
+        sendData(updateStr,22,true,true,false);
+    }
+    if(LTEStatusCount) LTEStatusCount--;
 }
 
 void updateMotors(){
@@ -489,7 +522,7 @@ void XBeeHandler(){
         processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
-        XBeeRxTime = millis();
+        if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis();
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[INFO] Received XBee Message: %s",data);
@@ -521,7 +554,7 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     Serial.println("New BT Command:");
     Serial.println(btBuf);
     processCommand(btBuf,1,true);
-    BLERxTime = millis();
+    if(btBuf[0] == 'A' || btBuf[0] == 'C') BLERxTime = millis();
     if(logMessages){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.printlnf("[INFO] Received BLE Message: %s",btBuf);
