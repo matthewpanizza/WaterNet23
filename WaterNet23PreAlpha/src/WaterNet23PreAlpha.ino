@@ -157,6 +157,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
         uint8_t checksum = (uint8_t)command[strlen(command)-1];
+        char dataStr[strlen(command)-7];
+        char cmdStr[3];
+        for(uint8_t i = 4; i < strlen(command)-1;i++){
+            if(i < 7) cmdStr[i-4] = command[i];
+            else dataStr[i-7] = command[i];
+        }
         if(checksum != strlen(command)){
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
@@ -164,12 +170,16 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 logFile.close();
             }
             else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
-        }
-        char dataStr[strlen(command)-7];
-        char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command)-1;i++){
-            if(i < 7) cmdStr[i-4] = command[i];
-            else dataStr[i-7] = command[i];
+            memcpy(errBuf,0,MAX_ERR_BUF_SIZE);
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                strncpy(rxBotNum,command,2);
+                snprintf("B%d%snak%3s",BOTNUM,rxBotNum,cmdStr);
+            }
+            else{
+                snprintf("B%dABnak%3s",BOTNUM,cmdStr);
+            }
+            errModeReply = mode;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 2){  //Acknowledge from XBee
