@@ -11,10 +11,12 @@
 #undef max
 #include <vector>
 
+#define chipSelect D8
+
+#define DEF_FILENAME        "WaterBot"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
-#define chipSelect D8
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -60,8 +62,11 @@ unsigned long lastScan = 0;
 bool offloadingMode;
 bool offloadingDone;
 char offloadFilename[MAX_FILENAME_LEN];
+char filenameMessages[MAX_FILENAME_LEN];
 bool remoteRx = false;
 bool logMessages;
+uint8_t errCmdMode;
+char errCmdStr[3];
 
 class WaterBot{
     public:
@@ -81,11 +86,16 @@ WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
 std::vector<WaterBot> WaterBots;
 
 void BLEScan(int BotNumber = -1);
+void XBeeHandler();
 void dataLTEHandler(const char *event, const char *data);
 
 void dataLTEHandler(const char *event, const char *data){
-    Serial.print("LTE Data Received\n");
-    Serial.printf("%s\n", data);
+    processCommand(data, 4,false);
+    if(logMessages){
+        if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[INFO] Received LTE Message: %s",data);
+        logFile.close();
+    }
 }
 
 void setup() {
@@ -104,6 +114,12 @@ void setup() {
 
     logMessages = true;
 
+    char timestamp[16];
+    snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
+    strcpy(filenameMessages,DEF_FILENAME);
+    strcat(filenameMessages,timestamp);
+    strcat(filenameMessages,"_LOG.txt");
+
     /*BleAdvertisingData advData;                 //Advertising data
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -117,10 +133,7 @@ void setup() {
 }
 
 void loop() {
-    if(digitalRead(A0) == HIGH){
-        Serial.println("Start offloader");
-        DataOffloader();
-    }
+    
     if (BLE.connected()) {
         if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
         char testStr[30] = "CCB1ptsHello from CC Hub!";
@@ -129,20 +142,6 @@ void loop() {
         peerRxCharacteristic.setValue(testStr);
         digitalWrite(D7,HIGH);
         delay(1000);
-        /*while (Serial.available() && txLen < UART_TX_BUF_SIZE) {
-            txBuf[txLen++] = Serial.read();
-            Serial.write(txBuf[txLen - 1]);
-        }
-        if (txLen > 0) {
-        	// Transmit the data to the BLE peripheral
-            peerRxCharacteristic.setValue(txBuf, txLen);
-            txLen = 0;
-        }
-        if(remoteRx){
-            peerRxCharacteristic.setValue(txBuf, txLen);
-            txLen = 0;
-            remoteRx = false;
-        }*/
     }
     else {
         digitalWrite(D7,LOW);
@@ -153,6 +152,8 @@ void loop() {
     	}
 
     }
+    if(offloadingMode) DataOffloader();
+    XBeeHandler();
 }
 
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -173,20 +174,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             return;
         }
-        if(!strcmp(cmdStr,"mtr")){  //Motor Speed Control
-            char lSpd[3] = {dataStr[0],dataStr[1],dataStr[2]};
-            char rSpd[3] = {dataStr[3],dataStr[4],dataStr[5]};
-            setLSpeed = atoi(lSpd);
-            setLSpeed = atoi(rSpd);
-        }
-        else if(!strcmp(cmdStr,"gps")){  //Received GPS data
-            digitalWrite(D7, HIGH);
-        }
-        else if(!strcmp(cmdStr,"sns")){  //Received Sensor data 
-            digitalWrite(D7, LOW);
-        }
-        else if(!strcmp(cmdStr,"req")){  //Data Request
-            
+        if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
+            strncpy(errCmdStr,dataStr,3);
+            errCmdMode = mode;
         }
         else if(!strcmp(cmdStr,"pts")){
             Serial.println(dataStr);
@@ -199,15 +189,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
             
-        }
-        else if(!strcmp(cmdStr,"aut")){  //Enter autonomous mode
-            
-        }
-        else if(!strcmp(cmdStr,"dmp")){  //Enter SD Card "Dump Mode"
-            offloadMode = true;
-            status.setPattern(LED_PATTERN_BLINK);
-            status.setColor(RGB_COLOR_BLUE);
-            status.setSpeed(LED_SPEED_FAST);
         }
         else{   //Didn't recognize command (may be corrupted?) send back error signal
             if(mode == 1){
@@ -299,14 +280,34 @@ void DataOffloader(){
     if(logDir.isOpen()) logDir.close();
 }
 
-static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-    for (size_t ii = 0; ii < len; ii++) {
-        txBuf[ii] = data[ii];
-        remoteRx = true;
-        Serial.write(data[ii]);
-        txLen++;
+void XBeeHandler(){  
+    while(Serial1.available()){
+        String data = Serial1.readStringUntil('\n');
+        char buffer[data.length()];
+        for(int i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+        processCommand(buffer,2,true);
+        Serial.println("New XBee Command:");
+        Serial.println(data); 
+        if(logMessages){
+            if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+            logFile.printlnf("[INFO] Received XBee Message: %s",data);
+            logFile.close();
+        }
     }
-} 
+}
+
+static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
+    char btBuf[len];
+    for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
+    Serial.println("New BT Command:");
+    Serial.println(btBuf);
+    processCommand(btBuf,1,true);
+    if(logMessages){
+        if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[INFO] Received BLE Message: %s",btBuf);
+        logFile.close();
+    }
+}
 
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
     char fileCommand[8 + MAX_FILENAME_LEN];

@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Library/CloudStorage/OneDrive-Personal/Particle/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -14,19 +14,22 @@
 #include "SdFat.h"
 void setup();
 void loop();
+void processCommand(const char *command, uint8_t mode, bool sendAck);
 void BLEScan(int BotNumber);
 void DataOffloader();
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
-#line 10 "/Users/matthewpanizza/Library/CloudStorage/OneDrive-Personal/Particle/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 10 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
 
+#define chipSelect D8
+
+#define DEF_FILENAME        "WaterBot"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
-#define chipSelect D8
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -72,8 +75,11 @@ unsigned long lastScan = 0;
 bool offloadingMode;
 bool offloadingDone;
 char offloadFilename[MAX_FILENAME_LEN];
+char filenameMessages[MAX_FILENAME_LEN];
 bool remoteRx = false;
 bool logMessages;
+uint8_t errCmdMode;
+char errCmdStr[3];
 
 class WaterBot{
     public:
@@ -115,6 +121,12 @@ void setup() {
     offloadingDone = false;
 
     logMessages = true;
+
+    char timestamp[16];
+    snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
+    strcpy(filenameMessages,DEF_FILENAME);
+    strcat(filenameMessages,timestamp);
+    strcat(filenameMessages,"_LOG.txt");
 
     /*BleAdvertisingData advData;                 //Advertising data
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
@@ -163,6 +175,56 @@ void loop() {
     		lastScan = millis();
     		BLEScan(-1);
     	}
+
+    }
+}
+
+void processCommand(const char *command, uint8_t mode, bool sendAck){
+    //Process if command is addressed to this bot "Bx" or all bots "AB"
+    if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
+        char dataStr[strlen(command)-7];
+        char cmdStr[3];
+        for(uint8_t i = 4; i < strlen(command);i++){
+            if(i < 7) cmdStr[i-4] = command[i];
+            else dataStr[i-7] = command[i];
+        }
+        if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
+            if(mode == 1){  //Acknowledge from XBee
+
+            }
+            else if(mode == 2){ //Acknowledge from BLE
+                
+            }
+            return;
+        }
+        if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
+            strncpy(errCmdStr,dataStr,3);
+            errCmdMode = mode;
+        }
+        else if(!strcmp(cmdStr,"pts")){
+            Serial.println(dataStr);
+            myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
+            String modeStr[3] = {"LTE", "XBee", "Bluetooth"};
+            myFile.printf("New string from %s: ", modeStr[mode]);
+            myFile.println(dataStr);
+            delay(5);
+            myFile.close();
+        }
+        else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
+            
+        }
+        else{   //Didn't recognize command (may be corrupted?) send back error signal
+            if(mode == 1){
+
+            }
+            if(mode == 2){
+
+            }
+        }
+
+        if(sendAck){    //Transmit out acknowledgement if needed
+
+        }
 
     }
 }
@@ -242,13 +304,17 @@ void DataOffloader(){
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-    for (size_t ii = 0; ii < len; ii++) {
-        txBuf[ii] = data[ii];
-        remoteRx = true;
-        Serial.write(data[ii]);
-        txLen++;
+    char btBuf[len];
+    for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
+    Serial.println("New BT Command:");
+    Serial.println(btBuf);
+    processCommand(btBuf,1,true);
+    if(logMessages){
+        if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[INFO] Received BLE Message: %s",btBuf);
+        logFile.close();
     }
-} 
+}
 
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
     char fileCommand[8 + MAX_FILENAME_LEN];
@@ -277,6 +343,7 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
         else if(!strcmp(fileCommand,"filedone")){
             Serial.println("Received done command");
             offloadingDone = true;
+            if(myFile.isOpen()) myFile.close();
             return;
         }
     }
