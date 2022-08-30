@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -28,9 +28,10 @@ void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void wdogHandler();
 void LEDHandler();
-#line 17 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 17 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
+#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
 
 #define PHADDR              99               //default I2C ID number for EZO pH Circuit.
 #define MCOND               100               //default I2C ID number for EZO Mini-Conductivity (0.1)
@@ -54,7 +55,7 @@ void LEDHandler();
 
 #define chipSelect D8//A5
 
-SYSTEM_MODE(MANUAL);
+//SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
 char nmeaBuffer[100];
@@ -142,6 +143,8 @@ uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
+char errBuf[MAX_ERR_BUF_SIZE];
+uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
@@ -169,6 +172,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
         uint8_t checksum = (uint8_t)command[strlen(command)-1];
+        char dataStr[strlen(command)-7];
+        char cmdStr[3];
+        for(uint8_t i = 4; i < strlen(command)-1;i++){
+            if(i < 7) cmdStr[i-4] = command[i];
+            else dataStr[i-7] = command[i];
+        }
         if(checksum != strlen(command)){
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
@@ -176,12 +185,16 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 logFile.close();
             }
             else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
-        }
-        char dataStr[strlen(command)-7];
-        char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command)-1;i++){
-            if(i < 7) cmdStr[i-4] = command[i];
-            else dataStr[i-7] = command[i];
+            memcpy(errBuf,0,MAX_ERR_BUF_SIZE);
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                strncpy(rxBotNum,command,2);
+                snprintf("B%d%snak%3s",BOTNUM,rxBotNum,cmdStr);
+            }
+            else{
+                snprintf("B%dABnak%3s",BOTNUM,cmdStr);
+            }
+            errModeReply = mode;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 2){  //Acknowledge from XBee
@@ -265,12 +278,16 @@ void setup(){
 
     senseTimer = millis();
     dataTimer = millis();
+    XBeeRxTime = 0;
+    BLERxTime = 0;
     dataWait = false;
     logSensors = true;
     logMessages = true;
     offloadMode = false;
     requestActive = false;
     LTEStatusCount = LTE_MAX_STATUS;
+
+    battPercent = 50;
 
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -302,6 +319,7 @@ void setup(){
 
     watchdog.start();
     ledTimer.start();
+    statusPD.start();
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(4))) {
         Serial.println("Error: could not connect to SD card!");
@@ -402,15 +420,21 @@ void sendResponseData(){
 }
 
 void statusUpdate(){
-    char updateStr[22];
-    sprintf(updateStr,"B%dABsup%s%s%0.6f%0.6f",BOTNUM,(char)battPercent,(char)statusFlags,latitude,longitude);
-    if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD) == 0){
-        sendData(updateStr,22,false,false,true);
+    if(statusReady){
+        char updateStr[28];
+        sprintf(updateStr,"B%dABsup%03d%03d%0.6f%0.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        Serial.println(updateStr);
+        Serial.println(LTEStatusCount);
+        if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
+            sendData(updateStr,28,false,false,true);
+        }
+        else{
+            LTEStatusCount = LTE_MAX_STATUS;
+            sendData(updateStr,28,true,true,false);
+        }
+        if(LTEStatusCount) LTEStatusCount--;
+        statusReady = false;
     }
-    else{
-        sendData(updateStr,22,true,true,false);
-    }
-    if(LTEStatusCount) LTEStatusCount--;
 }
 
 void updateMotors(){
@@ -436,12 +460,14 @@ void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee
 }
 
 void StatusHandler(){
+    statusFlags = 0;
     statusFlags = LTEAvail;
     statusFlags |= XBeeAvail << 1;
     statusFlags |= BLEAvail << 2;
     statusFlags |= offloadMode << 3;
     statusFlags |= manualRC << 4;
     statusFlags |= lowBattery << 5;
+    statusFlags |= logSensors << 6;
     statusReady = true;
 }
 
@@ -524,7 +550,7 @@ void XBeeHandler(){
         processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
-        if(buffer[0] == 'A' || buffer[0] == 'C') XBeeRxTime = millis();
+        if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis();
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[INFO] Received XBee Message: %s",data);
@@ -673,6 +699,7 @@ void LEDHandler(){
         SetPattern = LED_PATTERN_FADE;
     }
 
+    statusMode = 0;
     statusMode = LTEAvail;
     statusMode |= XBeeAvail << 1;
     statusMode |= BLEAvail << 2;

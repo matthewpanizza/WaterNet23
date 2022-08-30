@@ -40,7 +40,7 @@
 
 #define chipSelect D8//A5
 
-SYSTEM_MODE(MANUAL);
+//SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
 char nmeaBuffer[100];
@@ -263,12 +263,16 @@ void setup(){
 
     senseTimer = millis();
     dataTimer = millis();
+    XBeeRxTime = 0;
+    BLERxTime = 0;
     dataWait = false;
     logSensors = true;
     logMessages = true;
     offloadMode = false;
     requestActive = false;
     LTEStatusCount = LTE_MAX_STATUS;
+
+    battPercent = 50;
 
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -300,6 +304,7 @@ void setup(){
 
     watchdog.start();
     ledTimer.start();
+    statusPD.start();
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(4))) {
         Serial.println("Error: could not connect to SD card!");
@@ -400,15 +405,21 @@ void sendResponseData(){
 }
 
 void statusUpdate(){
-    char updateStr[22];
-    sprintf(updateStr,"B%dABsup%s%s%0.6f%0.6f",BOTNUM,(char)battPercent,(char)statusFlags,latitude,longitude);
-    if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD) == 0){
-        sendData(updateStr,22,false,false,true);
+    if(statusReady){
+        char updateStr[28];
+        sprintf(updateStr,"B%dABsup%03d%03d%0.6f%0.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        Serial.println(updateStr);
+        Serial.println(LTEStatusCount);
+        if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
+            sendData(updateStr,28,false,false,true);
+        }
+        else{
+            if(XBeeAvail || BLEAvail) LTEStatusCount = LTE_MAX_STATUS;
+            sendData(updateStr,28,true,true,false);
+        }
+        if(LTEStatusCount) LTEStatusCount--;
+        statusReady = false;
     }
-    else{
-        sendData(updateStr,22,true,true,false);
-    }
-    if(LTEStatusCount) LTEStatusCount--;
 }
 
 void updateMotors(){
@@ -434,12 +445,14 @@ void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee
 }
 
 void StatusHandler(){
+    statusFlags = 0;
     statusFlags = LTEAvail;
     statusFlags |= XBeeAvail << 1;
     statusFlags |= BLEAvail << 2;
     statusFlags |= offloadMode << 3;
     statusFlags |= manualRC << 4;
     statusFlags |= lowBattery << 5;
+    statusFlags |= logSensors << 6;
     statusReady = true;
 }
 
@@ -671,6 +684,7 @@ void LEDHandler(){
         SetPattern = LED_PATTERN_FADE;
     }
 
+    statusMode = 0;
     statusMode = LTEAvail;
     statusMode |= XBeeAvail << 1;
     statusMode |= BLEAvail << 2;
