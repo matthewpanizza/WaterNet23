@@ -17,6 +17,8 @@
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
+#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
+
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -66,7 +68,10 @@ char filenameMessages[MAX_FILENAME_LEN];
 bool remoteRx = false;
 bool logMessages;
 uint8_t errCmdMode;
+uint8_t errModeReply;
 char errCmdStr[3];
+char txBuf[UART_TX_BUF_SIZE];
+char errBuf[MAX_ERR_BUF_SIZE];
 
 class WaterBot{
     public:
@@ -159,11 +164,36 @@ void loop() {
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
-        char dataStr[strlen(command)-7];
+        uint8_t checksum;
+        char dataStr[strlen(command)-9];
         char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command);i++){
+        char checkStr[2];
+        checkStr[0] = command[strlen(command)-1];
+        checkStr[1] = command[strlen(command)-2];
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        for(uint8_t i = 4; i < strlen(command)-3;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
+        }
+        if(checksum != strlen(command)-3){
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-3,checksum);
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+                logFile.close();
+            }
+            else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+            Serial.println("Warning, checksum does not match");
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                rxBotNum[0] = command[0];
+                rxBotNum[1] = command[1];
+                sprintf(errBuf,"CC%2snak%3s",rxBotNum,cmdStr);
+                errModeReply = mode;
+            }
+            
+            return;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 1){  //Acknowledge from XBee
@@ -174,7 +204,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             return;
         }
-        if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
+        else if(!strcmp(cmdStr,"sup")){
+            //command[1];
+        }
+        else if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
             strncpy(errCmdStr,dataStr,3);
             errCmdMode = mode;
         }
