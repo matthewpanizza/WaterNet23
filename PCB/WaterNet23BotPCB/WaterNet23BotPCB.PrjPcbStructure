@@ -1,1 +1,2 @@
 Record=TopLevelDocument|FileName=MainPCB.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=MainPCB.SchDoc|FileName=UserInputs.SchDoc|SheetNumber=2
