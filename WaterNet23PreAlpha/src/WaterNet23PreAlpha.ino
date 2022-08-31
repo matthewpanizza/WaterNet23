@@ -188,6 +188,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 sprintf(errBuf,"B%dABnak%3s",BOTNUM,cmdStr);
             }
             errModeReply = mode;
+            return;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 2){  //Acknowledge from XBee
@@ -228,19 +229,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             status.setColor(RGB_COLOR_BLUE);
             status.setSpeed(LED_SPEED_FAST);
         }
-        else{   //Didn't recognize command (may be corrupted?) send back error signal
-            if(mode == 1){
-
-            }
-            if(mode == 2){
-
-            }
-        }
-
-        if(sendAck){    //Transmit out acknowledgement if needed
-
-        }
-
     }
 }
 
