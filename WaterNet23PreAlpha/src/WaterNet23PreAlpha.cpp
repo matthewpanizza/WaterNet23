@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -22,13 +22,13 @@
 void cmdLTEHandler(const char *event, const char *data);
 void setup();
 void loop();
-void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee, bool sendLTE);
+void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
 void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void wdogHandler();
 void LEDHandler();
-#line 17 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 17 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
 #define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
@@ -41,7 +41,7 @@ void LEDHandler();
 #define SENS_DATA_DLY       825
 
 #define WATCHDOG_PD         15000           //Watchdog timer period in milliseconds
-#define STATUS_PD           5000            //Time between status updates published to CC Hub
+#define STATUS_PD           15000            //Time between status updates published to CC Hub
 #define XBEE_WDOG_AVAIL     30000           //Watchdog interval between XBee messages for availablility check
 #define BLE_WDOG_AVAIL      30000           //Watchdog interval between BLE messages for availability check
 #define LTE_MAX_STATUS      480             // (Divided by LTE STAT PD) Maximum number of status messages to send over LTE if other methods are unavailable
@@ -55,7 +55,7 @@ void LEDHandler();
 
 #define chipSelect D8//A5
 
-//SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
 char nmeaBuffer[100];
@@ -105,7 +105,7 @@ bool getGPSLatLon();
 void sendResponseData();
 void timeInterval();
 void updateMotors();
-void sendData(const char *event, uint8_t dataSize, bool sendBLE, bool sendXBee, bool sendLTE);
+void sendData(const char *dataOut, uint8_t sendMode = 0, bool sendBLE = false, bool sendXBee = false, bool sendLTE = false);
 void XBeeHandler();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void sensorHandler();
@@ -171,28 +171,36 @@ int i = 0;
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
-        uint8_t checksum = (uint8_t)command[strlen(command)-1];
-        char dataStr[strlen(command)-7];
+        
+        uint8_t checksum;
+        char dataStr[strlen(command)-9];
         char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command)-1;i++){
+        char checkStr[2];
+        checkStr[0] = command[strlen(command)-1];
+        checkStr[1] = command[strlen(command)-2];
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        for(uint8_t i = 4; i < strlen(command)-3;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
-        if(checksum != strlen(command)){
+        if(checksum != strlen(command)-3){
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-3,checksum);
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
                 logFile.close();
             }
             else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
-            memcpy(errBuf,0,MAX_ERR_BUF_SIZE);
+            Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
-                strncpy(rxBotNum,command,2);
-                snprintf("B%d%snak%3s",BOTNUM,rxBotNum,cmdStr);
+                rxBotNum[0] = command[0];
+                rxBotNum[1] = command[1];
+                sprintf(errBuf,"B%d%2snak%3s",BOTNUM,rxBotNum,cmdStr);
             }
             else{
-                snprintf("B%dABnak%3s",BOTNUM,cmdStr);
+                sprintf(errBuf,"B%dABnak%3s",BOTNUM,cmdStr);
             }
             errModeReply = mode;
         }
@@ -346,12 +354,16 @@ void loop(){
         longitude = ((float)longitude_mdeg/1000000.0);
         //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
         //Serial.println(latLonBuf);
-        //sendData(latLonBuf, UART_TX_BUF_SIZE, true, true, false);
+        //sendData(latLonBuf, 0, true, true, false);
     }
     sensorHandler();
     XBeeHandler();
     statusUpdate();
     if(offloadMode) dataOffloader();
+    if(errModeReply){
+        sendData(errBuf,errModeReply,false,false,false);
+        errModeReply = 0;
+    }
     sendResponseData();
     delay(100);
 }
@@ -414,7 +426,7 @@ void sendResponseData(){
         char responseStr[50];
         memcpy(responseStr,0,50);
         sprintf(responseStr,"GL%0.6f,GO%0.6f,DO%0.4f,PH%0.4f,CA%0.4f,CB%0.4f,TP%0.4f",latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
-        sendData(responseStr,strlen(responseStr),requestActive & 1, requestActive & 2, requestActive & 4);
+        sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
 }
@@ -426,11 +438,11 @@ void statusUpdate(){
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
-            sendData(updateStr,28,false,false,true);
+            sendData(updateStr,0,false,false,true);
         }
         else{
-            LTEStatusCount = LTE_MAX_STATUS;
-            sendData(updateStr,28,true,true,false);
+            if(XBeeAvail || BLEAvail) LTEStatusCount = LTE_MAX_STATUS;
+            sendData(updateStr,0,true,true,false);
         }
         if(LTEStatusCount) LTEStatusCount--;
         statusReady = false;
@@ -443,19 +455,20 @@ void updateMotors(){
     }
 }
 
-void sendData(const char *dataOut, uint8_t dataSize, bool sendBLE, bool sendXBee, bool sendLTE){
-    if(sendLTE){
-        Particle.publish("Bot1dat", dataOut, PRIVATE);
+void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
+    char outStr[strlen(dataOut)+2];
+    sprintf(outStr,"%s%02x",dataOut,strlen(dataOut));
+    if(sendLTE || sendMode == 4){
+        Particle.publish("Bot1dat", outStr, PRIVATE);
         sendLTE = false;
     }
-    if(sendBLE && BLE.connected()){
-        uint8_t txBuf_tmp[UART_TX_BUF_SIZE];
-        for(int i = 0; i < dataSize; i++) txBuf_tmp[i] = dataOut[i];
-        if(dataSize < UART_TX_BUF_SIZE) txCharacteristic.setValue(txBuf_tmp, dataSize);
-        else txCharacteristic.setValue(txBuf_tmp, UART_TX_BUF_SIZE);
+    if((sendBLE || sendMode == 1) && BLE.connected()){
+        uint8_t txBuf_tmp[strlen(dataOut)];
+        memcpy(txBuf_tmp,outStr,strlen(dataOut));
+        txCharacteristic.setValue(txBuf_tmp, strlen(dataOut));
     }
-    if(sendXBee){
-        Serial1.println(dataOut);
+    if(sendXBee || sendMode == 2){
+        Serial1.println(outStr);
     }
 }
 
