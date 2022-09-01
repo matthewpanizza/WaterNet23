@@ -1,2 +1,5 @@
-Record=TopLevelDocument|FileName=MainPCB.SchDoc|SheetNumber=1
-Record=NoMainPathDocument|SourceDocument=MainPCB.SchDoc|FileName=UserInputs.SchDoc|SheetNumber=2
+Record=TopLevelDocument|FileName=LEDs.SchDoc|SheetNumber=4
+Record=NoMainPathDocument|SourceDocument=LEDs.SchDoc|FileName=MainPCB.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=LEDs.SchDoc|FileName=Power.SchDoc|SheetNumber=3
+Record=NoMainPathDocument|SourceDocument=LEDs.SchDoc|FileName=Sensors.SchDoc|SheetNumber=5
+Record=NoMainPathDocument|SourceDocument=LEDs.SchDoc|FileName=UserInputs.SchDoc|SheetNumber=2
