@@ -17,6 +17,8 @@
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
+#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
+
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -54,7 +56,6 @@ File myFile;
 File logFile;
 File logDir;
 
-uint8_t txBuf[UART_TX_BUF_SIZE];
 size_t txLen = 0;
 
 const unsigned long SCAN_PERIOD_MS = 2000;
@@ -66,7 +67,10 @@ char filenameMessages[MAX_FILENAME_LEN];
 bool remoteRx = false;
 bool logMessages;
 uint8_t errCmdMode;
+uint8_t errModeReply;
 char errCmdStr[3];
+char txBuf[UART_TX_BUF_SIZE];
+char errBuf[MAX_ERR_BUF_SIZE];
 
 class WaterBot{
     public:
@@ -78,6 +82,7 @@ class WaterBot{
     bool manualRC;
     bool lowBatt;
     bool dataRecording;
+    bool offloading;
     float GPSLat;
     float GPSLon;
 };
@@ -136,10 +141,11 @@ void loop() {
     
     if (BLE.connected()) {
         if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
-        char testStr[30] = "CCB1ptsHello from CC Hub!";
+
+        //char testStr[30] = "CCB1ptsHello from CC Hub!";
         //uint8_t testBuf[30];
         //memcpy(testStr,testBuf,30);
-        peerRxCharacteristic.setValue(testStr);
+        //peerRxCharacteristic.setValue(testStr);
         digitalWrite(D7,HIGH);
         delay(1000);
     }
@@ -159,11 +165,36 @@ void loop() {
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
-        char dataStr[strlen(command)-7];
+        uint8_t checksum;
+        char dataStr[strlen(command)-9];
         char cmdStr[3];
-        for(uint8_t i = 4; i < strlen(command);i++){
+        char checkStr[2];
+        checkStr[0] = command[strlen(command)-1];
+        checkStr[1] = command[strlen(command)-2];
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        for(uint8_t i = 4; i < strlen(command)-3;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
+        }
+        if(checksum != strlen(command)-3){
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-3,checksum);
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+                logFile.close();
+            }
+            else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+            Serial.println("Warning, checksum does not match");
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                rxBotNum[0] = command[0];
+                rxBotNum[1] = command[1];
+                sprintf(errBuf,"CC%2snak%3s",rxBotNum,cmdStr);
+                errModeReply = mode;
+            }
+            
+            return;
         }
         if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
             if(mode == 1){  //Acknowledge from XBee
@@ -174,7 +205,65 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             return;
         }
-        if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
+        else if(!strcmp(cmdStr,"sup")){
+            char rxIDBuf[1];
+            rxIDBuf[0] = command[1];
+            uint8_t rxBotID = atoi(rxIDBuf);
+            bool newBot = true;
+            for(WaterBot w: WaterBots){
+                if(rxBotID == w.botNum){
+                    newBot = false;
+                    uint8_t battpct;
+                    uint8_t statflags;
+                    float latRX;
+                    float lonRX;
+                    sscanf(dataStr,"%u,%u,%f,%f",&battpct,&statflags,&latRX,&lonRX);
+                    w.battPercent = battpct;
+                    w.LTEAvail = statflags & 1;
+                    w.XBeeAvail = (statflags >> 1) & 1;
+                    w.BLEAvail = (statflags >> 2) & 1;
+                    w.offloading = (statflags >> 3) & 1;
+                    w.manualRC = (statflags >> 4) & 1;
+                    w.lowBatt = (statflags >> 5) & 1;
+                    w.dataRecording = (statflags >> 6) & 1;
+                    w.GPSLat = latRX;
+                    w.GPSLon = lonRX;
+                    Serial.println("Status Update!");
+                    Serial.println("########################");
+                    Serial.println("##    STATUS UPDATE   ##");
+                    Serial.printlnf("##      Bot #: %1d     ##",w.botNum);
+                    Serial.printlnf("##     Batt %: %03d    ##",w.battPercent);
+                    Serial.println("##   LTE  BLE  XBee   ##");
+                    Serial.printlnf("##    %d    %d     %d    ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
+                    Serial.println("########################");
+                }
+
+            }
+            if(newBot){
+                Serial.println("Found a new water bot ID");
+                WaterBot newWaterbot;
+                newWaterbot.BLEAvail = true;
+                newWaterbot.botNum = rxBotID;
+                newBot = false;
+                uint8_t battpct;
+                uint8_t statflags;
+                float latRX;
+                float lonRX;
+                sscanf(dataStr,"%u,%u,%f,%f",&battpct,&statflags,&latRX,&lonRX);
+                newWaterbot.battPercent = battpct;
+                newWaterbot.LTEAvail = statflags & 1;
+                newWaterbot.XBeeAvail = (statflags >> 1) & 1;
+                newWaterbot.BLEAvail = (statflags >> 2) & 1;
+                newWaterbot.offloading = (statflags >> 3) & 1;
+                newWaterbot.manualRC = (statflags >> 4) & 1;
+                newWaterbot.lowBatt = (statflags >> 5) & 1;
+                newWaterbot.dataRecording = (statflags >> 6) & 1;
+                newWaterbot.GPSLat = latRX;
+                newWaterbot.GPSLon = lonRX;
+                WaterBots.push_back(newWaterbot);
+            }
+        }
+        else if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
             strncpy(errCmdStr,dataStr,3);
             errCmdMode = mode;
         }
@@ -223,20 +312,18 @@ void BLEScan(int BotNumber){
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
 					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
                         peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
-                        if(bufName){
-						    Serial.printlnf("Connected to Bot %d",bufName[0]);
-                            bool newBot = true;
-                            for(WaterBot w: WaterBots){
-                                if(bufName[0] == w.botNum) newBot = false;
-                            }
-                            if(newBot){
-                                Serial.println("Found a new water bot ID");
-                                WaterBot newWaterbot;
-                                newWaterbot.BLEAvail = true;
-                                newWaterbot.botNum = bufName[0];
-                                WaterBots.push_back(newWaterbot);
-                                BLEBot = &WaterBots.back();
-                            }
+						Serial.printlnf("Connected to Bot %d",bufName[0]);
+                        bool newBot = true;
+                        for(WaterBot w: WaterBots){
+                            if(bufName[0] == w.botNum) newBot = false;
+                        }
+                        if(newBot){
+                            Serial.println("Found a new water bot ID");
+                            WaterBot newWaterbot;
+                            newWaterbot.BLEAvail = true;
+                            newWaterbot.botNum = bufName[0];
+                            WaterBots.push_back(newWaterbot);
+                            BLEBot = &WaterBots.back();
                         }
                     }
                     break;

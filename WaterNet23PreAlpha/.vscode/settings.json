@@ -6,5 +6,5 @@
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "1.5.2",
-    "particle.targetDevice": "burrito_sniper"
+    "particle.targetDevice": ""
 }
