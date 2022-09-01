@@ -412,7 +412,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d,%d,%.6f,%.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){

@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -20,7 +20,7 @@ void DataOffloader();
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
-#line 10 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 10 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -235,7 +235,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     uint8_t statflags;
                     float latRX;
                     float lonRX;
-                    sscanf(dataStr,"%u,%u,%f,%f",&battpct,&statflags,&latRX,&lonRX);
+                    char testLat[12];
+                    char testLon[12];
+                    sscanf(dataStr,"%u %u %s %s",&battpct,&statflags,testLat,testLon);
+                    latRX = atof(testLat);
+                    lonRX = atof(testLon);
                     w.battPercent = battpct;
                     w.LTEAvail = statflags & 1;
                     w.XBeeAvail = (statflags >> 1) & 1;
@@ -254,7 +258,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     Serial.println("##    LTE  BLE  XBee    ##");
                     Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
                     Serial.println("##  Latitude Longitude  ##");
-                    Serial.printlnf("## %.6f %.6f ##",latRX,latRX);
+                    Serial.printlnf("## %.6f %.6f ##",w.GPSLat,w.GPSLon);
                     Serial.println("##########################");
                 }
 
@@ -267,11 +271,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 newBot = false;
                 uint8_t battpct;
                 uint8_t statflags;
-                char latStr[10];
-                char lonStr[10];
-                float latRX = atof(latStr);
-                float lonRX = atof(lonStr);
-                sscanf(dataStr,"%u,%u,%s,%.6f",&battpct,&statflags,latStr,lonStr);
+                float latRX;
+                float lonRX;
+                sscanf(dataStr,"%u %u %f %f",&battpct,&statflags,&latRX,&lonRX);
                 newWaterbot.battPercent = battpct;
                 newWaterbot.LTEAvail = statflags & 1;
                 newWaterbot.XBeeAvail = (statflags >> 1) & 1;

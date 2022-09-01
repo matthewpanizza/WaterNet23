@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -27,7 +27,7 @@ void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void wdogHandler();
 void LEDHandler();
-#line 17 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 17 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
 #define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
@@ -426,7 +426,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d,%d,%.6f,%.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
