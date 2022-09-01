@@ -140,12 +140,13 @@ void setup() {
 void loop() {
     
     if (BLE.connected()) {
-        if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
+        //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
 
         //char testStr[30] = "CCB1ptsHello from CC Hub!";
         //uint8_t testBuf[30];
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
+        sendData("CCB1ptsbigbot",0,true,false,false);
         digitalWrite(D7,HIGH);
         delay(1000);
     }
@@ -166,19 +167,22 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
         uint8_t checksum;
-        char dataStr[strlen(command)-9];
-        char cmdStr[3];
-        char checkStr[2];
-        checkStr[0] = command[strlen(command)-1];
-        checkStr[1] = command[strlen(command)-2];
+        char dataStr[strlen(command)-8];
+        dataStr[strlen(command)-9] = '\0';
+        char cmdStr[4];
+        cmdStr[3] = '\0';
+        char checkStr[3];
+        checkStr[0] = command[strlen(command)-2];
+        checkStr[1] = command[strlen(command)-1];
+        checkStr[2] = '\0';
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
-        for(uint8_t i = 4; i < strlen(command)-3;i++){
+        for(uint8_t i = 4; i < strlen(command)-2;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
-        if(checksum != strlen(command)-3){
-            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-3,checksum);
+        if(checksum != strlen(command)-2){
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
@@ -229,13 +233,15 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
                     Serial.println("Status Update!");
-                    Serial.println("########################");
-                    Serial.println("##    STATUS UPDATE   ##");
-                    Serial.printlnf("##      Bot #: %1d     ##",w.botNum);
-                    Serial.printlnf("##     Batt %: %03d    ##",w.battPercent);
-                    Serial.println("##   LTE  BLE  XBee   ##");
-                    Serial.printlnf("##    %d    %d     %d    ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
-                    Serial.println("########################");
+                    Serial.println("##########################");
+                    Serial.println("##     STATUS UPDATE    ##");
+                    Serial.printlnf("##       Bot #: %1d      ##",w.botNum);
+                    Serial.printlnf("##      Batt %: %03d     ##",w.battPercent);
+                    Serial.println("##    LTE  BLE  XBee    ##");
+                    Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
+                    Serial.println("##  Latitude Longitude  ##");
+                    Serial.printlnf("## %.6f %.6f ##",latRX,latRX);
+                    Serial.println("##########################");
                 }
 
             }
@@ -247,9 +253,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 newBot = false;
                 uint8_t battpct;
                 uint8_t statflags;
-                float latRX;
-                float lonRX;
-                sscanf(dataStr,"%u,%u,%f,%f",&battpct,&statflags,&latRX,&lonRX);
+                char latStr[10];
+                char lonStr[10];
+                float latRX = atof(latStr);
+                float lonRX = atof(lonStr);
+                sscanf(dataStr,"%u,%u,%s,%.6f",&battpct,&statflags,latStr,lonStr);
                 newWaterbot.battPercent = battpct;
                 newWaterbot.LTEAvail = statflags & 1;
                 newWaterbot.XBeeAvail = (statflags >> 1) & 1;
@@ -384,9 +392,11 @@ void XBeeHandler(){
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-    char btBuf[len];
+    char btBuf[len+1];
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
-    Serial.println("New BT Command:");
+    if(btBuf[len-1] != '\0') btBuf[len] = '\0';
+    else btBuf[len-1] = '\0';
+    Serial.print("New BT Command: ");
     Serial.println(btBuf);
     processCommand(btBuf,1,true);
     if(logMessages){
@@ -431,4 +441,21 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
     memcpy(dataStr,data,len);
     myFile.print(dataStr);
     Serial.println(dataStr);
+}
+
+void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
+    char outStr[strlen(dataOut)+2];
+    sprintf(outStr,"%s%02x",dataOut,strlen(dataOut));
+    if(sendLTE || sendMode == 4){
+        Particle.publish("Bot1dat", outStr, PRIVATE);
+        sendLTE = false;
+    }
+    if((sendBLE || sendMode == 1) && BLE.connected()){
+        uint8_t txBuf_tmp[strlen(outStr)];
+        memcpy(txBuf_tmp,outStr,strlen(outStr));
+        peerRxCharacteristic.setValue(txBuf_tmp, strlen(outStr));
+    }
+    if(sendXBee || sendMode == 2){
+        Serial1.println(outStr);
+    }
 }
