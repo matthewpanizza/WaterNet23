@@ -407,7 +407,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%03d%03d%0.6f%0.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d,%d,%.6f,%.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
@@ -436,9 +436,9 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
         sendLTE = false;
     }
     if((sendBLE || sendMode == 1) && BLE.connected()){
-        uint8_t txBuf_tmp[strlen(dataOut)];
-        memcpy(txBuf_tmp,outStr,strlen(dataOut));
-        txCharacteristic.setValue(txBuf_tmp, strlen(dataOut));
+        uint8_t txBuf_tmp[strlen(outStr)];
+        memcpy(txBuf_tmp,outStr,strlen(outStr));
+        txCharacteristic.setValue(txBuf_tmp, strlen(outStr));
     }
     if(sendXBee || sendMode == 2){
         Serial1.println(outStr);
