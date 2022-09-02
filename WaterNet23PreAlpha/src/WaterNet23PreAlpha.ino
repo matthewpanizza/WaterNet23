@@ -90,7 +90,7 @@ bool getGPSLatLon();
 void sendResponseData();
 void timeInterval();
 void updateMotors();
-void sendData(const char *dataOut, uint8_t sendMode = 0, bool sendBLE = false, bool sendXBee = false, bool sendLTE = false);
+void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
 void XBeeHandler();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void sensorHandler();
@@ -158,19 +158,22 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
         
         uint8_t checksum;
-        char dataStr[strlen(command)-9];
-        char cmdStr[3];
-        char checkStr[2];
-        checkStr[0] = command[strlen(command)-1];
-        checkStr[1] = command[strlen(command)-2];
+        char dataStr[strlen(command)-8];
+        dataStr[strlen(command)-9] = '\0';
+        char cmdStr[4];
+        cmdStr[3] = '\0';
+        char checkStr[3];
+        checkStr[0] = command[strlen(command)-2];
+        checkStr[1] = command[strlen(command)-1];
+        checkStr[2] = '\0';
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
-        for(uint8_t i = 4; i < strlen(command)-3;i++){
+        for(uint8_t i = 4; i < strlen(command)-2;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
-        if(checksum != strlen(command)-3){
-            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-3,checksum);
+        if(checksum != strlen(command)-2){
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
@@ -321,14 +324,16 @@ void setup(){
 }
 
 void loop(){
-    if(getGPSLatLon()){
+    /*if(getGPSLatLon()){
         char latLonBuf[UART_TX_BUF_SIZE];
         latitude = ((float)latitude_mdeg/1000000.0);
         longitude = ((float)longitude_mdeg/1000000.0);
         //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
-    }
+    }*/
+    latitude = -42.690690;
+    longitude = 69.420420;
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -407,7 +412,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d,%d,%.6f,%.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
@@ -419,6 +424,8 @@ void statusUpdate(){
         }
         if(LTEStatusCount) LTEStatusCount--;
         statusReady = false;
+        delay(100);
+        sendData("B1CCptsbigbot",0,true,false,false);
     }
 }
 
@@ -469,7 +476,7 @@ void sensorHandler(){
 
         }
         sensePH = atof(tempSense);
-        Serial.printlnf("pH: %f", sensePH);
+        //Serial.printlnf("pH: %f", sensePH);
         Wire.requestFrom(MCOND, 20, 1);
         code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
         char mcondSense[20];
@@ -479,7 +486,7 @@ void sensorHandler(){
 
         }
         float senseMCond = atof(mcondSense);
-        Serial.printlnf("MiniCond: %f",senseMCond);
+        //Serial.printlnf("MiniCond: %f",senseMCond);
         Wire.requestFrom(COND, 20, 1);
         code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
         char condSense[20];
@@ -489,7 +496,7 @@ void sensorHandler(){
 
         }
         float senseCond = atof(condSense);
-        Serial.printlnf("Conductivity: %f",senseCond);
+        //Serial.printlnf("Conductivity: %f",senseCond);
         Wire.requestFrom(TEMPADDR, 20, 1);
         code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
         char addrSense[20];
@@ -499,7 +506,7 @@ void sensorHandler(){
 
         }
         float senseTemp = atof(addrSense);
-        Serial.printlnf("Temperature: %f",senseTemp);
+        //Serial.printlnf("Temperature: %f",senseTemp);
         dataWait = false;
         if(logSensors){
             char timestamp[16];
@@ -563,8 +570,10 @@ void testConnection(bool checkBLE, bool checkXBee, bool checkLTE){
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-    char btBuf[len];
+    char btBuf[len+1];
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
+    if(btBuf[len-1] != '\0') btBuf[len] = '\0';
+    else btBuf[len-1] = '\0';
     Serial.println("New BT Command:");
     Serial.println(btBuf);
     processCommand(btBuf,1,true);
