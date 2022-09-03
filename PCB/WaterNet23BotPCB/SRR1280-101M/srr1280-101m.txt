@@ -1,0 +1,13 @@
+﻿"Symbol";"Value";"Unit";
+"TraceParts.PartNumber";"90-13062022-068286";"";
+"REFERENCE";"SRR1280-101M";"";
+"TraceParts.PartTitle";"SRR1280 Shielded  Power Inductor, 100uH";"";
+"TraceParts.InstanceId";"90-13062022-0682862N3XX9WWY2MK673V115V3T3RA";"";
+"DESIGN";"SRR1280 Shielded  Power Inductor, 100uH";"";
+"TraceParts.PartStatus";"Published";"";
+"TraceParts.PartStatusId";"";"";
+"SUPPLIER";"BOURNS";"";
+"TraceParts.PartVersion";"1.0.0";"";
+"TRACEPARTS";"TRACEPARTS";"";
+"TraceParts.PartLanguage";"en";"";
+"TraceParts.ClassPath";"BOURNS:90-13062022-068286";"";

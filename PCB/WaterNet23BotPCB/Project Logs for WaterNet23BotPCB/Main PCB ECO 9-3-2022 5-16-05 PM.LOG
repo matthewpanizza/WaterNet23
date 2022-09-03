@@ -1,0 +1,13 @@
+Removed Pin From Net: NetName=Solar_Converter Pin=R25-1
+Removed Pin From Net: NetName=Battery_GND Pin=R25-2
+Added Component: Designator=R25(RESC6331X70N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10m"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=Battery_GND Pin=R25-1
+Added Pin To Net: NetName=Solar_Converter Pin=R25-2

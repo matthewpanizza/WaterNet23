@@ -1,0 +1,1317 @@
+Added Component: Designator=C1(ANTC1608X90N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "0.1uF, 6V"; VariantName = "[No Variations]"
+Added Component: Designator=C2(ANTC1608X90N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "0.1uF, 6V"; VariantName = "[No Variations]"
+Added Component: Designator=C3(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "4.7uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C4(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "4.7uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C5(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "4.7uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C6(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C7(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 16V"; VariantName = "[No Variations]"
+Added Component: Designator=C8(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C9(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 16V"; VariantName = "[No Variations]"
+Added Component: Designator=C10(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C11(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 16V"; VariantName = "[No Variations]"
+Added Component: Designator=C12(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 25V"; VariantName = "[No Variations]"
+Added Component: Designator=C13(CAPC2012X145N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RLSHUNT"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10uF, 16V"; VariantName = "[No Variations]"
+Added Component: Designator=D1(DIO_SS26FL)
+Add component (AddParameter): Name = "AF"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Area Factor"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJO"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTA"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "EG"; Value = "1.11"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FC"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FCS"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IBV"; Value = "0.001"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKR"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Voltage"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IS"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ISR"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUN"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUNSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KEG"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "L"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LEVEL"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MJSW"; Value = "0.33"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "N"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NBV"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NR"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NS"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NTUN"; Value = "30"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PHP"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PJ"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SENS_AREA"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Starting Condition"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TCV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Temperature"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEVC"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TNOM"; Value = "27"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPB"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPHP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TT"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "VJ"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "W"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTI"; Value = "3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTITUN"; Value = "3"; VariantName = "[No Variations]"
+Added Component: Designator=D2(DIO_SS26FL)
+Add component (AddParameter): Name = "AF"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Area Factor"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJO"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTA"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "EG"; Value = "1.11"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FC"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FCS"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IBV"; Value = "0.001"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKR"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Voltage"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IS"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ISR"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUN"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUNSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KEG"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "L"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LEVEL"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MJSW"; Value = "0.33"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "N"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NBV"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NR"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NS"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NTUN"; Value = "30"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PHP"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PJ"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SENS_AREA"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Starting Condition"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TCV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Temperature"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEVC"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TNOM"; Value = "27"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPB"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPHP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TT"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "VJ"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "W"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTI"; Value = "3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTITUN"; Value = "3"; VariantName = "[No Variations]"
+Added Component: Designator=D3(DIO_SS26FL)
+Add component (AddParameter): Name = "AF"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Area Factor"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "BV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJO"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CJP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTA"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "CTP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "EG"; Value = "1.11"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FC"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FCS"; Value = "0.5"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "FV_MAX"; Value = "1e99"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IBV"; Value = "0.001"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IKR"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Voltage"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IS"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ISR"; Value = "1e-14"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUN"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JTUNSW"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KEG"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "KF"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "L"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LEVEL"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MJSW"; Value = "0.33"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "N"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NBV"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NR"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NS"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "NTUN"; Value = "30"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PHP"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PJ"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SENS_AREA"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Starting Condition"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TCV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Temperature"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEV"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TLEVC"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TM2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TNOM"; Value = "27"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPB"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TPHP"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TRS2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TT"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TTT2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "VJ"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "W"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTI"; Value = "3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "XTITUN"; Value = "3"; VariantName = "[No Variations]"
+Added Component: Designator=D4(ONSC-SOT-23-3-318-08_V)
+Add component (AddParameter): Name = "ComponentLink1Description"; Value = "Manufacturer URL"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ComponentLink1URL"; Value = "http://www.onsemi.com/"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ComponentLink2Description"; Value = "Datasheet"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ComponentLink2URL"; Value = "http://www.onsemi.com/pub_link/Collateral/BAV23CLT1-D.PDF"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ComponentLink3Description"; Value = "Package Specification"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "ComponentLink3URL"; Value = "http://www.onsemi.cn/pub_link/Collateral/318-08.PDF"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Configuration"; Value = "Common Cathode"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DatasheetVersion"; Value = "Rev. 2"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "IF Max (A)"; Value = "0.4"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Manufacturer"; Value = "On Semiconductor"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mounting Technology"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageDescription"; Value = "3-Pin Small Outline Transistor, Body 2.92 x 1.3 mm, Pitch 0.95 mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageReference"; Value = "SOT-23-3-318-08"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageVersion"; Value = "Rev. AP, 11/2009"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packing"; Value = "Tape and Reel"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PartNumber"; Value = "BAV23CLT1G"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RoHS"; Value = "TRUE"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "trr Max (ns)"; Value = "150"; VariantName = "[No Variations]"
+Added Component: Designator=J1(GCT_MEM2051-00-195-00-A)
+Add component (AddParameter): Name = "Availability"; Value = "Warning"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Check_prices"; Value = "https://www.snapeda.com/parts/MEM2051-00-195-00-A/Global%20Connector%20Technology/view-part/779220/?ref=eda"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Global Connector Technology"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "MEM2051-00-195-00-A"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Purchase-URL"; Value = "https://pricing.snapeda.com/search/part/MEM2051-00-195-00-A/?ref=eda"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/MEM2051-00-195-00-A/Global%20Connector%20Technology/view-part/779220/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=J2(GCT_USB4105-GF-A)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "USB4105-GF-A"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=J3(FP-PCB_SMAFRA_HT-MFG)
+Add component (AddParameter): Name = "Body Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Body Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case/Package"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Center Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Connector Type"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Dielectric Material"; Value = "PTFE"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Fastening Type"; Value = "Threaded"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Color"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Impedance"; Value = "50R"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Through Hole"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Ports"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Operating Frequency"; Value = "0 to 6 GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Orientation"; Value = "Right Angle"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "500"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tray"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "-"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Solder"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = "500V"; VariantName = "[No Variations]"
+Added Component: Designator=J4(FP-PCB_SMAFRA_HT-MFG)
+Add component (AddParameter): Name = "Body Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Body Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case/Package"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Center Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Connector Type"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Dielectric Material"; Value = "PTFE"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Fastening Type"; Value = "Threaded"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Color"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Impedance"; Value = "50R"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Through Hole"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Ports"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Operating Frequency"; Value = "0 to 6 GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Orientation"; Value = "Right Angle"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "500"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tray"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "-"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Solder"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = "500V"; VariantName = "[No Variations]"
+Added Component: Designator=J5(FP-PCB_SMAFRA_HT-MFG)
+Add component (AddParameter): Name = "Body Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Body Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case/Package"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Center Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Connector Type"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Dielectric Material"; Value = "PTFE"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Fastening Type"; Value = "Threaded"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Color"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Impedance"; Value = "50R"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Through Hole"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Ports"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Operating Frequency"; Value = "0 to 6 GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Orientation"; Value = "Right Angle"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "500"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tray"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "-"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Solder"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = "500V"; VariantName = "[No Variations]"
+Added Component: Designator=J6(FP-PCB_SMAFRA_HT-MFG)
+Add component (AddParameter): Name = "Body Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Body Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case/Package"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Center Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Connector Type"; Value = "SMA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Plating"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Dielectric Material"; Value = "PTFE"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Fastening Type"; Value = "Threaded"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Color"; Value = "Gold"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Impedance"; Value = "50R"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Frequency"; Value = "6GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Through Hole"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Ports"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Operating Frequency"; Value = "0 to 6 GHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Orientation"; Value = "Right Angle"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "500"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tray"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "-"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Solder"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = "500V"; VariantName = "[No Variations]"
+Added Component: Designator=L1(INDPM125125X800N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Current"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100uH, >2A"; VariantName = "[No Variations]"
+Added Component: Designator=L2(INDPM125125X800N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Current"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100uH, >2A"; VariantName = "[No Variations]"
+Added Component: Designator=L3(INDPM125125X800N)
+Add component (AddParameter): Name = "CPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Initial Current"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "M"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RPAR"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RSER"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100uH, >2A"; VariantName = "[No Variations]"
+Added Component: Designator=MD1(FP-XBP9B-DMUTB002-MFG)
+Add component (AddParameter): Name = "Case/Package"; Value = "Module"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Current - Receiving"; Value = "29mA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Current - Transmitting"; Value = "215mA"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Data Rate"; Value = "200Kbps"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Frequency"; Value = "900MHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Interface"; Value = "SPI"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Frequency"; Value = "928MHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Operating Temperature"; Value = "85°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Supply Voltage"; Value = "3.6V"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Memory Size"; Value = "2KB"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Frequency"; Value = "902MHz"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Operating Temperature"; Value = "-40°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Supply Voltage"; Value = "2.4V"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Pins"; Value = "20"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Output Power (dBm)"; Value = "24dBm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Bulk"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Radiation Hardening"; Value = "No"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RAM Size"; Value = "2KB"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Sensitivity"; Value = "-101dBm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "XBee-Pro™"; VariantName = "[No Variations]"
+Added Component: Designator=P1(XT30_Horizontal)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P2(TE_350761-4)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P3(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P4(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P5(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P6(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P7(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P8(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P9(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P10(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P11(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P12(HDR1X3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P13(BNC_RA CON)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P14(TE_6-440054-2)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P15(XT30_Horizontal)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P16(TE_1586039-6)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P17(TE_1586039-6)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=Q1(DPAK)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageDescription"; Value = "TO, Flat Index; 3 In-Line, Axial Leads; Body Dia. 4.6mm; Lead Dia. 0.5 mm (max)"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageReference"; Value = "E3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageVersion"; Value = "1995/1996"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Published"; Value = "8-Jun-2000"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=Q2(SOT23-3)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageDescription"; Value = "TO, Flat Index; 3 In-Line, Axial Leads; Body Dia. 4.6mm; Lead Dia. 0.5 mm (max)"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageReference"; Value = "E3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "PackageVersion"; Value = "1995/1996"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Published"; Value = "8-Jun-2000"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=R1(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "1K"; VariantName = "[No Variations]"
+Added Component: Designator=R2(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "1K"; VariantName = "[No Variations]"
+Added Component: Designator=R3(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "30m, >0.1W"; VariantName = "[No Variations]"
+Added Component: Designator=R4(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "30m, >0.1W"; VariantName = "[No Variations]"
+Added Component: Designator=R5(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "30m, >0.1W"; VariantName = "[No Variations]"
+Added Component: Designator=R6(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "5.1k"; VariantName = "[No Variations]"
+Added Component: Designator=R7(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "5.1k"; VariantName = "[No Variations]"
+Added Component: Designator=R8(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R9(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R10(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R11(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R12(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R13(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R14(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R15(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R16(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "200k"; VariantName = "[No Variations]"
+Added Component: Designator=R17(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "200k"; VariantName = "[No Variations]"
+Added Component: Designator=R18(RESC6331X70N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "1m"; VariantName = "[No Variations]"
+Added Component: Designator=R19(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100k"; VariantName = "[No Variations]"
+Added Component: Designator=R20(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "20k"; VariantName = "[No Variations]"
+Added Component: Designator=R21(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100k"; VariantName = "[No Variations]"
+Added Component: Designator=R22(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Component: Designator=R23(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "100k"; VariantName = "[No Variations]"
+Added Component: Designator=R24(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "20k"; VariantName = "[No Variations]"
+Added Component: Designator=R25(RESC6331X70N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10m"; VariantName = "[No Variations]"
+Added Component: Designator=R26(ANTC1608X90N)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "20k"; VariantName = "[No Variations]"
+Added Component: Designator=S1(TL3313AF250QG)
+Add component (AddParameter): Name = "closed"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Rclosed"; Value = "1m"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Ropen"; Value = "1Meg"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Added Component: Designator=S2(TL3313AF250QG)
+Add component (AddParameter): Name = "closed"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Rclosed"; Value = "1m"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Ropen"; Value = "1Meg"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Added Component: Designator=U1(TE_21992304)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "2199230-4"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Supplier 1"; Value = "Digi-Key"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Supplier Part Number 1"; Value = "Particle B402"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=U2(DW0016A-IPC_A)
+Add component (AddParameter): Name = "Copyright"; Value = "Copyright (C) 2022 Ultra Librarian. All rights reserved."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_1"; Value = "296-ISO1640QDWRQ1TR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_2"; Value = "296-ISO1640QDWRQ1CT-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_3"; Value = "296-ISO1640QDWRQ1DKR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Manufacturer_Part_Number"; Value = "ISO1640QDWRQ1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mfr_Name"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RefDes"; Value = "RefDes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Type"; Value = "DEV"; VariantName = "[No Variations]"
+Added Component: Designator=U3(B0303S-1WR3)
+Added Component: Designator=U4(CONV_AL8861Y-13)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "AL8861Y-13"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "SOT-89 Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/AL8861Y-13/Diodes%20Inc./view-part/1241445/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=U5(CONV_AL8861Y-13)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "AL8861Y-13"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "SOT-89 Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/AL8861Y-13/Diodes%20Inc./view-part/1241445/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=U6(CONV_AL8861Y-13)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "AL8861Y-13"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "SOT-89 Diodes Inc."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/AL8861Y-13/Diodes%20Inc./view-part/1241445/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=U7(DW0016A-IPC_A)
+Add component (AddParameter): Name = "Copyright"; Value = "Copyright (C) 2022 Ultra Librarian. All rights reserved."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_1"; Value = "296-ISO1640QDWRQ1TR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_2"; Value = "296-ISO1640QDWRQ1CT-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_3"; Value = "296-ISO1640QDWRQ1DKR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Manufacturer_Part_Number"; Value = "ISO1640QDWRQ1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mfr_Name"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RefDes"; Value = "RefDes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Type"; Value = "DEV"; VariantName = "[No Variations]"
+Added Component: Designator=U8(B0303S-1WR3)
+Added Component: Designator=U9(DW0016A-IPC_A)
+Add component (AddParameter): Name = "Copyright"; Value = "Copyright (C) 2022 Ultra Librarian. All rights reserved."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_1"; Value = "296-ISO1640QDWRQ1TR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_2"; Value = "296-ISO1640QDWRQ1CT-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_3"; Value = "296-ISO1640QDWRQ1DKR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Manufacturer_Part_Number"; Value = "ISO1640QDWRQ1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mfr_Name"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RefDes"; Value = "RefDes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Type"; Value = "DEV"; VariantName = "[No Variations]"
+Added Component: Designator=U10(B0303S-1WR3)
+Added Component: Designator=U11(DW0016A-IPC_A)
+Add component (AddParameter): Name = "Copyright"; Value = "Copyright (C) 2022 Ultra Librarian. All rights reserved."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_1"; Value = "296-ISO1640QDWRQ1TR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_2"; Value = "296-ISO1640QDWRQ1CT-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Digi-Key_Part_Number_3"; Value = "296-ISO1640QDWRQ1DKR-ND"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Manufacturer_Part_Number"; Value = "ISO1640QDWRQ1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mfr_Name"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RefDes"; Value = "RefDes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Type"; Value = "DEV"; VariantName = "[No Variations]"
+Added Component: Designator=U12(B0303S-1WR3)
+Added Component: Designator=U13(SOT23-5)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "INA139"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "SOT-23-5 Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/INA139/Texas%20Instruments/view-part/560986/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Component: Designator=U(SOT23-5)
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = "Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "INA139"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "SOT-23-5 Texas Instruments"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SnapEDA_Link"; Value = "https://www.snapeda.com/parts/INA139/Texas%20Instruments/view-part/560986/?ref=snap"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Pin To Net: NetName=3V3 Pin=C6-1
+Added Pin To Net: NetName=3V3 Pin=C8-1
+Added Pin To Net: NetName=3V3 Pin=C10-1
+Added Pin To Net: NetName=3V3 Pin=C12-1
+Added Pin To Net: NetName=3V3 Pin=J1-4
+Added Pin To Net: NetName=3V3 Pin=MD1-1
+Added Pin To Net: NetName=3V3 Pin=P12-1
+Added Pin To Net: NetName=3V3 Pin=R1-2
+Added Pin To Net: NetName=3V3 Pin=R2-2
+Added Pin To Net: NetName=3V3 Pin=R16-2
+Added Pin To Net: NetName=3V3 Pin=U-5
+Added Pin To Net: NetName=3V3 Pin=U1-10
+Added Pin To Net: NetName=3V3 Pin=U1-12
+Added Pin To Net: NetName=3V3 Pin=U2-3
+Added Pin To Net: NetName=3V3 Pin=U3-2
+Added Pin To Net: NetName=3V3 Pin=U7-3
+Added Pin To Net: NetName=3V3 Pin=U8-2
+Added Pin To Net: NetName=3V3 Pin=U9-3
+Added Pin To Net: NetName=3V3 Pin=U10-2
+Added Pin To Net: NetName=3V3 Pin=U11-3
+Added Pin To Net: NetName=3V3 Pin=U12-2
+Added Pin To Net: NetName=3V3 Pin=U13-5
+Added Net: Name=3V3
+Added Pin To Net: NetName=3V8 Pin=U1-2
+Added Pin To Net: NetName=3V8 Pin=U1-4
+Added Pin To Net: NetName=3V8 Pin=U1-6
+Added Pin To Net: NetName=3V8 Pin=U1-8
+Added Net: Name=3V8
+Added Pin To Net: NetName=A0 Pin=R23-1
+Added Pin To Net: NetName=A0 Pin=R24-2
+Added Pin To Net: NetName=A0 Pin=U1-23
+Added Net: Name=A0
+Added Pin To Net: NetName=A1 Pin=R19-1
+Added Pin To Net: NetName=A1 Pin=R20-2
+Added Pin To Net: NetName=A1 Pin=U1-33
+Added Net: Name=A1
+Added Pin To Net: NetName=A2 Pin=R26-2
+Added Pin To Net: NetName=A2 Pin=U1-35
+Added Pin To Net: NetName=A2 Pin=U13-1
+Added Net: Name=A2
+Added Pin To Net: NetName=A3 Pin=R21-2
+Added Pin To Net: NetName=A3 Pin=U-1
+Added Pin To Net: NetName=A3 Pin=U1-37
+Added Net: Name=A3
+Added Pin To Net: NetName=A4 Pin=P16-3
+Added Pin To Net: NetName=A4 Pin=U1-41
+Added Net: Name=A4
+Added Pin To Net: NetName=A5 Pin=P17-3
+Added Pin To Net: NetName=A5 Pin=U1-43
+Added Net: Name=A5
+Added Pin To Net: NetName=Battery_GND Pin=P1-1
+Added Pin To Net: NetName=Battery_GND Pin=P15-2
+Added Pin To Net: NetName=Battery_GND Pin=Q1-1
+Added Pin To Net: NetName=Battery_GND Pin=R25-1
+Added Pin To Net: NetName=Battery_GND Pin=U13-4
+Added Net: Name=Battery_GND
+Added Pin To Net: NetName=Battery_VCC Pin=P1-2
+Added Pin To Net: NetName=Battery_VCC Pin=R18-1
+Added Pin To Net: NetName=Battery_VCC Pin=U-4
+Added Net: Name=Battery_VCC
+Added Pin To Net: NetName=CS Pin=J1-2
+Added Pin To Net: NetName=CS Pin=U1-48
+Added Net: Name=CS
+Added Pin To Net: NetName=D2 Pin=U1-42
+Added Net: Name=D2
+Added Pin To Net: NetName=D3 Pin=U1-40
+Added Net: Name=D3
+Added Pin To Net: NetName=D22 Pin=D4-2
+Added Pin To Net: NetName=D22 Pin=R22-2
+Added Pin To Net: NetName=D22 Pin=U1-62
+Added Net: Name=D22
+Added Pin To Net: NetName=D23 Pin=Q2-1
+Added Pin To Net: NetName=D23 Pin=R16-1
+Added Pin To Net: NetName=D23 Pin=U1-64
+Added Net: Name=D23
+Added Pin To Net: NetName=GND Pin=C1-1
+Added Pin To Net: NetName=GND Pin=C2-1
+Added Pin To Net: NetName=GND Pin=C3-1
+Added Pin To Net: NetName=GND Pin=C4-1
+Added Pin To Net: NetName=GND Pin=C5-1
+Added Pin To Net: NetName=GND Pin=C6-2
+Added Pin To Net: NetName=GND Pin=C8-2
+Added Pin To Net: NetName=GND Pin=C10-2
+Added Pin To Net: NetName=GND Pin=C12-2
+Added Pin To Net: NetName=GND Pin=J1-6
+Added Pin To Net: NetName=GND Pin=J2-A1_B12
+Added Pin To Net: NetName=GND Pin=J2-B1_A12
+Added Pin To Net: NetName=GND Pin=J2-S1
+Added Pin To Net: NetName=GND Pin=J2-S2
+Added Pin To Net: NetName=GND Pin=J2-S3
+Added Pin To Net: NetName=GND Pin=J2-S4
+Added Pin To Net: NetName=GND Pin=MD1-10
+Added Pin To Net: NetName=GND Pin=MD1-14
+Added Pin To Net: NetName=GND Pin=P11-1
+Added Pin To Net: NetName=GND Pin=P16-5
+Added Pin To Net: NetName=GND Pin=P16-6
+Added Pin To Net: NetName=GND Pin=P17-5
+Added Pin To Net: NetName=GND Pin=P17-6
+Added Pin To Net: NetName=GND Pin=Q1-3
+Added Pin To Net: NetName=GND Pin=Q2-3
+Added Pin To Net: NetName=GND Pin=R6-1
+Added Pin To Net: NetName=GND Pin=R7-1
+Added Pin To Net: NetName=GND Pin=R17-1
+Added Pin To Net: NetName=GND Pin=R20-1
+Added Pin To Net: NetName=GND Pin=R21-1
+Added Pin To Net: NetName=GND Pin=R22-1
+Added Pin To Net: NetName=GND Pin=R24-1
+Added Pin To Net: NetName=GND Pin=R26-1
+Added Pin To Net: NetName=GND Pin=S1-2
+Added Pin To Net: NetName=GND Pin=S2-2
+Added Pin To Net: NetName=GND Pin=U-2
+Added Pin To Net: NetName=GND Pin=U1-1
+Added Pin To Net: NetName=GND Pin=U1-3
+Added Pin To Net: NetName=GND Pin=U1-5
+Added Pin To Net: NetName=GND Pin=U1-7
+Added Pin To Net: NetName=GND Pin=U1-9
+Added Pin To Net: NetName=GND Pin=U1-15
+Added Pin To Net: NetName=GND Pin=U1-39
+Added Pin To Net: NetName=GND Pin=U1-49
+Added Pin To Net: NetName=GND Pin=U1-56
+Added Pin To Net: NetName=GND Pin=U1-S1
+Added Pin To Net: NetName=GND Pin=U1-S2
+Added Pin To Net: NetName=GND Pin=U2-1
+Added Pin To Net: NetName=GND Pin=U2-7
+Added Pin To Net: NetName=GND Pin=U3-1
+Added Pin To Net: NetName=GND Pin=U4-2
+Added Pin To Net: NetName=GND Pin=U5-2
+Added Pin To Net: NetName=GND Pin=U6-2
+Added Pin To Net: NetName=GND Pin=U7-1
+Added Pin To Net: NetName=GND Pin=U7-7
+Added Pin To Net: NetName=GND Pin=U8-1
+Added Pin To Net: NetName=GND Pin=U9-1
+Added Pin To Net: NetName=GND Pin=U9-7
+Added Pin To Net: NetName=GND Pin=U10-1
+Added Pin To Net: NetName=GND Pin=U11-1
+Added Pin To Net: NetName=GND Pin=U11-7
+Added Pin To Net: NetName=GND Pin=U12-1
+Added Pin To Net: NetName=GND Pin=U13-2
+Added Net: Name=GND
+Added Pin To Net: NetName=ISO_GND_1 Pin=C7-1
+Added Pin To Net: NetName=ISO_GND_1 Pin=P4-1
+Added Pin To Net: NetName=ISO_GND_1 Pin=U2-9
+Added Pin To Net: NetName=ISO_GND_1 Pin=U2-16
+Added Pin To Net: NetName=ISO_GND_1 Pin=U3-3
+Added Net: Name=ISO_GND_1
+Added Pin To Net: NetName=ISO_GND_2 Pin=C9-1
+Added Pin To Net: NetName=ISO_GND_2 Pin=P6-1
+Added Pin To Net: NetName=ISO_GND_2 Pin=U7-9
+Added Pin To Net: NetName=ISO_GND_2 Pin=U7-16
+Added Pin To Net: NetName=ISO_GND_2 Pin=U8-3
+Added Net: Name=ISO_GND_2
+Added Pin To Net: NetName=ISO_GND_3 Pin=C11-1
+Added Pin To Net: NetName=ISO_GND_3 Pin=P8-1
+Added Pin To Net: NetName=ISO_GND_3 Pin=U9-9
+Added Pin To Net: NetName=ISO_GND_3 Pin=U9-16
+Added Pin To Net: NetName=ISO_GND_3 Pin=U10-3
+Added Net: Name=ISO_GND_3
+Added Pin To Net: NetName=ISO_GND_4 Pin=C13-1
+Added Pin To Net: NetName=ISO_GND_4 Pin=P10-1
+Added Pin To Net: NetName=ISO_GND_4 Pin=U11-9
+Added Pin To Net: NetName=ISO_GND_4 Pin=U11-16
+Added Pin To Net: NetName=ISO_GND_4 Pin=U12-3
+Added Net: Name=ISO_GND_4
+Added Pin To Net: NetName=ISO_SCL_1 Pin=P4-3
+Added Pin To Net: NetName=ISO_SCL_1 Pin=R9-1
+Added Pin To Net: NetName=ISO_SCL_1 Pin=U2-12
+Added Net: Name=ISO_SCL_1
+Added Pin To Net: NetName=ISO_SCL_2 Pin=P6-3
+Added Pin To Net: NetName=ISO_SCL_2 Pin=R11-1
+Added Pin To Net: NetName=ISO_SCL_2 Pin=U7-12
+Added Net: Name=ISO_SCL_2
+Added Pin To Net: NetName=ISO_SCL_3 Pin=P8-3
+Added Pin To Net: NetName=ISO_SCL_3 Pin=R13-1
+Added Pin To Net: NetName=ISO_SCL_3 Pin=U9-12
+Added Net: Name=ISO_SCL_3
+Added Pin To Net: NetName=ISO_SCL_4 Pin=P10-3
+Added Pin To Net: NetName=ISO_SCL_4 Pin=R15-1
+Added Pin To Net: NetName=ISO_SCL_4 Pin=U11-12
+Added Net: Name=ISO_SCL_4
+Added Pin To Net: NetName=ISO_SDA_1 Pin=P4-2
+Added Pin To Net: NetName=ISO_SDA_1 Pin=R8-1
+Added Pin To Net: NetName=ISO_SDA_1 Pin=U2-11
+Added Net: Name=ISO_SDA_1
+Added Pin To Net: NetName=ISO_SDA_2 Pin=P6-2
+Added Pin To Net: NetName=ISO_SDA_2 Pin=R10-1
+Added Pin To Net: NetName=ISO_SDA_2 Pin=U7-11
+Added Net: Name=ISO_SDA_2
+Added Pin To Net: NetName=ISO_SDA_3 Pin=P8-2
+Added Pin To Net: NetName=ISO_SDA_3 Pin=R12-1
+Added Pin To Net: NetName=ISO_SDA_3 Pin=U9-11
+Added Net: Name=ISO_SDA_3
+Added Pin To Net: NetName=ISO_SDA_4 Pin=P10-2
+Added Pin To Net: NetName=ISO_SDA_4 Pin=R14-1
+Added Pin To Net: NetName=ISO_SDA_4 Pin=U11-11
+Added Net: Name=ISO_SDA_4
+Added Pin To Net: NetName=ISO_VCC_1 Pin=C7-2
+Added Pin To Net: NetName=ISO_VCC_1 Pin=P3-1
+Added Pin To Net: NetName=ISO_VCC_1 Pin=R8-2
+Added Pin To Net: NetName=ISO_VCC_1 Pin=R9-2
+Added Pin To Net: NetName=ISO_VCC_1 Pin=U2-14
+Added Pin To Net: NetName=ISO_VCC_1 Pin=U3-4
+Added Net: Name=ISO_VCC_1
+Added Pin To Net: NetName=ISO_VCC_2 Pin=C9-2
+Added Pin To Net: NetName=ISO_VCC_2 Pin=P5-1
+Added Pin To Net: NetName=ISO_VCC_2 Pin=R10-2
+Added Pin To Net: NetName=ISO_VCC_2 Pin=R11-2
+Added Pin To Net: NetName=ISO_VCC_2 Pin=U7-14
+Added Pin To Net: NetName=ISO_VCC_2 Pin=U8-4
+Added Net: Name=ISO_VCC_2
+Added Pin To Net: NetName=ISO_VCC_3 Pin=C11-2
+Added Pin To Net: NetName=ISO_VCC_3 Pin=P7-1
+Added Pin To Net: NetName=ISO_VCC_3 Pin=R12-2
+Added Pin To Net: NetName=ISO_VCC_3 Pin=R13-2
+Added Pin To Net: NetName=ISO_VCC_3 Pin=U9-14
+Added Pin To Net: NetName=ISO_VCC_3 Pin=U10-4
+Added Net: Name=ISO_VCC_3
+Added Pin To Net: NetName=ISO_VCC_4 Pin=C13-2
+Added Pin To Net: NetName=ISO_VCC_4 Pin=P9-1
+Added Pin To Net: NetName=ISO_VCC_4 Pin=R14-2
+Added Pin To Net: NetName=ISO_VCC_4 Pin=R15-2
+Added Pin To Net: NetName=ISO_VCC_4 Pin=U11-14
+Added Pin To Net: NetName=ISO_VCC_4 Pin=U12-4
+Added Net: Name=ISO_VCC_4
+Added Pin To Net: NetName=LED_Anode Pin=P2-4
+Added Pin To Net: NetName=LED_Anode Pin=R3-2
+Added Pin To Net: NetName=LED_Anode Pin=R4-2
+Added Pin To Net: NetName=LED_Anode Pin=R5-2
+Added Pin To Net: NetName=LED_Anode Pin=U4-4
+Added Pin To Net: NetName=LED_Anode Pin=U5-4
+Added Pin To Net: NetName=LED_Anode Pin=U6-4
+Added Net: Name=LED_Anode
+Added Pin To Net: NetName=LED_B Pin=L3-2
+Added Pin To Net: NetName=LED_B Pin=P2-3
+Added Net: Name=LED_B
+Added Pin To Net: NetName=LED_G Pin=L2-2
+Added Pin To Net: NetName=LED_G Pin=P2-2
+Added Net: Name=LED_G
+Added Pin To Net: NetName=LED_R Pin=L1-2
+Added Pin To Net: NetName=LED_R Pin=P2-1
+Added Net: Name=LED_R
+Added Pin To Net: NetName=MCU_RGBB Pin=U1-65
+Added Pin To Net: NetName=MCU_RGBB Pin=U6-3
+Added Net: Name=MCU_RGBB
+Added Pin To Net: NetName=MCU_RGBG Pin=U1-63
+Added Pin To Net: NetName=MCU_RGBG Pin=U5-3
+Added Net: Name=MCU_RGBG
+Added Pin To Net: NetName=MCU_RGBR Pin=U1-61
+Added Pin To Net: NetName=MCU_RGBR Pin=U4-3
+Added Net: Name=MCU_RGBR
+Added Pin To Net: NetName=MCU_Rx Pin=MD1-2
+Added Pin To Net: NetName=MCU_Rx Pin=U1-38
+Added Net: Name=MCU_Rx
+Added Pin To Net: NetName=MCU_Tx Pin=MD1-3
+Added Pin To Net: NetName=MCU_Tx Pin=U1-36
+Added Net: Name=MCU_Tx
+Added Pin To Net: NetName=MCU_USB_D+ Pin=J2-A7
+Added Pin To Net: NetName=MCU_USB_D+ Pin=J2-B7
+Added Pin To Net: NetName=MCU_USB_D+ Pin=U1-11
+Added Net: Name=MCU_USB_D+
+Added Pin To Net: NetName=MCU_USB_D- Pin=J2-A6
+Added Pin To Net: NetName=MCU_USB_D- Pin=J2-B6
+Added Pin To Net: NetName=MCU_USB_D- Pin=U1-13
+Added Net: Name=MCU_USB_D-
+Added Pin To Net: NetName=MISO Pin=J1-7
+Added Pin To Net: NetName=MISO Pin=U1-50
+Added Net: Name=MISO
+Added Pin To Net: NetName=Mode Pin=C2-2
+Added Pin To Net: NetName=Mode Pin=R2-1
+Added Pin To Net: NetName=Mode Pin=S2-1
+Added Pin To Net: NetName=Mode Pin=U1-32
+Added Net: Name=Mode
+Added Pin To Net: NetName=MOSI Pin=J1-3
+Added Pin To Net: NetName=MOSI Pin=U1-52
+Added Net: Name=MOSI
+Added Pin To Net: NetName=NetD1_1 Pin=D1-1
+Added Pin To Net: NetName=NetD1_1 Pin=L1-1
+Added Pin To Net: NetName=NetD1_1 Pin=U4-1
+Added Net: Name=NetD1_1
+Added Pin To Net: NetName=NetD2_1 Pin=D2-1
+Added Pin To Net: NetName=NetD2_1 Pin=L2-1
+Added Pin To Net: NetName=NetD2_1 Pin=U5-1
+Added Net: Name=NetD2_1
+Added Pin To Net: NetName=NetD3_1 Pin=D3-1
+Added Pin To Net: NetName=NetD3_1 Pin=L3-1
+Added Pin To Net: NetName=NetD3_1 Pin=U6-1
+Added Net: Name=NetD3_1
+Added Pin To Net: NetName=NetD4_3 Pin=D4-3
+Added Net: Name=NetD4_3
+Added Pin To Net: NetName=NetJ2_A5 Pin=J2-A5
+Added Pin To Net: NetName=NetJ2_A5 Pin=R6-2
+Added Net: Name=NetJ2_A5
+Added Pin To Net: NetName=NetJ2_B5 Pin=J2-B5
+Added Pin To Net: NetName=NetJ2_B5 Pin=R7-2
+Added Net: Name=NetJ2_B5
+Added Pin To Net: NetName=NetQ2_2 Pin=Q2-2
+Added Pin To Net: NetName=NetQ2_2 Pin=R17-2
+Added Net: Name=NetQ2_2
+Added Pin To Net: NetName=PRB1 Pin=J3-1
+Added Pin To Net: NetName=PRB1 Pin=P3-2
+Added Net: Name=PRB1
+Added Pin To Net: NetName=PRB2 Pin=J4-1
+Added Pin To Net: NetName=PRB2 Pin=P5-2
+Added Net: Name=PRB2
+Added Pin To Net: NetName=PRB3 Pin=J5-1
+Added Pin To Net: NetName=PRB3 Pin=P7-2
+Added Net: Name=PRB3
+Added Pin To Net: NetName=PRB4 Pin=J6-1
+Added Pin To Net: NetName=PRB4 Pin=P9-2
+Added Net: Name=PRB4
+Added Pin To Net: NetName=PRB_GND_1 Pin=J3-2
+Added Pin To Net: NetName=PRB_GND_1 Pin=J3-3
+Added Pin To Net: NetName=PRB_GND_1 Pin=J3-4
+Added Pin To Net: NetName=PRB_GND_1 Pin=J3-5
+Added Pin To Net: NetName=PRB_GND_1 Pin=P3-3
+Added Net: Name=PRB_GND_1
+Added Pin To Net: NetName=PRB_GND_2 Pin=J4-2
+Added Pin To Net: NetName=PRB_GND_2 Pin=J4-3
+Added Pin To Net: NetName=PRB_GND_2 Pin=J4-4
+Added Pin To Net: NetName=PRB_GND_2 Pin=J4-5
+Added Pin To Net: NetName=PRB_GND_2 Pin=P5-3
+Added Net: Name=PRB_GND_2
+Added Pin To Net: NetName=PRB_GND_3 Pin=J5-2
+Added Pin To Net: NetName=PRB_GND_3 Pin=J5-3
+Added Pin To Net: NetName=PRB_GND_3 Pin=J5-4
+Added Pin To Net: NetName=PRB_GND_3 Pin=J5-5
+Added Pin To Net: NetName=PRB_GND_3 Pin=P7-3
+Added Net: Name=PRB_GND_3
+Added Pin To Net: NetName=PRB_GND_4 Pin=J6-2
+Added Pin To Net: NetName=PRB_GND_4 Pin=J6-3
+Added Pin To Net: NetName=PRB_GND_4 Pin=J6-4
+Added Pin To Net: NetName=PRB_GND_4 Pin=J6-5
+Added Pin To Net: NetName=PRB_GND_4 Pin=P9-3
+Added Net: Name=PRB_GND_4
+Added Pin To Net: NetName=PWM0 Pin=P16-4
+Added Pin To Net: NetName=PWM0 Pin=U1-66
+Added Net: Name=PWM0
+Added Pin To Net: NetName=PWM1 Pin=P17-4
+Added Pin To Net: NetName=PWM1 Pin=U1-68
+Added Net: Name=PWM1
+Added Pin To Net: NetName=PWM2 Pin=U1-70
+Added Net: Name=PWM2
+Added Pin To Net: NetName=PWM3 Pin=U1-72
+Added Net: Name=PWM3
+Added Pin To Net: NetName=Pwr_Button_Board_Side Pin=D4-1
+Added Pin To Net: NetName=Pwr_Button_Board_Side Pin=P14-2
+Added Pin To Net: NetName=Pwr_Button_Board_Side Pin=R19-2
+Added Net: Name=Pwr_Button_Board_Side
+Added Pin To Net: NetName=Reset Pin=C1-2
+Added Pin To Net: NetName=Reset Pin=MD1-5
+Added Pin To Net: NetName=Reset Pin=R1-1
+Added Pin To Net: NetName=Reset Pin=S1-1
+Added Pin To Net: NetName=Reset Pin=U1-34
+Added Net: Name=Reset
+Added Pin To Net: NetName=SCK Pin=J1-5
+Added Pin To Net: NetName=SCK Pin=U1-54
+Added Net: Name=SCK
+Added Pin To Net: NetName=SCL Pin=P11-3
+Added Pin To Net: NetName=SCL Pin=U1-22
+Added Pin To Net: NetName=SCL Pin=U2-6
+Added Pin To Net: NetName=SCL Pin=U7-6
+Added Pin To Net: NetName=SCL Pin=U9-6
+Added Pin To Net: NetName=SCL Pin=U11-6
+Added Net: Name=SCL
+Added Pin To Net: NetName=SDA Pin=P11-2
+Added Pin To Net: NetName=SDA Pin=U1-20
+Added Pin To Net: NetName=SDA Pin=U2-5
+Added Pin To Net: NetName=SDA Pin=U7-5
+Added Pin To Net: NetName=SDA Pin=U9-5
+Added Pin To Net: NetName=SDA Pin=U11-5
+Added Net: Name=SDA
+Added Pin To Net: NetName=Solar_Converter Pin=P15-1
+Added Pin To Net: NetName=Solar_Converter Pin=R25-2
+Added Pin To Net: NetName=Solar_Converter Pin=U13-3
+Added Net: Name=Solar_Converter
+Added Pin To Net: NetName=TEMP_PRB_GND Pin=P12-3
+Added Pin To Net: NetName=TEMP_PRB_GND Pin=P13-2
+Added Pin To Net: NetName=TEMP_PRB_GND Pin=P13-2
+Added Pin To Net: NetName=TEMP_PRB_GND Pin=P13-2
+Added Net: Name=TEMP_PRB_GND
+Added Pin To Net: NetName=TEMP_PRB Pin=P12-2
+Added Pin To Net: NetName=TEMP_PRB Pin=P13-1
+Added Net: Name=TEMP_PRB
+Added Pin To Net: NetName=VBAT Pin=C3-2
+Added Pin To Net: NetName=VBAT Pin=C4-2
+Added Pin To Net: NetName=VBAT Pin=C5-2
+Added Pin To Net: NetName=VBAT Pin=D1-2
+Added Pin To Net: NetName=VBAT Pin=D2-2
+Added Pin To Net: NetName=VBAT Pin=D3-2
+Added Pin To Net: NetName=VBAT Pin=P14-1
+Added Pin To Net: NetName=VBAT Pin=P16-1
+Added Pin To Net: NetName=VBAT Pin=P16-2
+Added Pin To Net: NetName=VBAT Pin=P17-1
+Added Pin To Net: NetName=VBAT Pin=P17-2
+Added Pin To Net: NetName=VBAT Pin=R3-1
+Added Pin To Net: NetName=VBAT Pin=R4-1
+Added Pin To Net: NetName=VBAT Pin=R5-1
+Added Pin To Net: NetName=VBAT Pin=R18-2
+Added Pin To Net: NetName=VBAT Pin=R23-2
+Added Pin To Net: NetName=VBAT Pin=U-3
+Added Pin To Net: NetName=VBAT Pin=U4-5
+Added Pin To Net: NetName=VBAT Pin=U5-5
+Added Pin To Net: NetName=VBAT Pin=U6-5
+Added Net: Name=VBAT
+Added Pin To Net: NetName=VUSB Pin=J2-A4_B9
+Added Pin To Net: NetName=VUSB Pin=J2-B4_A9
+Added Pin To Net: NetName=VUSB Pin=U1-16
+Added Net: Name=VUSB
+Added Class: Name=LEDs
+Added Class: Name=MainPCB
+Added Class: Name=Power
+Added Class: Name=Sensors
+Added Class: Name=UserInputs
+Added Room: Name=LEDs
+Added Room: Name=MainPCB
+Added Room: Name=Power
+Added Room: Name=Sensors
+Added Room: Name=UserInputs
