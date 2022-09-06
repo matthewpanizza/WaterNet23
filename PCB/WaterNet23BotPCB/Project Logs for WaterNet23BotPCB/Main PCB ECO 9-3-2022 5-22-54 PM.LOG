@@ -1,0 +1,4 @@
+Removed Pin From Net: NetName=Solar_Converter Pin=R25-1
+Removed Pin From Net: NetName=Battery_GND Pin=R25-2
+Added Pin To Net: NetName=Battery_GND Pin=R25-1
+Added Pin To Net: NetName=Solar_Converter Pin=R25-2

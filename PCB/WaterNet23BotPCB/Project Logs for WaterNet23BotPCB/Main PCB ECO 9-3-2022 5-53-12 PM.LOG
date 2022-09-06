@@ -1,0 +1,33 @@
+Removed Pin From Net: NetName=Battery_GND Pin=P15-1
+Removed Pin From Net: NetName=Solar_Converter Pin=P15-2
+Removed Pin From Net: NetName=Battery_GND Pin=R25-1
+Removed Pin From Net: NetName=Solar_Converter Pin=R25-2
+Removed Pin From Net: NetName=A2 Pin=U13-1
+Removed Pin From Net: NetName=GND Pin=U13-2
+Removed Pin From Net: NetName=Battery_GND Pin=U13-3
+Removed Pin From Net: NetName=Solar_Converter Pin=U13-4
+Removed Pin From Net: NetName=3V3 Pin=U13-5
+Removed Pin From Net: NetName=A3 Pin=U-1
+Removed Pin From Net: NetName=GND Pin=U-2
+Removed Pin From Net: NetName=VBAT Pin=U-3
+Removed Pin From Net: NetName=Battery_VCC Pin=U-4
+Removed Pin From Net: NetName=3V3 Pin=U-5
+Change Component Designator: OldDesignator=U NewDesignator=U14
+Added Pin To Net: NetName=Solar_Converter Pin=P15-1
+Added Pin To Net: NetName=Battery_GND Pin=P15-2
+Added Pin To Net: NetName=Solar_Converter Pin=R25-1
+Added Pin To Net: NetName=Battery_VCC Pin=R25-2
+Added Pin To Net: NetName=Battery_VCC Pin=U13-1
+Added Pin To Net: NetName=Solar_Converter Pin=U13-2
+Added Pin To Net: NetName=GND Pin=U13-4
+Added Pin To Net: NetName=A2 Pin=U13-6
+Added Pin To Net: NetName=3V3 Pin=U13-8
+Added Pin To Net: NetName=Battery_VCC Pin=U14-1
+Added Pin To Net: NetName=VBAT Pin=U14-2
+Added Pin To Net: NetName=GND Pin=U14-4
+Added Pin To Net: NetName=A3 Pin=U14-6
+Added Pin To Net: NetName=3V3 Pin=U14-8
+Change Class Name : Old Net Name=Room Definition2 New Net Name=Sensors
+Added Member To Class: ClassName=Power Member=Component R25 Resistor
+Added Member To Class: ClassName=UserInputs Member=Component S1 Switch Normally Opened
+Added Member To Class: ClassName=UserInputs Member=Component S2 Switch Normally Opened
