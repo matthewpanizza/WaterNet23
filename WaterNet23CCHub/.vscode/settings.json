@@ -1,4 +1,4 @@
 {
-    "particle.targetPlatform": "bsom",
+    "particle.targetPlatform": "boron",
     "particle.firmwareVersion": "1.5.2"
 }
