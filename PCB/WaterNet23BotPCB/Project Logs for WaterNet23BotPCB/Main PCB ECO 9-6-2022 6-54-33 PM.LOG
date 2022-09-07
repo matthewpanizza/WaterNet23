@@ -1,0 +1,78 @@
+Removed Member From Class: ClassName=MainPCB Member=C8
+Removed Member From Class: ClassName=UserInputs Member=C8
+Removed Member From Class: ClassName=UserInputs Member=C10
+Removed Member From Class: ClassName=UserInputs Member=C12
+Removed Member From Class: ClassName=Power Member=C31
+Removed Member From Class: ClassName=Power Member=C32
+Removed Member From Class: ClassName=Power Member=C33
+Removed Member From Class: ClassName=Power Member=C34
+Removed Member From Class: ClassName=Power Member=C35
+Removed Member From Class: ClassName=Power Member=C36
+Removed Member From Class: ClassName=Power Member=C37
+Removed Member From Class: ClassName=Power Member=C38
+Removed Member From Class: ClassName=Power Member=C39
+Removed Member From Class: ClassName=Power Member=C40
+Removed Member From Class: ClassName=Power Member=C41
+Removed Member From Class: ClassName=Power Member=L5
+Removed Member From Class: ClassName=Power Member=L6
+Removed Member From Class: ClassName=Power Member=Q3
+Removed Member From Class: ClassName=LEDs Member=R30
+Removed Member From Class: ClassName=Power Member=R30
+Removed Member From Class: ClassName=LEDs Member=R31
+Removed Member From Class: ClassName=Power Member=R31
+Removed Member From Class: ClassName=Power Member=R32
+Removed Member From Class: ClassName=Power Member=R33
+Removed Member From Class: ClassName=Power Member=R34
+Removed Member From Class: ClassName=LEDs Member=R35
+Removed Member From Class: ClassName=Power Member=R35
+Removed Member From Class: ClassName=Power Member=U8
+Removed Member From Class: ClassName=Power Member=U9
+Removed Member From Class: ClassName=LEDs Member=U17
+Added Member To Class: ClassName=MainPCB Member=Component C1 Capacitor
+Added Member To Class: ClassName=MainPCB Member=Component C2 Capacitor
+Added Member To Class: ClassName=UserInputs Member=Component C4 Capacitor
+Added Member To Class: ClassName=UserInputs Member=Component C5 Capacitor
+Added Member To Class: ClassName=UserInputs Member=Component C6 Capacitor
+Added Member To Class: ClassName=UserInputs Member=Component C7 Capacitor
+Added Member To Class: ClassName=Power Member=Component C8 Capacitor
+Added Member To Class: ClassName=Power Member=Component C9 Capacitor
+Added Member To Class: ClassName=Power Member=Component C10 Capacitor
+Added Member To Class: ClassName=Power Member=Component C15 Capacitor
+Added Member To Class: ClassName=Power Member=Component C16 Capacitor
+Added Member To Class: ClassName=Power Member=Component C17 Capacitor
+Added Member To Class: ClassName=Power Member=Component C18 Capacitor
+Added Member To Class: ClassName=Power Member=Component C19 Capacitor
+Added Member To Class: ClassName=Power Member=Component C20 Capacitor
+Added Member To Class: ClassName=Power Member=Component C21 Capacitor
+Added Member To Class: ClassName=Power Member=Component C22 Capacitor
+Added Member To Class: ClassName=Power Member=Component L2 Inductor
+Added Member To Class: ClassName=Power Member=Component L3 Inductor
+Added Member To Class: ClassName=LEDs Member=Component L4 Inductor
+Added Member To Class: ClassName=Power Member=Component Q2 YJL3400A
+Added Member To Class: ClassName=Power Member=Component R7 Resistor
+Added Member To Class: ClassName=Power Member=Component R10 Resistor
+Added Member To Class: ClassName=Power Member=Component R12 Resistor
+Added Member To Class: ClassName=Power Member=Component R14 Resistor
+Added Member To Class: ClassName=Power Member=Component R15 Resistor
+Added Member To Class: ClassName=Power Member=Component R16 Resistor
+Added Member To Class: ClassName=Power Member=Component R19 Resistor
+Added Member To Class: ClassName=Power Member=Component R20 Resistor
+Added Member To Class: ClassName=Power Member=Component R21 Resistor
+Added Member To Class: ClassName=Power Member=Component R22 Resistor
+Added Member To Class: ClassName=LEDs Member=Component R23 Resistor
+Added Member To Class: ClassName=LEDs Member=Component R24 Resistor
+Added Member To Class: ClassName=LEDs Member=Component R25 Resistor
+Added Member To Class: ClassName=Sensors Member=Component R26 Resistor
+Added Member To Class: ClassName=Sensors Member=Component R27 Resistor
+Added Member To Class: ClassName=Sensors Member=Component R28 Resistor
+Added Member To Class: ClassName=Sensors Member=Component R29 Resistor
+Added Member To Class: ClassName=Power Member=Component U4 ISL85003AFRZ
+Added Member To Class: ClassName=Power Member=Component U5 INA139
+Added Member To Class: ClassName=Power Member=Component U6 ISL85003AFRZ
+Added Member To Class: ClassName=LEDs Member=Component U7 AL8861Y-13
+Added Member To Class: ClassName=Sensors Member=Component U10 ISO1640QDWRQ1
+Added Member To Class: ClassName=Sensors Member=Component U11 B0303S-1WR3
+Added Member To Class: ClassName=Sensors Member=Component U12 ISO1640QDWRQ1
+Added Member To Class: ClassName=Sensors Member=Component U13 B0303S-1WR3
+Added Member To Class: ClassName=Sensors Member=Component U14 ISO1640QDWRQ1
+Added Member To Class: ClassName=Sensors Member=Component U15 B0303S-1WR3
