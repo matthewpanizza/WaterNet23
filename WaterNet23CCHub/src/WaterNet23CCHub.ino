@@ -5,6 +5,8 @@
  * Date:
  */
 
+//https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-09032/6823623
+
 #include "application.h"
 #include "SdFat.h"
 #undef min
@@ -13,11 +15,16 @@
 
 #define chipSelect D8
 
-#define DEF_FILENAME        "WaterBot"
-#define BLE_OFFLD_BUF       100
-#define CUSTOM_DATA_LEN     8
-#define MAX_FILENAME_LEN    30
-#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
+#define DEF_FILENAME            "WaterBot"
+#define BLE_OFFLD_BUF           100
+#define CUSTOM_DATA_LEN         8
+#define MAX_FILENAME_LEN        30
+#define MAX_ERR_BUF_SIZE        15              //Buffer size for error-return string
+#define XBEE_BLE_MAX_TIMEOUT    36
+#define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
+#define MAX_LTE_STATUSES        25
+#define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bots
+#define PAIR_BUTTON             D3
 
 
 // This example does not require the cloud so you can run it in manual mode or
@@ -66,11 +73,17 @@ char offloadFilename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
 bool remoteRx = false;
 bool logMessages;
+bool startConnect;
+bool postStatus;
+bool meshPair;
+bool botPairRx;
+bool statusTimeout;
 uint8_t errCmdMode;
 uint8_t errModeReply;
 char errCmdStr[3];
 char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
+uint8_t LTEStatuses;
 
 class WaterBot{
     public:
@@ -85,10 +98,24 @@ class WaterBot{
     bool offloading;
     float GPSLat;
     float GPSLon;
+    uint32_t timeoutCount;
+};
+
+class PairBot{
+    public:
+    uint8_t botNum;
+    int rssi;
 };
 
 WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
+WaterBot *ControlledBot;
 std::vector<WaterBot> WaterBots;
+std::vector<WaterBot> PairBots;
+std::vector<PairBot> BLEPair;
+
+Timer at1(5000,actionTimer5);
+Timer at2(60000,actionTimer60);
+
 
 void BLEScan(int BotNumber = -1);
 void XBeeHandler();
@@ -100,6 +127,47 @@ void dataLTEHandler(const char *event, const char *data){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.printlnf("[INFO] Received LTE Message: %s",data);
         logFile.close();
+    }
+}
+
+void startupPair(){
+    startConnect = false;
+    while(!startConnect){
+        BLEScan(-2);
+        XBeeHandler();
+        XBeeLTEPairSet();
+        delay(100);
+        if(digitalRead(PAIR_BUTTON)){
+            int minRSSI = -999;
+            int selectedBot = -1;
+            for(PairBot pb: BLEPair){
+                if(pb.rssi > minRSSI){
+                    minRSSI = pb.rssi;
+                    selectedBot = pb.botNum;
+                }
+                
+            }
+            if(selectedBot > 0){
+                meshPair = true;    //Did we find any bots over BLE
+            }
+            uint8_t BLETimeout = 0;
+            while(meshPair){
+                BLEScan(selectedBot);
+                BLETimeout++;
+                if(WaterBots.size() == 0 && BLETimeout == LTE_BKP_Time) Particle.publish("Bot1dat", "CCABhwd", PRIVATE);
+                if(BLETimeout > BLE_MAX_CONN_TIME) meshPair = false;
+                delay(100);
+            }
+        }
+    }
+}
+
+void XBeeLTEPairSet(){
+    for(WaterBot p: PairBots){
+        char replyStr[10];
+        sprintf(replyStr,"CCB%dhwa",p.botNum);
+        sendData(replyStr,0,false,p.XBeeAvail,p.LTEAvail);
+        PairBots.pop_back();
     }
 }
 
@@ -118,6 +186,8 @@ void setup() {
     offloadingDone = false;
 
     logMessages = true;
+    postStatus = false;
+    statusTimeout = false;
 
     char timestamp[16];
     snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
@@ -135,13 +205,26 @@ void setup() {
         Serial.println("Error: could not connect to SD card!");
         logMessages = false;
     }
+    
+    startupPair();
+
+    at1.start();
+    at2.stop();
 }
 
 void loop() {
-    
+    if(postStatus){
+        char statusStr[30];
+        if(ControlledBot != NULL) sprintf(statusStr,"CCABspcB%d",ControlledBot->botNum);
+        else sprintf(statusStr,"CCABspcNB");
+        sendData(statusStr,0,true,true,statusTimeout);                                  
+        postStatus = false;
+        statusTimeout = false;
+    }
+
+
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
-
         //char testStr[30] = "CCB1ptsHello from CC Hub!";
         //uint8_t testBuf[30];
         //memcpy(testStr,testBuf,30);
@@ -161,6 +244,7 @@ void loop() {
     }
     if(offloadingMode) DataOffloader();
     XBeeHandler();
+    XBeeLTEPairSet();
 }
 
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -169,6 +253,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         uint8_t checksum;
         char dataStr[strlen(command)-8];
         dataStr[strlen(command)-9] = '\0';
+        char rxIDBuf[1];
+        rxIDBuf[0] = command[1];
+        uint8_t rxBotID = atoi(rxIDBuf);
         char cmdStr[4];
         cmdStr[3] = '\0';
         char checkStr[3];
@@ -210,9 +297,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             return;
         }
         else if(!strcmp(cmdStr,"sup")){
-            char rxIDBuf[1];
-            rxIDBuf[0] = command[1];
-            uint8_t rxBotID = atoi(rxIDBuf);
+            
             bool newBot = true;
             for(WaterBot w: WaterBots){
                 if(rxBotID == w.botNum){
@@ -277,6 +362,23 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             strncpy(errCmdStr,dataStr,3);
             errCmdMode = mode;
         }
+        else if(!strcmp(cmdStr,"hwd")){  //Hello World! - Received startup pairing message
+            bool newBot = true;
+            for(WaterBot w: WaterBots){
+                if(rxBotID == w.botNum) newBot = false;
+            }
+            if(newBot){
+                Serial.println("Found a new water bot ID");
+                WaterBot newWaterbot;
+                if(mode == 1) newWaterbot.BLEAvail = true;
+                else if(mode == 2) newWaterbot.XBeeAvail = true;
+                else if(mode == 3) newWaterbot.LTEAvail = true;
+                newWaterbot.botNum = rxBotID;
+                WaterBots.push_back(newWaterbot);
+                PairBots.push_back(newWaterbot);
+            }
+            botPairRx = true;
+        }
         else if(!strcmp(cmdStr,"pts")){
             Serial.println(dataStr);
             myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
@@ -314,9 +416,29 @@ void BLEScan(int BotNumber){
             uint8_t BLECustomData[CUSTOM_DATA_LEN];
             scanResults->advertisingData.customData(BLECustomData,CUSTOM_DATA_LEN);
             if (svcCount > 0 && foundServiceUuid == serviceUuid) {
+                if(BotNumber == -2){
+                    bool newBot = true;
+                    PairBot *existingBot;
+                    for(PairBot p: BLEPair){
+                        if(BLECustomData[0] == p.botNum){
+                            newBot = false;
+                            existingBot = &p;
+                        } 
+                    }
+                    if(newBot){
+                        PairBot NewBot;
+                        NewBot.rssi = scanResults->rssi;
+                        NewBot.botNum = BLECustomData[0];
+                        BLEPair.push_back(NewBot);
+                    }
+                    else{
+                        existingBot->rssi = (scanResults->rssi + existingBot->rssi) >> 1;
+                    }
+                }
                 if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
-				    peer = BLE.connect(scanResults[ii].address);
+                    peer = BLE.connect(scanResults[ii].address);
 				    if (peer.connected()) {
+                        meshPair = false;
                         uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
                         scanResults[ii].advertisingData.customData(bufName, BLE_MAX_ADV_DATA_LEN);
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
@@ -325,7 +447,10 @@ void BLEScan(int BotNumber){
 						Serial.printlnf("Connected to Bot %d",bufName[0]);
                         bool newBot = true;
                         for(WaterBot w: WaterBots){
-                            if(bufName[0] == w.botNum) newBot = false;
+                            if(bufName[0] == w.botNum){
+                                newBot = false;
+                                w.BLEAvail = true;
+                            }
                         }
                         if(newBot){
                             Serial.println("Found a new water bot ID");
@@ -459,5 +584,27 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
     }
     if(sendXBee || sendMode == 2){
         Serial1.println(outStr);
+    }
+}
+
+void actionTimer5(){
+    postStatus = true;
+    for(WaterBot w: WaterBots){
+        w.timeoutCount++;
+    }
+    if(!BLE.connected)
+}
+
+void actionTimer60(){
+    bool reqLTEStatus = false;
+    for(WaterBot w: WaterBots){
+        if(w.timeoutCount > XBEE_BLE_MAX_TIMEOUT){
+            reqLTEStatus = true;
+            w.timeoutCount = 0;            
+        }
+    }
+    if(reqLTEStatus && LTEStatuses < MAX_LTE_STATUSES){
+        LTEStatuses++;
+        statusTimeout = true;
     }
 }
