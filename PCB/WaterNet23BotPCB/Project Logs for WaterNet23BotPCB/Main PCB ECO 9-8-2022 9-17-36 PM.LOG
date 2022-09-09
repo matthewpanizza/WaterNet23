@@ -1,0 +1,24 @@
+Removed Pin From Net: NetName=A4 Pin=P4-3
+Removed Pin From Net: NetName=PWM0 Pin=P4-4
+Removed Pin From Net: NetName=A5 Pin=P5-3
+Removed Pin From Net: NetName=PWM1 Pin=P5-4
+Removed Pin From Net: NetName=A4 Pin=P19-1
+Removed Pin From Net: NetName=A5 Pin=P19-2
+Change Component Footprint: Designator=P19 Old Footprint=1x2 Header New Footprint=HDR2X4
+Change Component Comment : Designator=P19 Old Comment=2x Debug New Comment=Header 4X2
+Added Pin To Net: NetName=PWM0 Pin=P4-3
+Added Pin To Net: NetName=GND Pin=P4-4
+Added Pin To Net: NetName=PWM1 Pin=P5-3
+Added Pin To Net: NetName=GND Pin=P5-4
+Added Pin To Net: NetName=D3 Pin=P19-2
+Added Pin To Net: NetName=A4 Pin=P19-3
+Added Pin To Net: NetName=PWM2 Pin=P19-4
+Added Pin To Net: NetName=A5 Pin=P19-5
+Added Pin To Net: NetName=PWM3 Pin=P19-6
+Added Pin To Net: NetName=GND Pin=P19-8
+Added Pin To Net: NetName=A0 Pin=P19-1
+Added Pin To Net: NetName=A0 Pin=U1-23
+Added Net: Name=A0
+Added Pin To Net: NetName=A7 Pin=P19-7
+Added Pin To Net: NetName=A7 Pin=U1-47
+Added Net: Name=A7
