@@ -109,6 +109,7 @@ LEDStatus status;
 // Global Variables //
 //////////////////////
 
+bool waitForConnection;
 long latitude_mdeg, longitude_mdeg;
 float latitude, longitude;
 uint8_t leftMotorSpeed, setLSpeed;
@@ -220,8 +221,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
-        else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
-            
+        else if(!strcmp(cmdStr,"hwa")){  //Incoming hello-world acknowledge
+            waitForConnection = false;
         }
         else if(!strcmp(cmdStr,"aut")){  //Enter autonomous mode
             
@@ -320,7 +321,10 @@ void setup(){
         logFile.printlnf("[INFO] WaterBot %d: Started Logging!",BOTNUM);
         logFile.close();
     }
-    // delete possible existing file
+    waitForConnection = true;
+    while(waitForConnection){
+        
+    }
 }
 
 void loop(){
@@ -730,4 +734,65 @@ void LEDHandler(){
     status.setPattern(SetPattern);
     status.setColor(SetColor);
     status.setSpeed(SetSpeed);    
+}
+
+void BLEScan(int BotNumber){
+    size_t count = BLE.scan(scanResults, SCAN_RESULT_COUNT);
+	if (count > 0) {
+		for (uint8_t ii = 0; ii < count; ii++) {
+			BleUuid foundServiceUuid;
+			size_t svcCount = scanResults[ii].advertisingData.serviceUUID(&foundServiceUuid, 1);
+            uint8_t BLECustomData[CUSTOM_DATA_LEN];
+            scanResults->advertisingData.customData(BLECustomData,CUSTOM_DATA_LEN);
+            if (svcCount > 0 && foundServiceUuid == serviceUuid) {
+                if(BotNumber == -2){
+                    bool newBot = true;
+                    PairBot *existingBot;
+                    for(PairBot p: BLEPair){
+                        if(BLECustomData[0] == p.botNum){
+                            newBot = false;
+                            existingBot = &p;
+                        } 
+                    }
+                    if(newBot){
+                        PairBot NewBot;
+                        NewBot.rssi = scanResults->rssi;
+                        NewBot.botNum = BLECustomData[0];
+                        BLEPair.push_back(NewBot);
+                    }
+                    else{
+                        existingBot->rssi = (scanResults->rssi + existingBot->rssi) >> 1;
+                    }
+                }
+                if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
+                    peer = BLE.connect(scanResults[ii].address);
+				    if (peer.connected()) {
+                        meshPair = false;
+                        uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
+                        scanResults[ii].advertisingData.customData(bufName, BLE_MAX_ADV_DATA_LEN);
+					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
+					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
+                        peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
+						Serial.printlnf("Connected to Bot %d",bufName[0]);
+                        bool newBot = true;
+                        for(WaterBot w: WaterBots){
+                            if(bufName[0] == w.botNum){
+                                newBot = false;
+                                w.BLEAvail = true;
+                            }
+                        }
+                        if(newBot){
+                            Serial.println("Found a new water bot ID");
+                            WaterBot newWaterbot;
+                            newWaterbot.BLEAvail = true;
+                            newWaterbot.botNum = bufName[0];
+                            WaterBots.push_back(newWaterbot);
+                            BLEBot = &WaterBots.back();
+                        }
+                    }
+                    break;
+                }
+			}
+		}
+	}
 }
