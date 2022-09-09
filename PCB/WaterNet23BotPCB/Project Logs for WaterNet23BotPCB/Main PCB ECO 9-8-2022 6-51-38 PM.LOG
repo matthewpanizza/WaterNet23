@@ -1,0 +1,34 @@
+Added Pin To Net: NetName=D22 Pin=P17-1
+Added Pin To Net: NetName=A1 Pin=P17-2
+Added Pin To Net: NetName=A2 Pin=P18-1
+Added Pin To Net: NetName=A3 Pin=P18-2
+Added Pin To Net: NetName=A4 Pin=P19-1
+Added Pin To Net: NetName=A5 Pin=P19-2
+Added Pin To Net: NetName=MCU_Tx Pin=P20-1
+Added Pin To Net: NetName=MCU_Rx Pin=P20-2
+Added Pin To Net: NetName=Reset Pin=P21-1
+Added Pin To Net: NetName=Mode Pin=P21-2
+Added Pin To Net: NetName=Pwr_Button_Board_Side Pin=P22-1
+Added Pin To Net: NetName=A6 Pin=P22-2
+Added Pin To Net: NetName=SCL Pin=P23-1
+Added Pin To Net: NetName=SDA Pin=P23-2
+Added Pin To Net: NetName=3V3 Pin=P24-1
+Added Pin To Net: NetName=SCK Pin=P24-2
+Added Pin To Net: NetName=MOSI Pin=P24-3
+Added Pin To Net: NetName=CS Pin=P24-4
+Added Pin To Net: NetName=MISO Pin=P24-5
+Added Pin To Net: NetName=GND Pin=P24-6
+Added Pin To Net: NetName=SDA Pin=R36-1
+Added Pin To Net: NetName=3V3_S Pin=R36-2
+Added Pin To Net: NetName=SCL Pin=R37-1
+Added Pin To Net: NetName=3V3_S Pin=R37-2
+Added Member To Class: ClassName=MainPCB Member=Component P17 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P18 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P19 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P20 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P21 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P22 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P23 2x Debug
+Added Member To Class: ClassName=MainPCB Member=Component P24 Header 3X2
+Added Member To Class: ClassName=Sensors Member=Component R36 Resistor
+Added Member To Class: ClassName=Sensors Member=Component R37 Resistor

@@ -1,0 +1,81 @@
+Removed Pin From Net: NetName=SDA Pin=P8-2
+Removed Pin From Net: NetName=SCL Pin=P8-3
+Removed Pin From Net: NetName=SDA Pin=U1-20
+Removed Pin From Net: NetName=SCL Pin=U1-22
+Removed Pin From Net: NetName=ISO_SCL_1 Pin=U10-11
+Removed Pin From Net: NetName=ISO_SDA_1 Pin=U10-12
+Removed Pin From Net: NetName=ISO_SCL_2 Pin=U12-11
+Removed Pin From Net: NetName=ISO_SDA_2 Pin=U12-12
+Removed Pin From Net: NetName=ISO_SCL_3 Pin=U14-11
+Removed Pin From Net: NetName=ISO_SDA_3 Pin=U14-12
+Removed Pin From Net: NetName=ISO_SCL_4 Pin=U16-11
+Removed Pin From Net: NetName=ISO_SDA_4 Pin=U16-12
+Change Footprint: Footprint Not Found SOIC127P600X175-16N
+Change Footprint: Footprint Not Found SOIC127P600X175-16N
+Change Footprint: Footprint Not Found SOIC127P600X175-16N
+Change Footprint: Footprint Not Found SOIC127P600X175-16N
+Change Component Comment : Designator=U10 Old Comment=ISO1640QDWRQ1 New Comment=MAX14933ASE+T
+Change Component Comment : Designator=U12 Old Comment=ISO1640QDWRQ1 New Comment=MAX14933ASE+T
+Change Component Comment : Designator=U14 Old Comment=ISO1640QDWRQ1 New Comment=MAX14933ASE+T
+Change Component Comment : Designator=U16 Old Comment=ISO1640QDWRQ1 New Comment=MAX14933ASE+T
+Change component parameters: Designator = "U10" ("U10"); Footprint = "DW0016A-IPC_A"; UniqueID = "\GTMEWVLC" ("\GTMEWVLC")
+Change component parameters (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MP"; Value = "MAX14933ASE+T"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Change component parameters: Designator = "U12" ("U12"); Footprint = "DW0016A-IPC_A"; UniqueID = "\DULUCUTQ" ("\DULUCUTQ")
+Change component parameters (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MP"; Value = "MAX14933ASE+T"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Change component parameters: Designator = "U14" ("U14"); Footprint = "DW0016A-IPC_A"; UniqueID = "\DRPNGVSC" ("\DRPNGVSC")
+Change component parameters (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MP"; Value = "MAX14933ASE+T"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Change component parameters: Designator = "U16" ("U16"); Footprint = "DW0016A-IPC_A"; UniqueID = "\CNFHPZZE" ("\CNFHPZZE")
+Change component parameters (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "MP"; Value = "MAX14933ASE+T"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Pin To Net: NetName=SCL Pin=P8-2
+Added Pin To Net: NetName=SDA Pin=P8-3
+Added Pin To Net: NetName=SCL Pin=U1-20
+Added Pin To Net: NetName=SDA Pin=U1-22
+Added Pin To Net: NetName=GND Pin=U10-2
+Added Pin To Net: NetName=GND Pin=U10-8
+Added Pin To Net: NetName=ISO_GND_1 Pin=U10-10
+Added Pin To Net: NetName=ISO_SDA_1 Pin=U10-11
+Added Pin To Net: NetName=ISO_SCL_1 Pin=U10-12
+Added Pin To Net: NetName=ISO_GND_1 Pin=U10-15
+Added Pin To Net: NetName=GND Pin=U12-2
+Added Pin To Net: NetName=GND Pin=U12-8
+Added Pin To Net: NetName=ISO_GND_2 Pin=U12-10
+Added Pin To Net: NetName=ISO_SDA_2 Pin=U12-11
+Added Pin To Net: NetName=ISO_SCL_2 Pin=U12-12
+Added Pin To Net: NetName=ISO_GND_2 Pin=U12-15
+Added Pin To Net: NetName=GND Pin=U14-2
+Added Pin To Net: NetName=GND Pin=U14-8
+Added Pin To Net: NetName=ISO_GND_3 Pin=U14-10
+Added Pin To Net: NetName=ISO_SDA_3 Pin=U14-11
+Added Pin To Net: NetName=ISO_SCL_3 Pin=U14-12
+Added Pin To Net: NetName=ISO_GND_3 Pin=U14-15
+Added Pin To Net: NetName=GND Pin=U16-2
+Added Pin To Net: NetName=GND Pin=U16-8
+Added Pin To Net: NetName=ISO_GND_4 Pin=U16-10
+Added Pin To Net: NetName=ISO_SDA_4 Pin=U16-11
+Added Pin To Net: NetName=ISO_SCL_4 Pin=U16-12
+Added Pin To Net: NetName=ISO_GND_4 Pin=U16-15
+Change Net Name : Old Net Name=SCL New Net Name=SDA
+Change Net Name : Old Net Name=SDA New Net Name=SCL
+Added Room: Name=MainPCB
+Added Room: Name=Power
+Added Room: Name=Sensors
