@@ -9,6 +9,19 @@
 #include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
 #include "sdios.h"
+#undef min
+#undef max
+#include <vector>
+
+//////////////////////////////
+// BOT CONFIGURATION MACROS //
+//////////////////////////////
+
+#define BOTNUM 1
+#define STARTUP_WAIT_PAIR 0
+#define ESC_PWM_L D4
+#define ESC_PWM_R D5
+#define chipSelect D8
 
 ////////////////////
 // PROGRAM MACROS //
@@ -31,14 +44,13 @@
 #define BLE_WDOG_AVAIL      30000           //Watchdog interval between BLE messages for availability check
 #define LTE_MAX_STATUS      480             // (Divided by LTE STAT PD) Maximum number of status messages to send over LTE if other methods are unavailable
 #define LTE_STAT_PD         4               //Divider for sending status via LTE to reduce data usage
+#define XBEE_START_PUB      5000            //Time period between sending "Hello World" messages over XBee during setup
 
 #define DEF_FILENAME        "WaterBot"
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
-
-#define chipSelect D8//A5
 
 SYSTEM_MODE(MANUAL);
 
@@ -56,30 +68,44 @@ File logDir;
 
 SerialLogHandler logHandler(LOG_LEVEL_INFO);                         //Log Configuration
 
+Servo ESCL;     // create servo object to control the left motor ESC
+Servo ESCR;     // create servo object to control the right motor ESC
+
 ///////////////////////
 // BLE Configuration //
 ///////////////////////
+
+class PairBot{
+    public:
+    uint8_t botNum;
+    int rssi;
+};
 
 const char* WaterNetService = "b4206910-dc4b-5743-c8b1-92d0e75182b0"; //Main BLE Service
 const char* rxUuid          = "b4206912-dc4b-5743-c8b1-92d0e75182b0"; //GPS Latitude Service
 const char* txUuid          = "b4206913-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 const char* offldUuid       = "b4206914-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 
+const BleUuid serviceUuid("b4206910-dc4b-5743-c8b1-92d0e75182b0");
+const BleUuid peerRxUuid("b4206912-dc4b-5743-c8b1-92d0e75182b0");
+const BleUuid peerTxUuid("b4206913-dc4b-5743-c8b1-92d0e75182b0");
+
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, WaterNetService);
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, WaterNetService, BLEDataReceived, NULL);
 BleCharacteristic offloadCharacteristic("off", BleCharacteristicProperty::NOTIFY, offldUuid, WaterNetService);
 
 BleScanResult scanResults[SCAN_RESULT_COUNT];
-
 BleCharacteristic peerTxCharacteristic;
 BleCharacteristic peerRxCharacteristic;
 BleCharacteristic offldCopyCharacteristic;
 BlePeerDevice peer;
-BleAdvertisingData advData;                 //Advertising data
-uint8_t BLECustomData[CUSTOM_DATA_LEN];
 
+BleAdvertisingData advData;                 //Advertising data
+
+uint8_t BLECustomData[CUSTOM_DATA_LEN];
 const unsigned long SCAN_PERIOD_MS = 2000;
 unsigned long lastScan = 0;
+std::vector<PairBot> BLEPair;
 
 //Function prototypes
 void setupSPI();
@@ -138,10 +164,6 @@ char filenameMessages[MAX_FILENAME_LEN];
 String xbeeBuf;
 
 int i = 0;
-///////////////////////////
-// BOT NUMBER DEFINITION //
-///////////////////////////
-#define BOTNUM 1
 
 
 /*class PeerBot{
@@ -207,7 +229,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             char lSpd[3] = {dataStr[0],dataStr[1],dataStr[2]};
             char rSpd[3] = {dataStr[3],dataStr[4],dataStr[5]};
             setLSpeed = atoi(lSpd);
-            setLSpeed = atoi(rSpd);
+            setRSpeed = atoi(rSpd);
+            updateMotorControl = true;
+            manualRC = true;
         }
         else if(!strcmp(cmdStr,"req")){  //Data Request
             requestActive = mode;
@@ -249,6 +273,12 @@ void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
 
+    uint32_t mtrArmTime = millis();
+    ESCL.attach(ESC_PWM_L,1000,2000); //Initialize motor control
+    ESCR.attach(ESC_PWM_R,1000,2000);
+    ESCL.write(90);                   //Set ESC position to 90 for at least 2 seconds to "arm" the motors
+    ESCR.write(90);
+
     BLE.on();
     
     //Log.info("Hello from WaterNet23!");
@@ -274,14 +304,14 @@ void setup(){
 
     battPercent = 50;
 
-    BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
-    BLE.addCharacteristic(rxCharacteristic);
-    BLE.addCharacteristic(offloadCharacteristic);
-
     char deviceName[10];
     strcpy(deviceName,"WTN23_Bot");
     deviceName[9] = BOTNUM+48;
     BLECustomData[0] = BOTNUM;
+
+    BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
+    BLE.addCharacteristic(rxCharacteristic);
+    BLE.addCharacteristic(offloadCharacteristic);
 
     advData.appendServiceUUID(WaterNetService); // Add the app service
     advData.appendCustomData(BLECustomData,CUSTOM_DATA_LEN);
@@ -321,9 +351,20 @@ void setup(){
         logFile.printlnf("[INFO] WaterBot %d: Started Logging!",BOTNUM);
         logFile.close();
     }
-    waitForConnection = true;
-    while(waitForConnection){
-        
+    if(STARTUP_WAIT_PAIR){
+        waitForConnection = true;
+        uint32_t publishMS = millis();
+        char dataBuf[10];
+        sprintf(dataBuf,"B%dCChwd",BOTNUM);
+        while(waitForConnection){
+            BLEScan(-2);
+            XBeeHandler();
+            if(millis() - publishMS >= XBEE_START_PUB){
+                publishMS = millis();
+                sendData(dataBuf,0,false,true,false);
+            }
+            delay(100);
+        }
     }
 }
 
@@ -336,11 +377,10 @@ void loop(){
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }*/
-    latitude = -42.690690;
-    longitude = 69.420420;
     sensorHandler();
     XBeeHandler();
     statusUpdate();
+    updateMotors();
     if(offloadMode) dataOffloader();
     if(errModeReply){
         sendData(errBuf,errModeReply,false,false,false);
@@ -435,6 +475,8 @@ void statusUpdate(){
 
 void updateMotors(){
     if(updateMotorControl){
+        ESCL.write(setLSpeed);
+        ESCR.write(setRSpeed);
         updateMotorControl = false;        
     }
 }
@@ -744,7 +786,8 @@ void BLEScan(int BotNumber){
 			size_t svcCount = scanResults[ii].advertisingData.serviceUUID(&foundServiceUuid, 1);
             uint8_t BLECustomData[CUSTOM_DATA_LEN];
             scanResults->advertisingData.customData(BLECustomData,CUSTOM_DATA_LEN);
-            if (svcCount > 0 && foundServiceUuid == serviceUuid) {
+            if(BLECustomData[0] == BOTNUM) return;  //Don't connect to yourself...
+            if (svcCount > 0 && foundServiceUuid == WaterNetService) {
                 if(BotNumber == -2){
                     bool newBot = true;
                     PairBot *existingBot;
@@ -767,28 +810,12 @@ void BLEScan(int BotNumber){
                 if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
                     peer = BLE.connect(scanResults[ii].address);
 				    if (peer.connected()) {
-                        meshPair = false;
                         uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
                         scanResults[ii].advertisingData.customData(bufName, BLE_MAX_ADV_DATA_LEN);
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
 					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
-                        peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
 						Serial.printlnf("Connected to Bot %d",bufName[0]);
                         bool newBot = true;
-                        for(WaterBot w: WaterBots){
-                            if(bufName[0] == w.botNum){
-                                newBot = false;
-                                w.BLEAvail = true;
-                            }
-                        }
-                        if(newBot){
-                            Serial.println("Found a new water bot ID");
-                            WaterBot newWaterbot;
-                            newWaterbot.BLEAvail = true;
-                            newWaterbot.botNum = bufName[0];
-                            WaterBots.push_back(newWaterbot);
-                            BLEBot = &WaterBots.back();
-                        }
                     }
                     break;
                 }
