@@ -67,7 +67,6 @@ boolean SFE_UBLOX_GPS::checkUblox()
 		checkUbloxI2C();
 	else if(commType == COMM_TYPE_SERIAL)
 		checkUbloxSerial();
-  return (true);
 }
 
 //Polls I2C for data, passing any new bytes to process()

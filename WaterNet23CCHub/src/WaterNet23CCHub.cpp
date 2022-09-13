@@ -19,6 +19,7 @@ void XBeeLTEPairSet();
 void setup();
 void loop();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
+void setupXBee();
 void BLEScan(int BotNumber);
 void DataOffloader();
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
@@ -43,6 +44,8 @@ void actionTimer60();
 #define MAX_LTE_STATUSES        25
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bots
 #define PAIR_BUTTON             D3
+#define JOYH_ADC                A0              //Horizontal Joystick
+#define JOYV_ADC                A1              //Vertical Joystick ADC pin
 
 
 // This example does not require the cloud so you can run it in manual mode or
@@ -191,10 +194,15 @@ void XBeeLTEPairSet(){
 
 void setup() {
 
-    Serial.begin(115200);
-    pinMode(A0, INPUT_PULLDOWN);
+    pinMode(PAIR_BUTTON,INPUT_PULLDOWN);
     pinMode(D7, OUTPUT);
+
+    Serial.begin(115200);
+    Serial1.begin(9600);                        //Start serial for XBee module
+    setupXBee();
+
 	BLE.on();
+
     peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
 
@@ -224,10 +232,10 @@ void setup() {
         logMessages = false;
     }
     
-    startupPair();
+    //startupPair();
 
     at1.start();
-    at2.stop();
+    at2.start();
 }
 
 void loop() {
@@ -247,9 +255,15 @@ void loop() {
         //uint8_t testBuf[30];
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
-        sendData("CCB1ptsbigbot",0,true,false,false);
+        //sendData("CCB1ptsbigbot",0,true,false,false);
+        char sendStr[18];
+        
+        sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
+        Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
+        Serial.println(sendStr);
+        sendData(sendStr,0,false,true,false);
         digitalWrite(D7,HIGH);
-        delay(1000);
+        delay(250);
     }
     else {
         digitalWrite(D7,LOW);
@@ -262,6 +276,7 @@ void loop() {
     }
     if(offloadingMode) DataOffloader();
     XBeeHandler();
+    XBeeLTEPairSet();
 }
 
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -405,9 +420,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             delay(5);
             myFile.close();
         }
-        else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
-            
-        }
         else{   //Didn't recognize command (may be corrupted?) send back error signal
             if(mode == 1){
 
@@ -424,14 +436,21 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     }
 }
 
+void setupXBee(){
+    Serial1.printf("\n");    //First character to set Bypass mode
+    delay(20);              //Wait some time before sending next character
+    Serial1.printf("B");     //Second character to set Bypass mode
+    delay(20);
+}
+
 void BLEScan(int BotNumber){
     size_t count = BLE.scan(scanResults, SCAN_RESULT_COUNT);
 	if (count > 0) {
 		for (uint8_t ii = 0; ii < count; ii++) {
 			BleUuid foundServiceUuid;
-			size_t svcCount = scanResults[ii].advertisingData.serviceUUID(&foundServiceUuid, 1);
+			size_t svcCount = scanResults[ii].advertisingData().serviceUUID(&foundServiceUuid, 1);
             uint8_t BLECustomData[CUSTOM_DATA_LEN];
-            scanResults->advertisingData.customData(BLECustomData,CUSTOM_DATA_LEN);
+            scanResults->advertisingData().customData(BLECustomData,CUSTOM_DATA_LEN);
             if (svcCount > 0 && foundServiceUuid == serviceUuid) {
                 if(BotNumber == -2){
                     bool newBot = true;
@@ -444,20 +463,20 @@ void BLEScan(int BotNumber){
                     }
                     if(newBot){
                         PairBot NewBot;
-                        NewBot.rssi = scanResults->rssi;
+                        NewBot.rssi = scanResults->rssi();
                         NewBot.botNum = BLECustomData[0];
                         BLEPair.push_back(NewBot);
                     }
                     else{
-                        existingBot->rssi = (scanResults->rssi + existingBot->rssi) >> 1;
+                        existingBot->rssi = (scanResults->rssi() + existingBot->rssi) >> 1;
                     }
                 }
                 if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
-                    peer = BLE.connect(scanResults[ii].address);
+                    peer = BLE.connect(scanResults[ii].address());
 				    if (peer.connected()) {
                         meshPair = false;
                         uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
-                        scanResults[ii].advertisingData.customData(bufName, BLE_MAX_ADV_DATA_LEN);
+                        scanResults[ii].advertisingData().customData(bufName, BLE_MAX_ADV_DATA_LEN);
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
 					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
                         peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
@@ -523,7 +542,8 @@ void XBeeHandler(){
     while(Serial1.available()){
         String data = Serial1.readStringUntil('\n');
         char buffer[data.length()];
-        for(int i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+        for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+        if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
         processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
@@ -609,6 +629,7 @@ void actionTimer5(){
     for(WaterBot w: WaterBots){
         w.timeoutCount++;
     }
+    //if(!BLE.connected)
 }
 
 void actionTimer60(){

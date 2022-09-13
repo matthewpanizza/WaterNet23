@@ -5,6 +5,6 @@
         "*.ino": "cpp"
     },
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0",
+    "particle.firmwareVersion": "1.5.2",
     "particle.targetDevice": ""
 }
