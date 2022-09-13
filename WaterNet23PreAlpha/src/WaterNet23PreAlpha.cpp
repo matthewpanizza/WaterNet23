@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -23,7 +23,7 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 void wdogHandler();
 void LEDHandler();
 void BLEScan(int BotNumber);
-#line 12 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 12 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #undef min
 #undef max
 #include <vector>
@@ -34,7 +34,7 @@ void BLEScan(int BotNumber);
 
 #define BOTNUM 1
 #define STARTUP_WAIT_PAIR 0
-#define ESC_PWM_L D4
+#define ESC_PWM_L D6
 #define ESC_PWM_R D5
 #define chipSelect D8
 
@@ -246,6 +246,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             setLSpeed = atoi(lSpd);
             setRSpeed = atoi(rSpd);
             Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",setLSpeed,setRSpeed);
+            ESCL.write(setLSpeed);
+            ESCR.write(setRSpeed);
             updateMotorControl = true;
             manualRC = true;
         }
@@ -290,12 +292,16 @@ void setup(){
     status.setActive(true);
 
     uint32_t mtrArmTime = millis();
+    setLSpeed = 90;
+    setRSpeed = 90;
     ESCL.attach(ESC_PWM_L,1000,2000); //Initialize motor control
     ESCR.attach(ESC_PWM_R,1000,2000);
-    delay(1000);
-    ESCL.write(90);                   //Set ESC position to 90 for at least 2 seconds to "arm" the motors
-    ESCR.write(90);
+    ESCL.write(setLSpeed);                   //Set ESC position to 90 for at least 2 seconds to "arm" the motors
+    ESCR.write(setRSpeed);
     delay(2000);
+    //ESCL.write(100);
+    //delay(5000);
+    //ESCL.write(90);
 
     BLE.on();
     
@@ -395,9 +401,10 @@ void loop(){
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }*/
-    sensorHandler();
+    /*sensorHandler();
     XBeeHandler();
     statusUpdate();
+    //ESCL.write(100);
     updateMotors();
     if(offloadMode) dataOffloader();
     if(errModeReply){
@@ -405,7 +412,7 @@ void loop(){
         errModeReply = 0;
     }
     sendResponseData();
-    delay(100);
+    delay(100);*/
 }
 
 //This function gets called from the SparkFun Ublox Arduino Library
@@ -493,8 +500,7 @@ void statusUpdate(){
 
 void updateMotors(){
     if(updateMotorControl){
-        ESCL.write(setLSpeed);
-        ESCR.write(setRSpeed);
+        
         updateMotorControl = false;        
     }
 }
@@ -797,7 +803,7 @@ void LEDHandler(){
 }
 
 void BLEScan(int BotNumber){
-    size_t count = BLE.scan(scanResults, SCAN_RESULT_COUNT);
+    /*size_t count = BLE.scan(scanResults, SCAN_RESULT_COUNT);
 	if (count > 0) {
 		for (uint8_t ii = 0; ii < count; ii++) {
 			BleUuid foundServiceUuid;
@@ -839,5 +845,5 @@ void BLEScan(int BotNumber){
                 }
 			}
 		}
-	}
+	}*/
 }
