@@ -2,7 +2,11 @@
     "extensions.ignoreRecommendations": true,
     "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
     "files.associations": {
-        "*.ino": "cpp"
+        "*.ino": "cpp",
+        "chrono": "cpp",
+        "limits": "cpp",
+        "ratio": "cpp",
+        "algorithm": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "1.5.2",
