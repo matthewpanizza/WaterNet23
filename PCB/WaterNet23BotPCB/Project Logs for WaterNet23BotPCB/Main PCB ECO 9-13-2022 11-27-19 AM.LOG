@@ -1,0 +1,8 @@
+Added Component: Designator=U18(U-Blox NEO-M8U)
+Added Pin To Net: NetName=SDA Pin=U18-1
+Added Pin To Net: NetName=SCL Pin=U18-2
+Added Pin To Net: NetName=3V3 Pin=U18-3
+Added Pin To Net: NetName=GND Pin=U18-4
+Added Pin To Net: NetName=GND Pin=U18-9
+Added Pin To Net: NetName=3V3 Pin=U18-11
+Added Member To Class: ClassName=MainPCB Member=Component U18 U-Blox NEO-M8U Breakout
