@@ -148,7 +148,7 @@ LEDStatus status;
 
 //////////////////////
 // Global Variables //
-//////////////////////
+/////////////////////
 
 bool waitForConnection;
 long latitude_mdeg, longitude_mdeg;
@@ -245,6 +245,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             char rSpd[3] = {dataStr[3],dataStr[4],dataStr[5]};
             setLSpeed = atoi(lSpd);
             setRSpeed = atoi(rSpd);
+            Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",setLSpeed,setRSpeed);
             updateMotorControl = true;
             manualRC = true;
         }
@@ -291,8 +292,10 @@ void setup(){
     uint32_t mtrArmTime = millis();
     ESCL.attach(ESC_PWM_L,1000,2000); //Initialize motor control
     ESCR.attach(ESC_PWM_R,1000,2000);
+    delay(1000);
     ESCL.write(90);                   //Set ESC position to 90 for at least 2 seconds to "arm" the motors
     ESCR.write(90);
+    delay(2000);
 
     BLE.on();
     
