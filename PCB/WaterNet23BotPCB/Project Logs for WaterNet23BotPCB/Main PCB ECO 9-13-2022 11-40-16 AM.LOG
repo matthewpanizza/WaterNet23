@@ -1,0 +1,3 @@
+Removed Pin From Net: NetName=MCU_Tx Pin=P20-1
+Removed Pin From Net: NetName=MCU_Rx Pin=P20-2
+Removed Member From Class: ClassName=MainPCB Member=P20
