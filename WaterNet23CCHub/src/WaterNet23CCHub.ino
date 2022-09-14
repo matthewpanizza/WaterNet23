@@ -24,7 +24,8 @@
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define MAX_LTE_STATUSES        25
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bots
-#define PAIR_BUTTON             D3
+#define PAIR_BUTTON             A3
+#define OFFLOAD_BTN             A2
 #define JOYH_ADC                A0              //Horizontal Joystick
 #define JOYV_ADC                A1              //Vertical Joystick ADC pin
 
@@ -176,6 +177,7 @@ void XBeeLTEPairSet(){
 void setup() {
 
     pinMode(PAIR_BUTTON,INPUT_PULLDOWN);
+    pinMode(OFFLOAD_BTN,INPUT_PULLDOWN);
     pinMode(D7, OUTPUT);
 
     Serial.begin(115200);
@@ -237,12 +239,14 @@ void loop() {
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
         //sendData("CCB1ptsbigbot",0,true,false,false);
+        if(digitalRead(OFFLOAD_BTN)) offloadingMode = true;
+
         char sendStr[18];
         
         sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
         Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
         Serial.println(sendStr);
-        sendData(sendStr,0,false,true,false);
+        sendData(sendStr,0,true,false,false);
         digitalWrite(D7,HIGH);
         delay(250);
     }
@@ -255,6 +259,7 @@ void loop() {
     	}
 
     }
+    //if(!logMessages) Serial.println("DANGER SD CARD NOT WORKING");
     if(offloadingMode) DataOffloader();
     XBeeHandler();
     XBeeLTEPairSet();
