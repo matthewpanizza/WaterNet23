@@ -361,9 +361,6 @@ void setup(){
     }
     if(STARTUP_WAIT_PAIR){
         waitForConnection = true;
-    }
-    if(STARTUP_WAIT_PAIR){
-        waitForConnection = true;
         uint32_t publishMS = millis();
         char dataBuf[10];
         sprintf(dataBuf,"B%dCChwd",BOTNUM);
@@ -457,9 +454,9 @@ bool getGPSLatLon(){
 //Function to check if response data to a request needs to be sent out
 void sendResponseData(){
     if(requestActive){
-        char responseStr[50];
-        memcpy(responseStr,0,50);
-        sprintf(responseStr,"GL%0.6f,GO%0.6f,DO%0.4f,PH%0.4f,CA%0.4f,CB%0.4f,TP%0.4f",latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
+        char responseStr[65];
+        memcpy(responseStr,0,65);
+        sprintf(responseStr,"B%dCCsnsGL%0.6f,GO%0.6f,DO%0.4f,PH%0.4f,CA%0.4f,CB%0.4f,TP%0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
