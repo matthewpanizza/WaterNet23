@@ -9,6 +9,6 @@
         "algorithm": "cpp"
     },
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "1.5.2",
+    "particle.firmwareVersion": "4.0.0",
     "particle.targetDevice": ""
 }
