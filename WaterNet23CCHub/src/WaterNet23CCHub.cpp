@@ -18,6 +18,7 @@ void startupPair();
 void XBeeLTEPairSet();
 void setup();
 void loop();
+void updateMenu();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void setupXBee();
 void BLEScan(int BotNumber);
@@ -27,6 +28,13 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
 void actionTimer5();
 void actionTimer60();
+void WaterBotSim(uint8_t count);
+void entHandler();
+void rHandler();
+void lHandler();
+void uHandler();
+void dHandler();
+void jHandler();
 #line 12 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
@@ -39,7 +47,7 @@ void actionTimer60();
 #define JOYV_ADC                A3              //Vertical Joystick ADC pin
 #define JOY_BTN                 D23             //Joystick button press
 #define L_DPAD                  A4              //Left DPAD button
-#define R_DPAD                  D6              //Right DPAD button
+#define R_DPAD                  A0              //Right DPAD button
 #define U_DPAD                  A5              //Up DPAD button
 #define D_DPAD                  D7              //Down DPAD button
 #define E_DPAD                  D22              //"Enter" DPAD button
@@ -56,6 +64,10 @@ void actionTimer60();
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define MAX_LTE_STATUSES        25
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
+
+//Menu Parameters
+#define MAX_MENU_ITEMS          2
+#define DEBOUNCE_MS             30
 
 
 // This example does not require the cloud so you can run it in manual mode or
@@ -118,6 +130,13 @@ char errCmdStr[3];
 char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t LTEStatuses;
+
+//Menu variables
+uint8_t botSelect;
+bool redrawMenu = true;
+bool selectingBots = true;
+uint8_t menuItem = 0;
+uint32_t debounceTime;
 
 class WaterBot{
     public:
@@ -211,11 +230,15 @@ void startupPair(){
             oled.setCursor(0,16);
             oled.printlnf("Bot: %d",selectedBot);
             oled.display();
+            botSelect = selectedBot;
             while(meshPair){
                 BLEScan(selectedBot);
                 BLETimeout++;
                 if(WaterBots.size() == 0 && BLETimeout == LTE_BKP_Time) Particle.publish("Bot1dat", "CCABhwd", PRIVATE);
-                if(BLETimeout > BLE_MAX_CONN_TIME) meshPair = false;
+                if(BLETimeout > BLE_MAX_CONN_TIME){
+                    meshPair = false;
+                    botSelect = WaterBots.front().botNum;
+                }
                 delay(100);
             }
             oled.clearDisplay();
@@ -233,6 +256,8 @@ void XBeeLTEPairSet(){
     }
 }
 
+void rHandler(void);
+
 void setup() {
 
     pinMode(E_DPAD,INPUT_PULLUP);
@@ -241,6 +266,15 @@ void setup() {
     pinMode(L_DPAD,INPUT_PULLUP);
     pinMode(R_DPAD,INPUT_PULLUP);
     pinMode(JOY_BTN,INPUT_PULLUP);
+    
+    attachInterrupt(E_DPAD,entHandler,FALLING);
+    attachInterrupt(U_DPAD,uHandler,FALLING);
+    attachInterrupt(D_DPAD,dHandler,FALLING);
+    attachInterrupt(L_DPAD,lHandler,FALLING);
+    attachInterrupt(R_DPAD,rHandler,FALLING);
+    attachInterrupt(JOY_BTN,jHandler,FALLING);
+
+    debounceTime = millis();
 
     Serial.begin(115200);
     Serial1.begin(9600);                        //Start serial for XBee module
@@ -277,6 +311,7 @@ void setup() {
     advData.appendServiceUUID(RemoteService); // Add the app service
     advData.appendLocalName("RemoteTest");           //Local advertising name
     BLE.advertise(&advData);                    //Start advertising the characteristics*/
+
     if (!sd.begin(chipSelect, SD_SCK_MHZ(4))) {
         Serial.println("Error: could not connect to SD card!");
         logMessages = false;
@@ -292,7 +327,7 @@ void setup() {
     at1.start();
     at2.start();
 
-    
+    WaterBotSim(6);
 }
 
 void loop() {
@@ -305,6 +340,10 @@ void loop() {
         statusTimeout = false;
     }
 
+    updateMenu();
+    Serial.printlnf("Selected Bot: %d",botSelect);
+
+    
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -317,10 +356,10 @@ void loop() {
 
         char sendStr[18];
         
-        sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
-        Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
-        Serial.println(sendStr);
-        sendData(sendStr,0,true,false,false);
+        //sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
+        //Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
+        //Serial.println(sendStr);
+        //sendData(sendStr,0,true,false,false);
         //digitalWrite(D7,HIGH);
         delay(250);
     }
@@ -336,6 +375,30 @@ void loop() {
     if(offloadingMode) DataOffloader();
     XBeeHandler();
     XBeeLTEPairSet();
+}
+
+void updateMenu(){
+    if(redrawMenu){
+        oled.fillRect(0,0,128,15,0);
+        for(uint8_t i = 0; i < WaterBots.size(); i++){
+            if(WaterBots.at(i).botNum == botSelect){
+                oled.setCursor(5+18*i,4);
+                oled.setTextSize(1);
+                oled.setTextColor(0);
+                oled.fillRect(1+i*18,1,14,14,1);
+                oled.printf("%d",WaterBots.at(i).botNum);
+            }
+            else{
+                oled.setCursor(5+18*i,4);
+                oled.setTextSize(1);
+                oled.setTextColor(1);
+                oled.drawRect(1+i*18,1,14,14,1);
+                oled.printf("%d",WaterBots.at(i).botNum);
+            }
+        }
+        oled.display();
+        redrawMenu = false;
+    }
 }
 
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -708,4 +771,70 @@ void actionTimer60(){
         LTEStatuses++;
         statusTimeout = true;
     }
+}
+
+void WaterBotSim(uint8_t count){
+    if(count + WaterBots.size() > 10) count = 10-WaterBots.size();
+    uint8_t botloop = count+WaterBots.size();
+    for(uint8_t temp = 0; temp < botloop; temp++){
+        int dupeBot = false;
+        for(WaterBot wb: WaterBots){
+            if(wb.botNum == temp) dupeBot = true;
+        }
+        if(dupeBot) continue;
+        WaterBot simBot;
+        simBot.botNum = temp;
+        simBot.BLEAvail = false;
+        simBot.XBeeAvail = true;
+        simBot.LTEAvail = false;
+        WaterBots.push_back(simBot);
+    }
+
+}
+
+void entHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
+    //selectingBots = !selectingBots;
+}
+void rHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
+    Serial.println("Right trigger");
+    if(selectingBots){
+        if(botSelect != WaterBots.back().botNum){
+            bool findCurrent = false;
+            for(WaterBot ws: WaterBots){
+                if(findCurrent){
+                    botSelect = ws.botNum;
+                    break;
+                }
+                if(ws.botNum == botSelect) findCurrent = true;
+            }
+            redrawMenu = true;   
+        }
+    }
+}
+void lHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
+    if(selectingBots){
+        if(botSelect != WaterBots.front().botNum){
+            uint8_t newBotNum;
+            for(WaterBot ws: WaterBots){
+                if(ws.botNum == botSelect) botSelect = newBotNum;
+                else newBotNum = ws.botNum;
+            }
+            redrawMenu = true;   
+        }
+    }
+}
+void uHandler(){
+    if(menuItem) menuItem--;
+}
+void dHandler(){
+    if(menuItem < MAX_MENU_ITEMS) menuItem++;
+}
+void jHandler(){
+    
 }
