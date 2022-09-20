@@ -31,8 +31,21 @@ void actionTimer60();
 #undef min
 #undef max
 #include <vector>
+#include "oled-wing-adafruit.h"
 
-#define chipSelect D8
+// Pin Definitions
+
+#define JOYH_ADC                A2              //Horizontal Joystick
+#define JOYV_ADC                A3              //Vertical Joystick ADC pin
+#define JOY_BTN                 D23             //Joystick button press
+#define L_DPAD                  A4              //Left DPAD button
+#define R_DPAD                  D6              //Right DPAD button
+#define U_DPAD                  A5              //Up DPAD button
+#define D_DPAD                  D7              //Down DPAD button
+#define E_DPAD                  D22              //"Enter" DPAD button
+#define chipSelect              D8              //SD Card chip select pin
+
+//Program Parameters
 
 #define DEF_FILENAME            "WaterBot"
 #define BLE_OFFLD_BUF           100
@@ -42,11 +55,7 @@ void actionTimer60();
 #define XBEE_BLE_MAX_TIMEOUT    36
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define MAX_LTE_STATUSES        25
-#define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bots
-#define PAIR_BUTTON             A3
-#define OFFLOAD_BTN             A2
-#define JOYH_ADC                A0              //Horizontal Joystick
-#define JOYV_ADC                A1              //Vertical Joystick ADC pin
+#define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 
 
 // This example does not require the cloud so you can run it in manual mode or
@@ -77,6 +86,9 @@ BleCharacteristic peerTxCharacteristic;
 BleCharacteristic peerRxCharacteristic;
 BleCharacteristic peerOffloadCharacteristic;
 BlePeerDevice peer;
+
+//OLED Object
+OledWingAdafruit oled;
 
 //SD File system object
 SdFat sd((SPIClass*)&SPI1);
@@ -154,25 +166,51 @@ void dataLTEHandler(const char *event, const char *data){
 
 void startupPair(){
     startConnect = false;
+    oled.clearDisplay();
+    oled.setCursor(0,0);
+    oled.print("Scanning ");
+    oled.fillCircle(115,7,3,WHITE);
+    oled.display();
+    uint8_t loadAnim = 0;
     while(!startConnect){
+        oled.setCursor(0,16);
+        oled.fillRect(72,16,35,15,0);
+        oled.printlnf("Bots: %d",BLEPair.size());
+        Serial.printlnf("Array size: %d",BLEPair.size());
+        oled.drawCircle(115,7,loadAnim,WHITE);
+        if(loadAnim-1) oled.fillCircle(115,7,loadAnim-1,0);
+        oled.display();
+        loadAnim++;
+        if(loadAnim > 7){
+            loadAnim = 0;
+            oled.drawCircle(115,7,7,0);
+        }
         BLEScan(-2);
         XBeeHandler();
         XBeeLTEPairSet();
-        delay(100);
-        if(digitalRead(PAIR_BUTTON)){
+        
+        //delay(50);
+        if(digitalRead(E_DPAD) == LOW){
             int minRSSI = -999;
             int selectedBot = -1;
             for(PairBot pb: BLEPair){
                 if(pb.rssi > minRSSI){
                     minRSSI = pb.rssi;
                     selectedBot = pb.botNum;
+                    Serial.println("Found a local bot");
                 }
                 
             }
-            if(selectedBot > 0){
+            if(selectedBot >= 0){
                 meshPair = true;    //Did we find any bots over BLE
             }
             uint8_t BLETimeout = 0;
+            oled.clearDisplay();
+            oled.setCursor(0,0);
+            oled.print("Connecting");
+            oled.setCursor(0,16);
+            oled.printlnf("Bot: %d",selectedBot);
+            oled.display();
             while(meshPair){
                 BLEScan(selectedBot);
                 BLETimeout++;
@@ -180,6 +218,8 @@ void startupPair(){
                 if(BLETimeout > BLE_MAX_CONN_TIME) meshPair = false;
                 delay(100);
             }
+            oled.clearDisplay();
+            oled.display();
         }
     }
 }
@@ -195,15 +235,19 @@ void XBeeLTEPairSet(){
 
 void setup() {
 
-    pinMode(PAIR_BUTTON,INPUT_PULLDOWN);
-    pinMode(OFFLOAD_BTN,INPUT_PULLDOWN);
-    pinMode(D7, OUTPUT);
+    pinMode(E_DPAD,INPUT_PULLUP);
+    pinMode(U_DPAD,INPUT_PULLUP);
+    pinMode(D_DPAD,INPUT_PULLUP);
+    pinMode(L_DPAD,INPUT_PULLUP);
+    pinMode(R_DPAD,INPUT_PULLUP);
+    pinMode(JOY_BTN,INPUT_PULLUP);
 
     Serial.begin(115200);
     Serial1.begin(9600);                        //Start serial for XBee module
     setupXBee();
 
 	BLE.on();
+    BLE.setScanTimeout(50);
 
     peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
@@ -223,6 +267,10 @@ void setup() {
     strcat(filenameMessages,timestamp);
     strcat(filenameMessages,"_LOG.txt");
 
+    oled.setup(); 
+    oled.clearDisplay();
+    oled.display();
+
     /*BleAdvertisingData advData;                 //Advertising data
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
@@ -233,11 +281,18 @@ void setup() {
         Serial.println("Error: could not connect to SD card!");
         logMessages = false;
     }
+    oled.setTextSize(2);
+    oled.setTextColor(WHITE);
+    oled.setCursor(0,0);
+    oled.print(" Starting ");
+    oled.display();
     
-    //startupPair();
+    startupPair();
 
     at1.start();
     at2.start();
+
+    
 }
 
 void loop() {
@@ -258,7 +313,7 @@ void loop() {
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
         //sendData("CCB1ptsbigbot",0,true,false,false);
-        if(digitalRead(OFFLOAD_BTN)) offloadingMode = true;
+        //if(digitalRead(OFFLOAD_BTN)) offloadingMode = true;
 
         char sendStr[18];
         
@@ -266,11 +321,11 @@ void loop() {
         Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
         Serial.println(sendStr);
         sendData(sendStr,0,true,false,false);
-        digitalWrite(D7,HIGH);
+        //digitalWrite(D7,HIGH);
         delay(250);
     }
     else {
-        digitalWrite(D7,LOW);
+        //digitalWrite(D7,LOW);
     	if (millis() - lastScan >= SCAN_PERIOD_MS) {
     		// Time to scan
     		lastScan = millis();
@@ -278,7 +333,6 @@ void loop() {
     	}
 
     }
-    //if(!logMessages) Serial.println("DANGER SD CARD NOT WORKING");
     if(offloadingMode) DataOffloader();
     XBeeHandler();
     XBeeLTEPairSet();
@@ -454,32 +508,37 @@ void BLEScan(int BotNumber){
 		for (uint8_t ii = 0; ii < count; ii++) {
 			BleUuid foundServiceUuid;
 			size_t svcCount = scanResults[ii].advertisingData().serviceUUID(&foundServiceUuid, 1);
-            uint8_t BLECustomData[CUSTOM_DATA_LEN];
-            scanResults->advertisingData().customData(BLECustomData,CUSTOM_DATA_LEN);
             if (svcCount > 0 && foundServiceUuid == serviceUuid) {
+                uint8_t BLECustomData[CUSTOM_DATA_LEN];
+                scanResults[ii].advertisingData().customData(BLECustomData,CUSTOM_DATA_LEN);
                 if(BotNumber == -2){
+                    Serial.printlnf("Found Bot #: %d %d %d %d %d %d %d %d, services: %d",BLECustomData[0],BLECustomData[1],BLECustomData[2],BLECustomData[3],BLECustomData[4],BLECustomData[5],BLECustomData[6],BLECustomData[7], svcCount);
                     bool newBot = true;
                     PairBot *existingBot;
                     for(PairBot p: BLEPair){
                         if(BLECustomData[0] == p.botNum){
                             newBot = false;
                             existingBot = &p;
+                            
                         } 
                     }
                     if(newBot){
+                        
                         PairBot NewBot;
-                        NewBot.rssi = scanResults->rssi();
+                        NewBot.rssi = scanResults[ii].rssi();
                         NewBot.botNum = BLECustomData[0];
                         BLEPair.push_back(NewBot);
+                        Serial.printlnf("Found new bot: %d", BLECustomData[0],BLEPair.size());
                     }
                     else{
-                        existingBot->rssi = (scanResults->rssi() + existingBot->rssi) >> 1;
+                        existingBot->rssi = (scanResults[ii].rssi() + existingBot->rssi) >> 1;
                     }
                 }
                 if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
                     peer = BLE.connect(scanResults[ii].address());
 				    if (peer.connected()) {
                         meshPair = false;
+                        startConnect = true;
                         uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
                         scanResults[ii].advertisingData().customData(bufName, BLE_MAX_ADV_DATA_LEN);
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);

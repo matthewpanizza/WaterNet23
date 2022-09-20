@@ -32,12 +32,14 @@ void BLEScan(int BotNumber);
 // BOT CONFIGURATION MACROS //
 //////////////////////////////
 
-#define BOTNUM 1
-#define STARTUP_WAIT_PAIR 0
-#define ESC_PWM_L D6
-#define ESC_PWM_R D5
-#define chipSelect A4
-#define REPL_NAK        false
+#define BOTNUM              1
+#define STARTUP_WAIT_PAIR   0
+
+//Pin Configuration
+
+#define ESC_PWM_L           D6
+#define ESC_PWM_R           D5
+#define chipSelect          D8
 
 ////////////////////
 // PROGRAM MACROS //
@@ -67,6 +69,8 @@ void BLEScan(int BotNumber);
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
+
+#define REPL_NAK            false
 
 SYSTEM_MODE(MANUAL);
 
