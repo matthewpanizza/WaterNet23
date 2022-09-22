@@ -10,7 +10,6 @@
  * Date:
  */
 
-//https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-09032/6823623
 
 #include "application.h"
 #include "SdFat.h"
@@ -35,7 +34,7 @@ void lHandler();
 void uHandler();
 void dHandler();
 void jHandler();
-#line 12 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -151,6 +150,11 @@ class WaterBot{
     bool offloading;
     float GPSLat;
     float GPSLon;
+    float pH;
+    float temp;
+    float DO;
+    float Cond;
+    float MCond;
     uint32_t timeoutCount;
 };
 
@@ -251,7 +255,7 @@ void XBeeLTEPairSet(){
     for(WaterBot p: PairBots){
         char replyStr[10];
         sprintf(replyStr,"CCB%dhwa",p.botNum);
-        sendData(replyStr,0,false,p.XBeeAvail,p.LTEAvail);
+        sendData(replyStr,0,true,p.XBeeAvail,p.LTEAvail);
         PairBots.pop_back();
     }
 }
@@ -281,7 +285,8 @@ void setup() {
     setupXBee();
 
 	BLE.on();
-    BLE.setScanTimeout(50);
+    BLE.setScanTimeout(50);  //100ms scan
+    BLE.setTxPower(8);
 
     peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
@@ -312,7 +317,7 @@ void setup() {
     advData.appendLocalName("RemoteTest");           //Local advertising name
     BLE.advertise(&advData);                    //Start advertising the characteristics*/
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(4))) {
+    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
         Serial.println("Error: could not connect to SD card!");
         logMessages = false;
     }
@@ -327,7 +332,7 @@ void setup() {
     at1.start();
     at2.start();
 
-    WaterBotSim(6);
+    //WaterBotSim(6);
 }
 
 void loop() {
@@ -341,9 +346,9 @@ void loop() {
     }
 
     updateMenu();
-    Serial.printlnf("Selected Bot: %d",botSelect);
+    Serial.printlnf("Selected Bot: %d ",botSelect);
 
-    
+    if(!logMessages) Serial.println("Error, SD Card Not working");
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -352,10 +357,11 @@ void loop() {
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
         //sendData("CCB1ptsbigbot",0,true,false,false);
-        //if(digitalRead(OFFLOAD_BTN)) offloadingMode = true;
+        if(!digitalRead(D_DPAD)) sendData("CCB1req",0,true,false,false);//offloadingMode = true;
 
-        char sendStr[18];
-        
+        for(WaterBot ws: WaterBots) Serial.printlnf("Temp: %0.6f",ws.temp);
+
+        //char sendStr[18];
         //sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
         //Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
         //Serial.println(sendStr);
@@ -404,12 +410,27 @@ void updateMenu(){
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
-        uint8_t checksum;
-        char dataStr[strlen(command)-8];
-        dataStr[strlen(command)-9] = '\0';
+        
         char rxIDBuf[1];
         rxIDBuf[0] = command[1];
         uint8_t rxBotID = atoi(rxIDBuf);
+        bool newBot = true;
+        WaterBot *TargetWB;
+        for(WaterBot w: WaterBots){
+            if(rxBotID == w.botNum){
+                newBot = false;
+                TargetWB = &w;
+            }
+        }
+        if(newBot){
+            WaterBot newWaterbot;
+            newWaterbot.botNum = rxBotID;
+            WaterBots.push_back(newWaterbot);
+            TargetWB = &newWaterbot;
+        }
+        uint8_t checksum;
+        char dataStr[strlen(command)-8];
+        dataStr[strlen(command)-9] = '\0';
         char cmdStr[4];
         cmdStr[3] = '\0';
         char checkStr[3];
@@ -451,11 +472,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             return;
         }
         else if(!strcmp(cmdStr,"sup")){
-            
-            bool newBot = true;
             for(WaterBot w: WaterBots){
                 if(rxBotID == w.botNum){
-                    newBot = false;
                     uint8_t battpct;
                     uint8_t statflags;
                     float latRX;
@@ -488,29 +506,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 }
 
             }
-            if(newBot){
-                Serial.println("Found a new water bot ID");
-                WaterBot newWaterbot;
-                newWaterbot.BLEAvail = true;
-                newWaterbot.botNum = rxBotID;
-                newBot = false;
-                uint8_t battpct;
-                uint8_t statflags;
-                float latRX;
-                float lonRX;
-                sscanf(dataStr,"%u %u %f %f",&battpct,&statflags,&latRX,&lonRX);
-                newWaterbot.battPercent = battpct;
-                newWaterbot.LTEAvail = statflags & 1;
-                newWaterbot.XBeeAvail = (statflags >> 1) & 1;
-                newWaterbot.BLEAvail = (statflags >> 2) & 1;
-                newWaterbot.offloading = (statflags >> 3) & 1;
-                newWaterbot.manualRC = (statflags >> 4) & 1;
-                newWaterbot.lowBatt = (statflags >> 5) & 1;
-                newWaterbot.dataRecording = (statflags >> 6) & 1;
-                newWaterbot.GPSLat = latRX;
-                newWaterbot.GPSLon = lonRX;
-                WaterBots.push_back(newWaterbot);
-            }
+        }
+        if(!strcmp(cmdStr,"sns")){
+            double inTemp;
+            sscanf(dataStr,"%lf %lf %lf %lf %lf %lf %lf",&TargetWB->GPSLat,&TargetWB->GPSLon,&TargetWB->DO,&TargetWB->pH,&TargetWB->Cond,&TargetWB->MCond,&inTemp);
+            Serial.printlnf("Bot #: %d Temp: %lf", TargetWB->botNum,inTemp);
         }
         else if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
             strncpy(errCmdStr,dataStr,3);
@@ -609,17 +609,19 @@ void BLEScan(int BotNumber){
                         peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
 						Serial.printlnf("Connected to Bot %d",bufName[0]);
                         bool newBot = true;
+                        WaterBot newWaterbot;
+                        newWaterbot.BLEAvail = true;
+                        newWaterbot.botNum = bufName[0];
+                        PairBots.push_back(newWaterbot);
                         for(WaterBot w: WaterBots){
                             if(bufName[0] == w.botNum){
                                 newBot = false;
                                 w.BLEAvail = true;
+                                BLEBot = &w;
                             }
                         }
                         if(newBot){
                             Serial.println("Found a new water bot ID");
-                            WaterBot newWaterbot;
-                            newWaterbot.BLEAvail = true;
-                            newWaterbot.botNum = bufName[0];
                             WaterBots.push_back(newWaterbot);
                             BLEBot = &WaterBots.back();
                         }
@@ -644,7 +646,7 @@ void DataOffloader(){
         snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
         //Particle.publish("CCHub", OffloadCommand, PRIVATE);
         memcpy(OffloadBuf,OffloadCommand,10);
-        peerRxCharacteristic.setValue(OffloadBuf,10);
+        sendData(OffloadCommand,0,true,false,false);
         Serial.printlnf("Requested SD Card Data from Bot %d Over BLE\n",BLEBot->botNum);
         delay(1000);
         if(BLEBot->botNum != OffloadingBot){
@@ -663,6 +665,7 @@ void DataOffloader(){
         OffloadingBot++;
     }
     if(logDir.isOpen()) logDir.close();
+    offloadingMode = false;
 }
 
 void XBeeHandler(){  
@@ -701,6 +704,7 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
     char fileCommand[8 + MAX_FILENAME_LEN];
     memset(fileCommand,0,8 + MAX_FILENAME_LEN);
     memcpy(fileCommand,data,8);
+    
     if(fileCommand[0] == 'f'){
         //Serial.printlnf("Found an 'f' command %s",fileCommand);
         if(!strcmp(fileCommand,"filename")){
@@ -728,6 +732,7 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
             return;
         }
     }
+    
     char dataStr[len];
     memcpy(dataStr,data,len);
     myFile.print(dataStr);

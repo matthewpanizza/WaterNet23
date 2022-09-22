@@ -10,5 +10,5 @@
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": ""
+    "particle.targetDevice": "curious_turtle"
 }

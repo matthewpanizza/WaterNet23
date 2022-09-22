@@ -1,4 +1,5 @@
 {
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0"
+    "particle.firmwareVersion": "4.0.0",
+    "particle.targetDevice": "burrito_sniper"
 }

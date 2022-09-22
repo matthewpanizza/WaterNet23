@@ -18,7 +18,7 @@
 //////////////////////////////
 
 #define BOTNUM              1
-#define STARTUP_WAIT_PAIR   0
+#define STARTUP_WAIT_PAIR   1
 
 //Pin Configuration
 
@@ -80,37 +80,18 @@ Servo ESCR;
 // BLE Configuration //
 ///////////////////////
 
-class PairBot{
-    public:
-    uint8_t botNum;
-    int rssi;
-};
-
 const char* WaterNetService = "b4206910-dc4b-5743-c8b1-92d0e75182b0"; //Main BLE Service
 const char* rxUuid          = "b4206912-dc4b-5743-c8b1-92d0e75182b0"; //GPS Latitude Service
 const char* txUuid          = "b4206913-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 const char* offldUuid       = "b4206914-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 
-const BleUuid serviceUuid("b4206910-dc4b-5743-c8b1-92d0e75182b0");
-const BleUuid peerRxUuid("b4206912-dc4b-5743-c8b1-92d0e75182b0");
-const BleUuid peerTxUuid("b4206913-dc4b-5743-c8b1-92d0e75182b0");
-
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, WaterNetService);
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, WaterNetService, BLEDataReceived, NULL);
 BleCharacteristic offloadCharacteristic("off", BleCharacteristicProperty::NOTIFY, offldUuid, WaterNetService);
 
-BleScanResult scanResults[SCAN_RESULT_COUNT];
-BleCharacteristic peerTxCharacteristic;
-BleCharacteristic peerRxCharacteristic;
-BleCharacteristic offldCopyCharacteristic;
-BlePeerDevice peer;
-
 BleAdvertisingData advData;                 //Advertising data
 
 uint8_t BLECustomData[CUSTOM_DATA_LEN];
-const unsigned long SCAN_PERIOD_MS = 2000;
-unsigned long lastScan = 0;
-std::vector<PairBot> BLEPair;
 
 //Function prototypes
 void setupSPI();
@@ -158,6 +139,7 @@ bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
+uint32_t lastStatusTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
@@ -165,19 +147,9 @@ uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
-
 String xbeeBuf;
 
 int i = 0;
-
-/*class PeerBot{
-    public:
-        uint8_t botNumber;  //Bot ID of other bot
-        bool LTEConnected;  //Status if other bot is connected to LTE
-        bool XBeeConnected; //Status if other bot is receiving XBee data
-        uint8_t BLEPeer;    //Identify which peer this bot is connected to
-
-};*/
 
 //Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -254,8 +226,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
-        else if(!strcmp(cmdStr,"ccs")){  //Incoming communication status
-            
+        else if(!strcmp(cmdStr,"spc")){  //Incoming communication status
+            lastStatusTime = millis();
+        }
+        else if(!strcmp(cmdStr,"hwa")){
+            waitForConnection = false;
         }
         else if(!strcmp(cmdStr,"aut")){  //Enter autonomous mode
             
@@ -289,9 +264,10 @@ void setup(){
     ESCR.attach(ESC_PWM_R,1000,2000);
     ESCL.write(setLSpeed);
     ESCR.write(setRSpeed);
-    delay(2000);
+    if(!STARTUP_WAIT_PAIR) delay(2000);         //Delay for 2 seconds to allow motor controllers to arm
 
     BLE.on();
+    BLE.setTxPower(8);          //Max transmitting power
     
     //Log.info("Hello from WaterNet23!");
     Serial.begin();
@@ -305,6 +281,7 @@ void setup(){
 
     senseTimer = millis();
     dataTimer = millis();
+    lastStatusTime = millis();
     XBeeRxTime = 0;
     BLERxTime = 0;
     dataWait = false;
@@ -326,6 +303,7 @@ void setup(){
     advData.appendCustomData(BLECustomData,CUSTOM_DATA_LEN);
 
     BLE.advertise(&advData);                    //Start advertising the characteristics
+
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
@@ -344,7 +322,7 @@ void setup(){
     ledTimer.start();
     statusPD.start();
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(4))) {
+    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
         Serial.println("Error: could not connect to SD card!");
         logSensors = false;
         logMessages = false;
@@ -365,7 +343,6 @@ void setup(){
         char dataBuf[10];
         sprintf(dataBuf,"B%dCChwd",BOTNUM);
         while(waitForConnection){
-            BLEScan(-2);
             XBeeHandler();
             if(millis() - publishMS >= XBEE_START_PUB){
                 publishMS = millis();
@@ -373,7 +350,9 @@ void setup(){
             }
             delay(100);
         }
+        Serial.println("Successfully paired with controller");
     }
+    
 }
 
 void loop(){
@@ -455,8 +434,9 @@ bool getGPSLatLon(){
 void sendResponseData(){
     if(requestActive){
         char responseStr[65];
-        memcpy(responseStr,0,65);
-        sprintf(responseStr,"B%dCCsnsGL%0.6f,GO%0.6f,DO%0.4f,PH%0.4f,CA%0.4f,CB%0.4f,TP%0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
+        memset(responseStr,0,65);
+        //sprintf(responseStr,"B%dCCsns %0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,69.0);
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
@@ -649,7 +629,7 @@ void wdogHandler(){
         logFile.printlnf("[WARN] XBee Messages have not been received in %ds, assuming XBee is unavailable",(XBEE_WDOG_AVAIL/1000));
         LTEAvail = false;
     }
-    if(millis()-XBeeRxTime > XBEE_WDOG_AVAIL){
+    if(millis()-XBeeRxTime > XBEE_WDOG_AVAIL || !XBeeRxTime){
         if(XBeeAvail){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[WARN] XBee Messages have not been received in %ds, assuming XBee is unavailable",(XBEE_WDOG_AVAIL/1000));
@@ -657,8 +637,8 @@ void wdogHandler(){
         XBeeAvail = false;
     }
     else XBeeAvail = true;
-    if(millis()-BLERxTime > BLE_WDOG_AVAIL){
-        if(BLEAvail){
+    if(millis()-BLERxTime > BLE_WDOG_AVAIL || !BLERxTime){
+        if(BLEAvail && BLERxTime){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[WARN] BLE Messages have not been received in %ds, assuming BLE is unavailable",(BLE_WDOG_AVAIL/1000));
         }
@@ -668,16 +648,19 @@ void wdogHandler(){
 }
 
 void dataOffloader(){
+    Serial.println("Entering Data Offloader Mode");
     if (!logDir.open("/")) {
         offloadMode = false;
+        Serial.println("Error, could not open root SD card directory");
         return;
     }
+    Serial.println("Waiting for CCHub connection...");
     while(!BLE.connected()){
         BLE.advertise(&advData);;
         delay(10);
     }
+    Serial.println("Starting transfer...");
     char fileCode[8 + MAX_FILENAME_LEN];
-    uint8_t codeBuf[8 + MAX_FILENAME_LEN];
     while (myFile.openNext(&logDir, O_RDONLY) && BLE.connected()) {
         char namebuf[MAX_FILENAME_LEN];
         myFile.getName(namebuf,MAX_FILENAME_LEN);
@@ -694,17 +677,16 @@ void dataOffloader(){
             offloadCharacteristic.setValue(fileCode);
             Serial.printlnf("File %s is a .csv or .txt printing data", namebuf);
             delay(150);
+            noInterrupts();
             while(myFile.available()){
                 char lineBuffer[BLE_OFFLD_BUF];
                 memset(lineBuffer,0,BLE_OFFLD_BUF);
+                //myFile.readBytes(lineBuffer,BLE_OFFLD_BUF);
                 myFile.readBytesUntil('\r',lineBuffer,BLE_OFFLD_BUF);
-                //uint8_t lineBytes[strlen(lineBuffer)];
-                //memcpy(lineBytes,lineBuffer,strlen(lineBuffer));
                 offloadCharacteristic.setValue(lineBuffer);
-                delayMicroseconds(500);
-                //delay(1);
                 //Serial.println(lineBuffer);
             }
+            interrupts();
             memset(fileCode,0,8+MAX_FILENAME_LEN);
             strcpy(fileCode,"filecomp");
             //memcpy(codeBuf,fileCode,8+MAX_FILENAME_LEN);
@@ -787,50 +769,4 @@ void LEDHandler(){
     status.setPattern(SetPattern);
     status.setColor(SetColor);
     status.setSpeed(SetSpeed);    
-}
-
-void BLEScan(int BotNumber){
-    /*size_t count = BLE.scan(scanResults, SCAN_RESULT_COUNT);
-	if (count > 0) {
-		for (uint8_t ii = 0; ii < count; ii++) {
-			BleUuid foundServiceUuid;
-			size_t svcCount = scanResults[ii].advertisingData.serviceUUID(&foundServiceUuid, 1);
-            uint8_t BLECustomData[CUSTOM_DATA_LEN];
-            scanResults->advertisingData.customData(BLECustomData,CUSTOM_DATA_LEN);
-            if(BLECustomData[0] == BOTNUM) return;  //Don't connect to yourself...
-            if (svcCount > 0 && foundServiceUuid == WaterNetService) {
-                if(BotNumber == -2){
-                    bool newBot = true;
-                    PairBot *existingBot;
-                    for(PairBot p: BLEPair){
-                        if(BLECustomData[0] == p.botNum){
-                            newBot = false;
-                            existingBot = &p;
-                        } 
-                    }
-                    if(newBot){
-                        PairBot NewBot;
-                        NewBot.rssi = scanResults->rssi;
-                        NewBot.botNum = BLECustomData[0];
-                        BLEPair.push_back(NewBot);
-                    }
-                    else{
-                        existingBot->rssi = (scanResults->rssi + existingBot->rssi) >> 1;
-                    }
-                }
-                if(BotNumber == -1 || BotNumber == BLECustomData[0]){   //Check if a particular bot number was specified
-                    peer = BLE.connect(scanResults[ii].address);
-				    if (peer.connected()) {
-                        uint8_t bufName[BLE_MAX_ADV_DATA_LEN];
-                        scanResults[ii].advertisingData.customData(bufName, BLE_MAX_ADV_DATA_LEN);
-					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
-					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
-						Serial.printlnf("Connected to Bot %d",bufName[0]);
-                        bool newBot = true;
-                    }
-                    break;
-                }
-			}
-		}
-	}*/
 }
