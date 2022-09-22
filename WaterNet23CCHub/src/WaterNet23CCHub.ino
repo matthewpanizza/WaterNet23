@@ -389,17 +389,19 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         uint8_t rxBotID = atoi(rxIDBuf);
         bool newBot = true;
         WaterBot *TargetWB;
+        int index = 0;
         for(WaterBot w: WaterBots){
             if(rxBotID == w.botNum){
                 newBot = false;
-                TargetWB = &w;
+                TargetWB = &WaterBots.at(index);
             }
+            index++;
         }
         if(newBot){
             WaterBot newWaterbot;
             newWaterbot.botNum = rxBotID;
             WaterBots.push_back(newWaterbot);
-            TargetWB = &newWaterbot;
+            TargetWB = &WaterBots.back();
         }
         uint8_t checksum;
         char dataStr[strlen(command)-8];
@@ -483,13 +485,14 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         if(!strcmp(cmdStr,"sns")){
             char GPSLatstr[12];
             char GPSLonstr[12];
-            char pHstr[12];
-            char DOstr[12];
-            char Condstr[12];
-            char MCondstr[12];
-            char Tempstr[12];
-            sscanf(dataStr,"%s %s %s %s %s %s %s",GPSLatstr,GPSLonstr,DOstr,pHstr,&TargetWB->Cond,&TargetWB->MCond,Tempstr);
-            Serial.printlnf("Bot #: %d Temp: %lf", TargetWB->botNum,inTemp);
+            uint32_t do_in,pH_in,cond_in,mcond_in,temp_in;
+            sscanf(dataStr,"%s %s %d %d %d %d %d",GPSLatstr,GPSLonstr,&do_in,&pH_in,&cond_in,&mcond_in,&temp_in);
+            TargetWB->DO = ((float)do_in)/1000.0;
+            TargetWB->pH = ((float)pH_in)/1000.0;
+            TargetWB->Cond = ((float)cond_in)/1000.0;
+            TargetWB->MCond = ((float)mcond_in)/1000.0;
+            TargetWB->temp = ((float)temp_in)/1000.0;
+            Serial.printlnf("Bot #: %d Temp: %f", TargetWB->botNum,TargetWB->temp);
         }
         else if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
             strncpy(errCmdStr,dataStr,3);

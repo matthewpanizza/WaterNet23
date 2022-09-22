@@ -436,7 +436,7 @@ void sendResponseData(){
         char responseStr[65];
         memset(responseStr,0,65);
         //sprintf(responseStr,"B%dCCsns %0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
-        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,69.0);
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
