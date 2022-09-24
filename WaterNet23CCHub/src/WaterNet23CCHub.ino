@@ -19,7 +19,7 @@
 #define JOYV_ADC                A3              //Vertical Joystick ADC pin
 #define JOY_BTN                 D23             //Joystick button press
 #define L_DPAD                  A4              //Left DPAD button
-#define R_DPAD                  A0              //Right DPAD button
+#define R_DPAD                  A1              //Right DPAD button
 #define U_DPAD                  A5              //Up DPAD button
 #define D_DPAD                  D7              //Down DPAD button
 #define E_DPAD                  D22              //"Enter" DPAD button
@@ -106,7 +106,7 @@ uint8_t LTEStatuses;
 //Menu variables
 uint8_t botSelect;
 bool redrawMenu = true;
-bool selectingBots = true;
+bool selectingBots = false;
 uint8_t menuItem = 0;
 uint32_t debounceTime;
 
@@ -220,6 +220,7 @@ void startupPair(){
             }
             oled.clearDisplay();
             oled.display();
+            selectingBots = true;
         }
     }
 }
@@ -781,6 +782,7 @@ void WaterBotSim(uint8_t count){
 
 void entHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
+    Serial.println("Enter trigger");
     debounceTime = millis();
     //selectingBots = !selectingBots;
 }
@@ -804,10 +806,11 @@ void rHandler(){
 }
 void lHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
+    Serial.println("Right trigger");
     debounceTime = millis();
     if(selectingBots){
         if(botSelect != WaterBots.front().botNum){
-            uint8_t newBotNum;
+            uint8_t newBotNum = WaterBots.front().botNum;
             for(WaterBot ws: WaterBots){
                 if(ws.botNum == botSelect) botSelect = newBotNum;
                 else newBotNum = ws.botNum;
@@ -818,10 +821,12 @@ void lHandler(){
 }
 void uHandler(){
     if(menuItem) menuItem--;
+    Serial.println("Up trigger");
 }
 void dHandler(){
     if(menuItem < MAX_MENU_ITEMS) menuItem++;
+    Serial.println("Down trigger");
 }
 void jHandler(){
-    
+    Serial.println("Joystick trigger");
 }
