@@ -24,6 +24,7 @@
 
 #define ESC_PWM_L           D6
 #define ESC_PWM_R           D5
+#define SENSE_EN            D2
 #define chipSelect          D8
 
 ////////////////////
@@ -256,6 +257,9 @@ void cmdLTEHandler(const char *event, const char *data){
 void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
+
+    pinMode(SENSE_EN, OUTPUT);
+    digitalWrite(SENSE_EN,LOW);
 
     uint32_t mtrArmTime = millis();
     setLSpeed = 90;
