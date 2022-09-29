@@ -32,13 +32,16 @@ void LEDHandler();
 //////////////////////////////
 
 #define BOTNUM              1
-#define STARTUP_WAIT_PAIR   1
+#define STARTUP_WAIT_PAIR   0
 
 //Pin Configuration
 
 #define ESC_PWM_L           D6
 #define ESC_PWM_R           D5
+#define SENSE_EN            D2
 #define chipSelect          D8
+#define PWR_EN              D22
+#define LEAK_DET            D23
 
 ////////////////////
 // PROGRAM MACROS //
@@ -79,7 +82,7 @@ MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 SFE_UBLOX_GPS myGPS;
 
 //SD File system object
-SdFat sd((SPIClass*)&SPI1);
+SdFat sd((SPIClass*)&SPI);
 
 File myFile;
 File logFile;
@@ -271,6 +274,12 @@ void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
 
+    pinMode(SENSE_EN, OUTPUT);
+    pinMode(PWR_EN, OUTPUT);
+    pinMode(LEAK_DET, INPUT);
+    digitalWrite(SENSE_EN,LOW);
+    digitalWrite(PWR_EN,LOW);
+
     uint32_t mtrArmTime = millis();
     setLSpeed = 90;
     setRSpeed = 90;
@@ -450,7 +459,7 @@ void sendResponseData(){
         char responseStr[65];
         memset(responseStr,0,65);
         //sprintf(responseStr,"B%dCCsns %0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
-        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
@@ -459,7 +468,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){

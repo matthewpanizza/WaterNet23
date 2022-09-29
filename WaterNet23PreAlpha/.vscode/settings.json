@@ -9,6 +9,5 @@
         "algorithm": "cpp"
     },
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": "curious_turtle"
+    "particle.firmwareVersion": "4.0.0"
 }
