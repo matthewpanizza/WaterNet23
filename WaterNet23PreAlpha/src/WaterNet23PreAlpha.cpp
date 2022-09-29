@@ -32,7 +32,7 @@ void LEDHandler();
 //////////////////////////////
 
 #define BOTNUM              1
-#define STARTUP_WAIT_PAIR   1
+#define STARTUP_WAIT_PAIR   0
 
 //Pin Configuration
 
@@ -454,7 +454,7 @@ void sendResponseData(){
         char responseStr[65];
         memset(responseStr,0,65);
         //sprintf(responseStr,"B%dCCsns %0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
-        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
@@ -463,7 +463,7 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){
         char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f",BOTNUM,battPercent,statusFlags,latitude,longitude);
+        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);
         Serial.println(updateStr);
         Serial.println(LTEStatusCount);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
