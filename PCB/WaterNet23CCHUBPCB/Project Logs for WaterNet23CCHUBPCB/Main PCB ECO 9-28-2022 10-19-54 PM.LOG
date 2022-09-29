@@ -1,0 +1,9 @@
+Removed Pin From Net: NetName=3V3 Pin=C3-1
+Removed Pin From Net: NetName=GND Pin=C3-2
+Removed Pin From Net: NetName=D23/Joystick_Button Pin=R2-2
+Removed Pin From Net: NetName=D23/Joystick_Button Pin=U1-B2A
+Added Pin To Net: NetName=3V3 Pin=C3-2
+Added Pin To Net: NetName=NetC3_1 Pin=C3-1
+Added Pin To Net: NetName=NetC3_1 Pin=R2-2
+Added Pin To Net: NetName=NetC3_1 Pin=U1-B2A
+Added Net: Name=NetC3_1
