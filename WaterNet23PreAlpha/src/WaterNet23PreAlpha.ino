@@ -26,6 +26,8 @@
 #define ESC_PWM_R           D5
 #define SENSE_EN            D2
 #define chipSelect          D8
+#define PWR_EN              D22
+#define LEAK_DET            D23
 
 ////////////////////
 // PROGRAM MACROS //
@@ -66,7 +68,7 @@ MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 SFE_UBLOX_GPS myGPS;
 
 //SD File system object
-SdFat sd((SPIClass*)&SPI1);
+SdFat sd((SPIClass*)&SPI);
 
 File myFile;
 File logFile;
@@ -259,7 +261,10 @@ void setup(){
     status.setActive(true);
 
     pinMode(SENSE_EN, OUTPUT);
+    pinMode(PWR_EN, OUTPUT);
+    pinMode(LEAK_DET, INPUT);
     digitalWrite(SENSE_EN,LOW);
+    digitalWrite(PWR_EN,LOW);
 
     uint32_t mtrArmTime = millis();
     setLSpeed = 90;

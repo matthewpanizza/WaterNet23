@@ -8,6 +8,6 @@
         "ratio": "cpp",
         "algorithm": "cpp"
     },
-    "particle.targetPlatform": "boron",
+    "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0"
 }
