@@ -1,0 +1,4 @@
+Added Pin To Net: NetName=NetP2_8 Pin=P2-8
+Added Pin To Net: NetName=NetP2_8 Pin=P3-8
+Added Net: Name=NetP2_8
+Added Member To Class: ClassName=CCHub Breakout Member=Component P2 Left Header
