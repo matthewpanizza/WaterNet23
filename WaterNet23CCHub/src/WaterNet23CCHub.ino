@@ -40,7 +40,8 @@
 //Menu Parameters
 #define MAX_MENU_ITEMS          2
 #define DEBOUNCE_MS             30
-
+#define OLED_MAX_X              128
+#define OLED MAX_Y              32
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -137,6 +138,17 @@ class PairBot{
     int rssi;
 };
 
+class MenuItem{
+    public:
+
+    uint8_t (WaterBot::*MethodPointer);
+    uint8_t stepSize;
+    bool onOffSetting;
+    uint8_t minVal;
+    uint8_t maxVal;
+    char itemName[10];
+};
+
 WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
 WaterBot *ControlledBot;
 std::vector<WaterBot> WaterBots;
@@ -145,6 +157,8 @@ std::vector<PairBot> BLEPair;
 
 Timer at1(5000,actionTimer5);
 Timer at2(60000,actionTimer60);
+
+MenuItem testItem;
 
 
 void BLEScan(int BotNumber = -1);
@@ -300,12 +314,21 @@ void setup() {
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
+
+    WaterBot tBot;
+    tBot.battPercent = 69;
+
+    testItem.MethodPointer = &WaterBot::battPercent;
+    tBot.*(testItem.MethodPointer) = 80;
+    delay(4000);
+    Serial.println(tBot.battPercent);
     
     startupPair();
 
     at1.start();
     at2.start();
 
+    
     //WaterBotSim(6);
 }
 
@@ -359,7 +382,7 @@ void loop() {
 
 void updateMenu(){
     if(redrawMenu){
-        oled.fillRect(0,0,128,15,0);
+        oled.fillRect(0,0,OLED_MAX_X,15,0);
         for(uint8_t i = 0; i < WaterBots.size(); i++){
             if(WaterBots.at(i).botNum == botSelect){
                 oled.setCursor(5+18*i,4);
@@ -375,6 +398,15 @@ void updateMenu(){
                 oled.drawRect(1+i*18,1,14,14,1);
                 oled.printf("%d",WaterBots.at(i).botNum);
             }
+        }
+        if(menuItem == 0){
+            
+        }
+        else if(menuItem == MAX_MENU_ITEMS){
+
+        }
+        else{
+
         }
         oled.display();
         redrawMenu = false;

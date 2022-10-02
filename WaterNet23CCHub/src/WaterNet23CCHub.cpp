@@ -67,7 +67,8 @@ void jHandler();
 //Menu Parameters
 #define MAX_MENU_ITEMS          2
 #define DEBOUNCE_MS             30
-
+#define OLED_MAX_X              128
+#define OLED MAX_Y              32
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -133,7 +134,7 @@ uint8_t LTEStatuses;
 //Menu variables
 uint8_t botSelect;
 bool redrawMenu = true;
-bool selectingBots = true;
+bool selectingBots = false;
 uint8_t menuItem = 0;
 uint32_t debounceTime;
 
@@ -164,6 +165,17 @@ class PairBot{
     int rssi;
 };
 
+class MenuItem{
+    public:
+
+    uint8_t (WaterBot::*MethodPointer);
+    uint8_t stepSize;
+    bool onOffSetting;
+    uint8_t minVal;
+    uint8_t maxVal;
+    char itemName[10];
+};
+
 WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
 WaterBot *ControlledBot;
 std::vector<WaterBot> WaterBots;
@@ -172,6 +184,8 @@ std::vector<PairBot> BLEPair;
 
 Timer at1(5000,actionTimer5);
 Timer at2(60000,actionTimer60);
+
+MenuItem testItem;
 
 
 void BLEScan(int BotNumber = -1);
@@ -247,6 +261,7 @@ void startupPair(){
             }
             oled.clearDisplay();
             oled.display();
+            selectingBots = true;
         }
     }
 }
@@ -326,12 +341,21 @@ void setup() {
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
+
+    WaterBot tBot;
+    tBot.battPercent = 69;
+
+    testItem.MethodPointer = &WaterBot::battPercent;
+    tBot.*(testItem.MethodPointer) = 80;
+    delay(4000);
+    Serial.println(tBot.battPercent);
     
     startupPair();
 
     at1.start();
     at2.start();
 
+    
     //WaterBotSim(6);
 }
 
@@ -385,7 +409,7 @@ void loop() {
 
 void updateMenu(){
     if(redrawMenu){
-        oled.fillRect(0,0,128,15,0);
+        oled.fillRect(0,0,OLED_MAX_X,15,0);
         for(uint8_t i = 0; i < WaterBots.size(); i++){
             if(WaterBots.at(i).botNum == botSelect){
                 oled.setCursor(5+18*i,4);
@@ -401,6 +425,15 @@ void updateMenu(){
                 oled.drawRect(1+i*18,1,14,14,1);
                 oled.printf("%d",WaterBots.at(i).botNum);
             }
+        }
+        if(menuItem == 0){
+            
+        }
+        else if(menuItem == MAX_MENU_ITEMS){
+
+        }
+        else{
+
         }
         oled.display();
         redrawMenu = false;
@@ -816,7 +849,7 @@ void rHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     Serial.println("Right trigger");
-    /*if(selectingBots){
+    if(selectingBots){
         if(botSelect != WaterBots.back().botNum){
             bool findCurrent = false;
             for(WaterBot ws: WaterBots){
@@ -828,7 +861,7 @@ void rHandler(){
             }
             redrawMenu = true;   
         }
-    }*/
+    }
 }
 void lHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
@@ -836,7 +869,7 @@ void lHandler(){
     debounceTime = millis();
     if(selectingBots){
         if(botSelect != WaterBots.front().botNum){
-            uint8_t newBotNum;
+            uint8_t newBotNum = WaterBots.front().botNum;
             for(WaterBot ws: WaterBots){
                 if(ws.botNum == botSelect) botSelect = newBotNum;
                 else newBotNum = ws.botNum;
