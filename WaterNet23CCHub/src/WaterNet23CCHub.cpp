@@ -13,6 +13,7 @@
 
 #include "application.h"
 #include "SdFat.h"
+void init(uint8_t inStep, uint8_t minV, uint8_t maxV, bool switchOnOff, const char * itemString);
 void startupPair();
 void XBeeLTEPairSet();
 void setup();
@@ -21,7 +22,7 @@ void updateMenu();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void setupXBee();
 void BLEScan(int BotNumber);
-void DataOffloader();
+void DataOffloader(uint8_t bot_id);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
@@ -65,10 +66,13 @@ void jHandler();
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 
 //Menu Parameters
-#define MAX_MENU_ITEMS          2
-#define DEBOUNCE_MS             30
+#define MAX_MENU_ITEMS          4
+#define DEBOUNCE_MS             100
 #define OLED_MAX_X              128
 #define OLED MAX_Y              32
+
+//Development Parameters
+#define VERBOSE 1
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -132,10 +136,13 @@ char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t LTEStatuses;
 
 //Menu variables
-uint8_t botSelect;
+uint8_t botSelect = 0;
 bool redrawMenu = true;
-bool selectingBots = false;
+bool selectingBots = true;
 uint8_t menuItem = 0;
+bool selectingItem = false;
+bool modifiedValue = false;
+bool updateControl = false;
 uint32_t debounceTime;
 
 class WaterBot{
@@ -146,16 +153,17 @@ class WaterBot{
     bool LTEAvail;
     bool XBeeAvail;
     bool manualRC;
+    bool sentry;
     bool lowBatt;
     bool dataRecording;
-    bool offloading;
-    float GPSLat;
-    float GPSLon;
-    float pH;
-    float temp;
-    float DO;
-    float Cond;
-    float MCond;
+    bool offloading = false;
+    float GPSLat = 0.0;
+    float GPSLon= 0.0;
+    float pH = 0.0;
+    float temp = 0.0;
+    float DO = 0.0;
+    float Cond = 0.0;
+    float MCond = 0.0;
     uint32_t timeoutCount;
 };
 
@@ -167,13 +175,21 @@ class PairBot{
 
 class MenuItem{
     public:
-
-    uint8_t (WaterBot::*MethodPointer);
-    uint8_t stepSize;
-    bool onOffSetting;
-    uint8_t minVal;
-    uint8_t maxVal;
-    char itemName[10];
+        void init(uint8_t inStep, uint8_t minV, uint8_t maxV, bool switchOnOff, const char * itemString){
+            minVal = minV;
+            maxVal = maxV;
+            stepSize = inStep;
+            onOffSetting = switchOnOff;
+            strcpy(itemName,itemString);
+        }
+        uint8_t (WaterBot::*MethodPointer);
+        bool (WaterBot::*MethodPointerBool);
+        uint8_t stepSize;
+        bool onOffSetting;
+        bool statOnly = false;
+        uint8_t minVal;
+        uint8_t maxVal;
+        char itemName[10];
 };
 
 WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
@@ -185,12 +201,14 @@ std::vector<PairBot> BLEPair;
 Timer at1(5000,actionTimer5);
 Timer at2(60000,actionTimer60);
 
-MenuItem testItem;
+MenuItem * SelectedItem;
+std::vector<MenuItem> MenuItems;
 
 
 void BLEScan(int BotNumber = -1);
 void XBeeHandler();
 void dataLTEHandler(const char *event, const char *data);
+void createMenu();
 
 void dataLTEHandler(const char *event, const char *data){
     processCommand(data, 4,false);
@@ -321,6 +339,8 @@ void setup() {
     strcat(filenameMessages,timestamp);
     strcat(filenameMessages,"_LOG.txt");
 
+    createMenu();
+
     oled.setup(); 
     oled.clearDisplay();
     oled.display();
@@ -341,28 +361,20 @@ void setup() {
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
-
-    WaterBot tBot;
-    tBot.battPercent = 69;
-
-    testItem.MethodPointer = &WaterBot::battPercent;
-    tBot.*(testItem.MethodPointer) = 80;
-    delay(4000);
-    Serial.println(tBot.battPercent);
     
-    startupPair();
+    //startupPair();
+    delay(3000);
 
     at1.start();
     at2.start();
 
-    
-    //WaterBotSim(6);
+    WaterBotSim(2);
 }
 
 void loop() {
     if(postStatus){
         char statusStr[30];
-        if(ControlledBot != NULL) sprintf(statusStr,"CCABspcB%d",ControlledBot->botNum);
+        if(ControlledBot != NULL) sprintf(statusStr,"CCABspcB%1d",ControlledBot->botNum);
         else sprintf(statusStr,"CCABspcNB");
         sendData(statusStr,0,true,true,statusTimeout);                                  
         postStatus = false;
@@ -370,9 +382,21 @@ void loop() {
     }
 
     updateMenu();
-    Serial.printlnf("Selected Bot: %d ",botSelect);
+    //Serial.printlnf("Selected Bot: %d ",botSelect);
 
     if(!logMessages) Serial.println("Error, SD Card Not working");
+    if(updateControl){
+        updateControl = false;
+        ControlledBot = NULL;
+        for(uint8_t i = 0; i < WaterBots.size(); i++){
+            if(WaterBots.at(i).botNum == botSelect) ControlledBot =  &WaterBots.at(i);
+        }
+        if(ControlledBot == NULL) return;
+        if(ControlledBot->offloading) offloadingMode = true;
+        char statusStr[30];
+        sprintf(statusStr,"CCB%dcnf%1d",ControlledBot->botNum,int(ControlledBot->dataRecording));
+        sendData(statusStr,0,true,true,statusTimeout);
+    }
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -402,14 +426,68 @@ void loop() {
     	}
 
     }
-    if(offloadingMode) DataOffloader();
+    if(offloadingMode){
+        DataOffloader(ControlledBot->botNum);
+        ControlledBot->offloading = false;
+    }
     XBeeHandler();
     XBeeLTEPairSet();
+}
+
+void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
+    if(highlighted){
+        oled.fillRect(x,y,OLED_MAX_X - 40,16,1);
+        oled.setCursor(x+1,y+1);
+        oled.setTextSize(2);
+        oled.setTextColor(0);
+        oled.print(MenuItems.at(id).itemName);
+        if(selected){
+            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,1);
+            oled.setCursor(OLED_MAX_X - 39,y+1);
+            oled.setTextColor(0);
+            if(MenuItems.at(id).onOffSetting){
+                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+                else oled.printf("Off");
+            }
+            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+        }
+        else{
+            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,0);
+            oled.setCursor(OLED_MAX_X - 39,y+1);
+            oled.setTextColor(1);
+            if(MenuItems.at(id).onOffSetting){
+                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+                else oled.printf("Off");
+            }
+            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+        }
+        Serial.printlnf("Printed Highlighted Menu item with name: %s",MenuItems.at(id).itemName);
+    }
+    else{
+        oled.fillRect(x,y,OLED_MAX_X - 40,16,0);
+        oled.setCursor(x+1,y+1);
+        oled.setTextSize(2);
+        oled.setTextColor(1);
+        oled.print(MenuItems.at(id).itemName);
+        oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,0);
+        oled.setCursor(OLED_MAX_X - 39,y+1);
+        oled.setTextColor(1);
+        if(MenuItems.at(id).onOffSetting){
+            if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+            else oled.printf("Off");
+        }
+        else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+    }
+    
+    
+    
+    MenuItems.at(id);
 }
 
 void updateMenu(){
     if(redrawMenu){
         oled.fillRect(0,0,OLED_MAX_X,15,0);
+        uint8_t menuSelect = 0;
         for(uint8_t i = 0; i < WaterBots.size(); i++){
             if(WaterBots.at(i).botNum == botSelect){
                 oled.setCursor(5+18*i,4);
@@ -417,6 +495,7 @@ void updateMenu(){
                 oled.setTextColor(0);
                 oled.fillRect(1+i*18,1,14,14,1);
                 oled.printf("%d",WaterBots.at(i).botNum);
+                menuSelect = i;
             }
             else{
                 oled.setCursor(5+18*i,4);
@@ -427,13 +506,30 @@ void updateMenu(){
             }
         }
         if(menuItem == 0){
-            
+            Serial.println("Menu item 0");
+            if(MenuItems.size()) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));
+            uint8_t loopIter = MenuItems.size();
+            if(loopIter > 2) loopIter = 2;
+            for(int mi = 1; mi <= loopIter; mi++){
+                Serial.printlnf("Menu item %d", mi);
+                printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
+            }
         }
-        else if(menuItem == MAX_MENU_ITEMS){
-
+        else if(menuItem == MAX_MENU_ITEMS-1){
+            Serial.printlnf("Menu item %d", menuItem);
+            printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));
+            Serial.printlnf("Menu item %d", menuItem-1);
+            printMenuItem(menuItem-1,false,!selectingBots,0,32,WaterBots.at(menuSelect));
+            Serial.printlnf("Menu item %d", menuItem-2);
+            printMenuItem(menuItem-2,false,!selectingBots,0,16,WaterBots.at(menuSelect));
         }
         else{
-
+            Serial.printlnf("Menu item %d", menuItem+1);
+            printMenuItem(menuItem+1,false,!selectingBots,0,48,WaterBots.at(menuSelect));
+            Serial.printlnf("Menu item %d", menuItem);
+            printMenuItem(menuItem,true,!selectingBots,0,32,WaterBots.at(menuSelect));
+            Serial.printlnf("Menu item %d", menuItem-1);
+            printMenuItem(menuItem-1,false,!selectingBots,0,16,WaterBots.at(menuSelect));
         }
         oled.display();
         redrawMenu = false;
@@ -675,14 +771,14 @@ void BLEScan(int BotNumber){
 	}
 }
 
-void DataOffloader(){
-    uint8_t OffloadingBot = 1;
+void DataOffloader(uint8_t bot_id){
+    uint8_t OffloadingBot = bot_id;
     if (!logDir.open("/")) {
         offloadingDone = true;
         Serial.println("Error, could not open root directory on SD Card. Is it inserted?");
         return;
     }
-    while(OffloadingBot <= WaterBots.size()){
+    //while(OffloadingBot <= WaterBots.size()){
         char OffloadCommand[10];
         uint8_t OffloadBuf[10];
         snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
@@ -705,7 +801,7 @@ void DataOffloader(){
         while(!offloadingDone) delay(100);
         Serial.printlnf("Finished transferring file from Bot %d",BLEBot->botNum);
         OffloadingBot++;
-    }
+    //}
     if(logDir.isOpen()) logDir.close();
     offloadingMode = false;
 }
@@ -784,6 +880,7 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
     char outStr[strlen(dataOut)+2];
     sprintf(outStr,"%s%02x",dataOut,strlen(dataOut));
+    if(VERBOSE) Serial.println(outStr);
     if(sendLTE || sendMode == 4){
         Particle.publish("Bot1dat", outStr, PRIVATE);
         sendLTE = false;
@@ -834,21 +931,53 @@ void WaterBotSim(uint8_t count){
         simBot.BLEAvail = false;
         simBot.XBeeAvail = true;
         simBot.LTEAvail = false;
+        simBot.battPercent = random(100);
         WaterBots.push_back(simBot);
     }
 
+}
+
+void createMenu(){
+    MenuItem dataRecord;
+    dataRecord.init(1,0,1,true,"Record");
+    dataRecord.MethodPointerBool = &WaterBot::dataRecording;
+
+    MenuItem battStat;
+    battStat.init(1,0,100,false,"Battery");
+    battStat.statOnly = true;
+    battStat.MethodPointer = &WaterBot::battPercent;
+
+    MenuItem offloadItem;
+    offloadItem.init(1,0,1,true,"Offload");
+    offloadItem.MethodPointerBool = &WaterBot::offloading;
+
+    MenuItem sentryToggle;
+    sentryToggle.init(1,0,1,true,"Sentry");
+    sentryToggle.MethodPointerBool = &WaterBot::sentry;
+
+    MenuItems.push_back(dataRecord);
+    MenuItems.push_back(battStat);
+    MenuItems.push_back(offloadItem);
+    MenuItems.push_back(sentryToggle);
+
+    SelectedItem = &MenuItems.at(menuItem);
 }
 
 void entHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     Serial.println("Enter trigger");
     debounceTime = millis();
-    //selectingBots = !selectingBots;
+    
+    redrawMenu = true;  
+    selectingBots = !selectingBots;
+    if(modifiedValue) updateControl = true;
 }
+
 void rHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     Serial.println("Right trigger");
+    redrawMenu = true;  
     if(selectingBots){
         if(botSelect != WaterBots.back().botNum){
             bool findCurrent = false;
@@ -859,14 +988,36 @@ void rHandler(){
                 }
                 if(ws.botNum == botSelect) findCurrent = true;
             }
-            redrawMenu = true;   
+             
+        }
+    }
+    else{
+        int index = 0;
+        for(WaterBot ws: WaterBots){
+            if(ws.botNum == botSelect){
+                MenuItem curItem = *SelectedItem;
+                Serial.println(curItem.itemName);
+                if(curItem.statOnly) return;
+                if(curItem.onOffSetting){
+                    Serial.println("Modified an On/Off Control");
+                    WaterBots.at(index).*(curItem.MethodPointerBool) = true;
+                    Serial.printlnf("Bot: %d, Modified ",WaterBots.at(index).botNum);
+                }
+                else{
+                    if(WaterBots.at(index).*(curItem.MethodPointer) < curItem.maxVal) WaterBots.at(index).*(curItem.MethodPointer) += curItem.stepSize;
+                }
+                modifiedValue = true;
+            }
+            index++;
         }
     }
 }
+
 void lHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     Serial.println("Right trigger");
     debounceTime = millis();
+    redrawMenu = true;
     if(selectingBots){
         if(botSelect != WaterBots.front().botNum){
             uint8_t newBotNum = WaterBots.front().botNum;
@@ -874,18 +1025,51 @@ void lHandler(){
                 if(ws.botNum == botSelect) botSelect = newBotNum;
                 else newBotNum = ws.botNum;
             }
-            redrawMenu = true;   
+               
+        }
+    }
+    else{
+        int index = 0;
+        for(WaterBot ws: WaterBots){
+            if(ws.botNum == botSelect){
+                MenuItem curItem = *SelectedItem;
+                Serial.println(curItem.itemName);
+                if(curItem.statOnly) return;
+                if(curItem.onOffSetting){
+                    Serial.println("Modified an On/Off Control");
+                    WaterBots.at(index).*(curItem.MethodPointerBool) = false;//!(WaterBots.at(index).*(curItem.MethodPointerBool));
+                    Serial.printlnf("Bot: %d, Modified ",WaterBots.at(index).botNum);
+                }
+                else{
+                    if(WaterBots.at(index).*(curItem.MethodPointer) > curItem.minVal) WaterBots.at(index).*(curItem.MethodPointer) -= curItem.stepSize;
+                }
+                modifiedValue = true;
+            }
+            index++;
         }
     }
 }
+
 void uHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
     if(menuItem) menuItem--;
+    SelectedItem = &MenuItems.at(menuItem);
     Serial.println("Up trigger");
+    redrawMenu = true;  
 }
+
 void dHandler(){
-    if(menuItem < MAX_MENU_ITEMS) menuItem++;
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
+    if(menuItem < MAX_MENU_ITEMS-1) menuItem++;
+    SelectedItem = &MenuItems.at(menuItem);
     Serial.println("Down trigger");
+    redrawMenu = true;  
 }
+
 void jHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
     Serial.println("Joystick trigger");
 }
