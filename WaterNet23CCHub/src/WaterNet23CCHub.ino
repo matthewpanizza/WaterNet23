@@ -124,11 +124,12 @@ class WaterBot{
     bool BLEAvail;
     bool LTEAvail;
     bool XBeeAvail;
-    bool manualRC;
-    bool sentry;
+    uint8_t driveMode;
     bool lowBatt;
     bool dataRecording;
     bool offloading = false;
+    float TargetLat = -999;
+    float TargetLon = -999;
     float GPSLat = 0.0;
     float GPSLon= 0.0;
     float pH = 0.0;
@@ -591,9 +592,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.XBeeAvail = (statflags >> 1) & 1;
                     w.BLEAvail = (statflags >> 2) & 1;
                     w.offloading = (statflags >> 3) & 1;
-                    w.manualRC = (statflags >> 4) & 1;
-                    w.lowBatt = (statflags >> 5) & 1;
-                    w.dataRecording = (statflags >> 6) & 1;
+                    w.driveMode = (statflags >> 4) & 3;
+                    w.lowBatt = (statflags >> 6) & 1;
+                    w.dataRecording = (statflags >> 7) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
                     Serial.println("Status Update!");
@@ -925,7 +926,7 @@ void createMenu(){
 
     MenuItem sentryToggle;
     sentryToggle.init(1,0,1,true,"Sentry");
-    sentryToggle.MethodPointerBool = &WaterBot::sentry;
+    sentryToggle.MethodPointer = &WaterBot::driveMode;
 
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);

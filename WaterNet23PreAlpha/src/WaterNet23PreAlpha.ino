@@ -128,11 +128,12 @@ LEDStatus status;
 bool waitForConnection;
 long latitude_mdeg, longitude_mdeg;
 float latitude, longitude;
+float targetLat, targetLon;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
 uint8_t battPercent;
 bool updateMotorControl;
-bool manualRC;
+uint8_t driveMode = 0;
 bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
@@ -216,7 +217,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             ESCL.write(setLSpeed);
             ESCR.write(setRSpeed);
             updateMotorControl = true;
-            manualRC = true;
+            driveMode = 0;
         }
         else if(!strcmp(cmdStr,"req")){  //Data Request
             requestActive = mode;
@@ -286,8 +287,6 @@ void setup(){
     setupXBee();                                //Setup XBee module
     setupGPS();                                 //Setup GPS module
     setupLTE();                                 //Initialize LTE Flags
-
-    manualRC = true;
 
     senseTimer = millis();
     dataTimer = millis();
@@ -530,9 +529,9 @@ void StatusHandler(){
     statusFlags |= XBeeAvail << 1;
     statusFlags |= BLEAvail << 2;
     statusFlags |= offloadMode << 3;
-    statusFlags |= manualRC << 4;
-    statusFlags |= lowBattery << 5;
-    statusFlags |= logSensors << 6;
+    statusFlags |= driveMode << 4;
+    statusFlags |= lowBattery << 6;
+    statusFlags |= logSensors << 7;
     statusReady = true;
     Serial.println("Sending a status update!");
 }
@@ -761,7 +760,7 @@ void LEDHandler(){
         SetPattern = LED_PATTERN_SOLID;
         SetSpeed = LED_SPEED_NORMAL;
     }
-    else if(manualRC){
+    else if(driveMode == 0){
         SetPattern = LED_PATTERN_BLINK;
         SetSpeed = LED_SPEED_SLOW;
     }
