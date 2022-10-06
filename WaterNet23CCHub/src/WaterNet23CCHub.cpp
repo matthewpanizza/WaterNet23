@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -23,6 +23,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck);
 void setupXBee();
 void BLEScan(int BotNumber);
 void DataOffloader(uint8_t bot_id);
+void RPiHandler();
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
@@ -35,7 +36,7 @@ void lHandler();
 void uHandler();
 void dHandler();
 void jHandler();
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -156,8 +157,8 @@ class WaterBot{
     bool lowBatt;
     bool dataRecording;
     bool offloading = false;
-    float TargetLat = -999;
-    float TargetLon = -999;
+    float TargetLat = -999.0;
+    float TargetLon = -999.0;
     float GPSLat = 0.0;
     float GPSLon= 0.0;
     float pH = 0.0;
@@ -432,6 +433,7 @@ void loop() {
         ControlledBot->offloading = false;
     }
     XBeeHandler();
+    RPiHandler();
     XBeeLTEPairSet();
 }
 
@@ -673,13 +675,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             botPairRx = true;
         }
         else if(!strcmp(cmdStr,"pts")){
-            Serial.println(dataStr);
-            myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
-            String modeStr[3] = {"LTE", "XBee", "Bluetooth"};
-            myFile.printf("New string from %s: ", modeStr[mode]);
-            myFile.println(dataStr);
-            delay(5);
-            myFile.close();
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+                logFile.close();
+            }
+            else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
         else{   //Didn't recognize command (may be corrupted?) send back error signal
             if(mode == 1){
@@ -807,13 +808,31 @@ void DataOffloader(uint8_t bot_id){
     offloadingMode = false;
 }
 
+void RPiHandler(){
+    while(Serial.available()){
+        while(Serial.available()){
+            String data = Serial.readStringUntil('\n');
+            //Serial.println(data);
+            char buffer[data.length()];
+            for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+            if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+            processCommand(buffer,2,true);
+            if(logMessages){
+                if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data);
+                logFile.close();
+            }
+        }
+    }
+}
+
 void XBeeHandler(){  
     while(Serial1.available()){
         String data = Serial1.readStringUntil('\n');
         char buffer[data.length()];
         for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
         if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
-        processCommand(buffer,2,true);
+        processCommand(buffer,3,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
         if(logMessages){
