@@ -10,19 +10,21 @@
  */
 
 #include "application.h"                    //Needed for I2C to GPS
-#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
-#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
-#include "SdFat.h"
-#include "sdios.h"
+#include "SparkFun_u-blox_GNSS_Arduino_Library.h"
 void cmdLTEHandler(const char *event, const char *data);
 void setup();
 void loop();
+int32_t parseSensorData(uint32_t allData);
 void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void wdogHandler();
 void LEDHandler();
-#line 12 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 9 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#define X_AXIS_ACCELERATION 0
+//#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
+#include "SdFat.h"
+#include "sdios.h"
 #undef min
 #undef max
 #include <vector>
@@ -78,8 +80,8 @@ SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
 char nmeaBuffer[100];
-MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
-SFE_UBLOX_GPS myGPS;
+//MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
+SFE_UBLOX_GNSS myGPS;
 
 //SD File system object
 SdFat sd((SPIClass*)&SPI);
@@ -379,14 +381,18 @@ void setup(){
 }
 
 void loop(){
-    /*if(getGPSLatLon()){
+    if(getGPSLatLon()){
         char latLonBuf[UART_TX_BUF_SIZE];
-        latitude = ((float)latitude_mdeg/1000000.0);
-        longitude = ((float)longitude_mdeg/1000000.0);
-        //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
-        //Serial.println(latLonBuf);
+        latitude = ((float)latitude_mdeg/10000000.0);
+        longitude = ((float)longitude_mdeg/10000000.0);
+        sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
+        Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
-    }*/
+    }
+    long heading = myGPS.getHeading();
+    Serial.println(heading);
+    delay(250);
+
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -401,15 +407,37 @@ void loop(){
     delay(100);
 }
 
+
+int32_t parseSensorData(uint32_t allData)
+{
+  //the sensor data is a 3 byte, signed integer (bits 0 - 23)
+  uint32_t sensorData = (allData & 0x00FFFFFF);
+
+  //check out the sign bit
+  uint32_t signBit =    (allData & 0x00800000) >> 20;
+
+  int32_t signedData = 0;
+
+   //if the number is negative, we need to fill the extra byte with 1s
+  if(signBit != 0)
+  {
+    signedData |= 0xFF000000;
+  }
+
+  signedData |= sensorData;
+  
+  return signedData;
+}
+
 //This function gets called from the SparkFun Ublox Arduino Library
 //As each NMEA character comes in you can specify what to do with it
 //Useful for passing to other libraries like tinyGPS, MicroNMEA, or even
 //a buffer, radio, etc.
-void SFE_UBLOX_GPS::processNMEA(char incoming){
+//void SFE_UBLOX_GPS::processNMEA(char incoming){
   //Take the incoming char from the Ublox I2C port and pass it on to the MicroNMEA lib
   //for sentence cracking
-  nmea.process(incoming);
-}
+//  nmea.process(incoming);
+//}
 //Initialization for LTE events and flags
 void setupLTE(){
     Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
@@ -431,26 +459,27 @@ void setupXBee(){
 
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
-    myGPS.begin(Wire);
-    if (myGPS.isConnected() == false){
-        //Log.warn("Ublox GPS not detected at default I2C address, freezing.");
-        //while (1);
+    if(myGPS.begin() == false){
+        delay(1000);
+        Serial.println("Error, Could not initialize GPS");
     }
+    myGPS.setI2COutput(COM_TYPE_UBX);
+    myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 }
 
 bool getGPSLatLon(){
-    myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
+    //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
-  if(nmea.isValid() == true){
-    latitude_mdeg= nmea.getLatitude();
-    longitude_mdeg = nmea.getLongitude();
+  //if(nmea.isValid() == true){
+    latitude_mdeg= myGPS.getLatitude();
+    longitude_mdeg = myGPS.getLongitude();
     return true;
-  }
-  else{
+  //}
+  //else{
     //Log.warn("Location not available: %d Sattelites",nmea.getNumSatellites());
-  }
-  return false;
+ // }
+  //return false;
 }
 
 //Function to check if response data to a request needs to be sent out
