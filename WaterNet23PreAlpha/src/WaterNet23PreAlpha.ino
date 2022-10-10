@@ -6,6 +6,8 @@
 
 #include "application.h"                    //Needed for I2C to GPS
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
+#include <Adafruit_LIS3MDL.h>
+#include <Adafruit_Sensor.h>
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -67,6 +69,8 @@ SYSTEM_MODE(MANUAL);
 char nmeaBuffer[100];
 //MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 SFE_UBLOX_GNSS myGPS;
+
+Adafruit_LIS3MDL lis3mdl;
 
 //SD File system object
 SdFat sd((SPIClass*)&SPI);
@@ -316,6 +320,23 @@ void setup(){
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
+    if (! lis3mdl.begin_I2C()) {          // hardware I2C mode, can pass in address & alt Wire
+        while (1) {
+            Serial.println("Failed to find LIS3MDL chip");
+            delay(1000); 
+        }
+    }
+    Serial.println("LIS3MDL Found!");
+    lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+    lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+    lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
+    lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
+    lis3mdl.setIntThreshold(500);
+    lis3mdl.configInterrupt(false, false, true, // enable z axis
+                          true, // polarity
+                          false, // don't latch
+                          true); // enabled!
+
     char timestamp[16];
     snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
     strcpy(filename,DEF_FILENAME);
@@ -365,6 +386,22 @@ void setup(){
 }
 
 void loop(){
+    lis3mdl.read();      // get X Y and Z data at once
+    // Then print out the raw data
+    Serial.print("\nX:  "); Serial.print(lis3mdl.x); 
+    Serial.print("  \tY:  "); Serial.print(lis3mdl.y); 
+    Serial.print("  \tZ:  "); Serial.println(lis3mdl.z); 
+
+    /* Or....get a new sensor event, normalized to uTesla */
+    sensors_event_t event; 
+    lis3mdl.getEvent(&event);
+    /* Display the results (magnetic field is measured in uTesla) */
+    Serial.print("\nX: "); Serial.print(event.magnetic.x);
+    Serial.print(" \tY: "); Serial.print(event.magnetic.y); 
+    Serial.print(" \tZ: "); Serial.print(event.magnetic.z); 
+    Serial.println(" uTesla ");
+
+    Serial.println();
     if(getGPSLatLon()){
         char latLonBuf[UART_TX_BUF_SIZE];
         latitude = ((float)latitude_mdeg/10000000.0);
@@ -373,9 +410,6 @@ void loop(){
         Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }
-    long heading = myGPS.getHeading();
-    Serial.println(heading);
-    delay(250);
 
     sensorHandler();
     XBeeHandler();
@@ -391,27 +425,6 @@ void loop(){
     delay(100);
 }
 
-
-int32_t parseSensorData(uint32_t allData)
-{
-  //the sensor data is a 3 byte, signed integer (bits 0 - 23)
-  uint32_t sensorData = (allData & 0x00FFFFFF);
-
-  //check out the sign bit
-  uint32_t signBit =    (allData & 0x00800000) >> 20;
-
-  int32_t signedData = 0;
-
-   //if the number is negative, we need to fill the extra byte with 1s
-  if(signBit != 0)
-  {
-    signedData |= 0xFF000000;
-  }
-
-  signedData |= sensorData;
-  
-  return signedData;
-}
 
 //This function gets called from the SparkFun Ublox Arduino Library
 //As each NMEA character comes in you can specify what to do with it

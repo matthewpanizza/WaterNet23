@@ -6,7 +6,8 @@
         "chrono": "cpp",
         "limits": "cpp",
         "ratio": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "istream": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0"
