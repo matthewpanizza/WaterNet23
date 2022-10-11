@@ -43,6 +43,12 @@
 #define OLED_MAX_X              128
 #define OLED MAX_Y              32
 
+//Control Parameters
+#define JOY_DEADZONE        55
+#define JOY_MID             2048
+#define JOY_MAX             3995
+#define JOY_MIN             100
+
 //Development Parameters
 #define VERBOSE 1
 
@@ -336,7 +342,7 @@ void setup() {
     oled.display();
     
     //startupPair();
-    delay(3000);
+    //delay(3000);
 
     at1.start();
     at2.start();
@@ -370,6 +376,7 @@ void loop() {
         sprintf(statusStr,"CCB%dcnf%1d",ControlledBot->botNum,int(ControlledBot->dataRecording));
         sendData(statusStr,0,true,true,statusTimeout);
     }
+    manualMotorControl(botSelect);
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -812,6 +819,90 @@ void XBeeHandler(){
             logFile.close();
         }
     }
+}
+
+void manualMotorControl(uint8_t commandedBot){
+
+    char mtrStr[15];
+    int VRead, HRead, VSet, HSet;
+    VRead = 4095-analogRead(JOYV_ADC);
+    HRead = analogRead(JOYH_ADC);
+    if(VRead < JOY_MID - JOY_DEADZONE){
+        VSet = -90 * (VRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(VSet < -90) VSet = -90;
+    }
+    else if(VRead > JOY_MID + JOY_DEADZONE){
+        VSet = 90 * (VRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(VSet > 90) VSet = 90;
+    }
+    else{
+        VSet = 0;
+    }
+    if(HRead < JOY_MID - JOY_DEADZONE){
+        HSet = -90 * (HRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(HSet < -90) HSet = -90;
+    }
+    else if(HRead > JOY_MID + JOY_DEADZONE){
+        HSet = 90 * (HRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(HSet > 90) HSet = 90;
+    }
+    else{
+        HSet = 0;
+    }
+    uint8_t LSpeed, RSpeed;
+    LSpeed = 90 + VSet/2;
+    if(VSet > 0){
+        if(HSet > 0){
+            if(HSet > VSet){
+                LSpeed = 90 + HSet/2 + VSet/2;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > VSet){
+                RSpeed = 90 - HSet/2 + VSet/2;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+    }
+    else{
+        if(HSet > 0){
+            if(HSet > (0-VSet)){
+                Serial.println("Hello World!!!!!!!");
+                LSpeed = (90 + HSet/2 + VSet/2);
+                RSpeed = (90 - HSet/2 + VSet);
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > (0-VSet)){
+                RSpeed = 90 + HSet/2 + VSet/2;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+    }
+    
+    
+    
+    sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
+    Serial.println(mtrStr);
+    sendData(mtrStr,0,true,false, false);
+    delay(100);
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {

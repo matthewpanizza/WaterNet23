@@ -701,8 +701,8 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 
 void motionHandler(){
     if(driveMode == 0 && millis() - lastMtrTime > MTR_TIMEOUT){
-        setLSpeed = 0;
-        setRSpeed = 0;
+        setLSpeed = 90;
+        setRSpeed = 90;
         updateMotorControl = true;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);

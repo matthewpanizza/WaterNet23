@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -23,7 +23,7 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 void motionHandler();
 void wdogHandler();
 void LEDHandler();
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -717,8 +717,8 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 
 void motionHandler(){
     if(driveMode == 0 && millis() - lastMtrTime > MTR_TIMEOUT){
-        setLSpeed = 0;
-        setRSpeed = 0;
+        setLSpeed = 90;
+        setRSpeed = 90;
         updateMotorControl = true;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);
