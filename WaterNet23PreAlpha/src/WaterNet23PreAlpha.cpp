@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -16,12 +16,14 @@
 void cmdLTEHandler(const char *event, const char *data);
 void setup();
 void loop();
+uint8_t readPowerSys();
 void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
+void motionHandler();
 void wdogHandler();
 void LEDHandler();
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -34,16 +36,19 @@ void LEDHandler();
 // BOT CONFIGURATION MACROS //
 //////////////////////////////
 
-#define BOTNUM              1
-#define STARTUP_WAIT_PAIR   0
+#define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
+#define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 
 //Pin Configuration
 
-#define ESC_PWM_L           D6
-#define ESC_PWM_R           D5
-#define SENSE_EN            D2
-#define chipSelect          D8
-#define PWR_EN              D22
+#define ESC_PWM_L           D6          //Left motor ESC output pin
+#define ESC_PWM_R           D5          //Right motor ESC output pin
+#define SENSE_EN            D2          //Output pin to enable/disable voltage regulator for sensors
+#define chipSelect          D8          //Chip select pin for Micro SD Card
+#define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
+#define SOL_ISENSE          A2          //Shunt monitor ADC input for solar array input current
+#define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
+#define PWR_EN              D22         
 #define LEAK_DET            D23
 
 ////////////////////
@@ -74,6 +79,15 @@ void LEDHandler();
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
+
+#define BAT_MIN             13.2            //Voltage to read 0% battery
+#define BAT_MAX             16.4            //Voltage to read 100% battery
+#define BAT_LOW             14.0            //Voltage to set low battery flag
+#define VDIV_MULT           0.004835        //Calculate the ratio for ADC to voltage conversion 3.3V in on ADC = 4095 3.3V on 100kOhm + 20kOhm divider yields (3.3/20000)*120000 = 19.8V in MAX
+#define BAT_ISENSE_MULT     33.0            //Calculate the maximum current the shunt can measure for the battery. Rs = 0.001, RL = 100k. Vo = Is * 0.1, max current is 33A
+#define SLR_ISENSE_MULT     16.5            //Calculate the maximum current the shunt can measure for the solar array. Rs = 0.010, RL = 20k. Vo = Is * 0.2, max current is 16.5A
+
+#define MTR_TIMEOUT         4000
 
 #define REPL_NAK            false
 
@@ -134,6 +148,7 @@ void statusUpdate();
 //Tmers
 Timer watchdog(WATCHDOG_PD, wdogHandler);   //Create timer object for watchdog
 Timer ledTimer(1000,LEDHandler);
+Timer motionTimer(2500, motionHandler);
 Timer statusPD(STATUS_PD,StatusHandler);
 
 //LED Control
@@ -150,6 +165,7 @@ float targetLat, targetLon;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
 uint8_t battPercent;
+float battVoltage, battCurrent, solarCurrent;
 bool updateMotorControl;
 uint8_t driveMode = 0;
 bool lowBattery;
@@ -162,6 +178,7 @@ bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
+uint32_t lastMtrTime;
 uint32_t lastStatusTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
@@ -235,6 +252,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             ESCL.write(setLSpeed);
             ESCR.write(setRSpeed);
             updateMotorControl = true;
+            lastMtrTime = millis();
             driveMode = 0;
         }
         else if(!strcmp(cmdStr,"req")){  //Data Request
@@ -280,6 +298,7 @@ void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
 
+    
     pinMode(SENSE_EN, OUTPUT);
     pinMode(PWR_EN, OUTPUT);
     pinMode(LEAK_DET, INPUT);
@@ -335,12 +354,9 @@ void setup(){
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
     if (! lis3mdl.begin_I2C()) {          // hardware I2C mode, can pass in address & alt Wire
-        while (1) {
-            Serial.println("Failed to find LIS3MDL chip");
-            delay(1000); 
-        }
+        Serial.println("Failed to find LIS3MDL chip");
     }
-    Serial.println("LIS3MDL Found!");
+    else Serial.println("LIS3MDL Found!");
     lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
     lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
     lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
@@ -363,6 +379,7 @@ void setup(){
     Serial.println(filenameMessages);
 
     watchdog.start();
+    motionTimer.start();
     ledTimer.start();
     statusPD.start();
 
@@ -400,22 +417,22 @@ void setup(){
 }
 
 void loop(){
-    lis3mdl.read();      // get X Y and Z data at once
+    /*lis3mdl.read();      // get X Y and Z data at once
     // Then print out the raw data
     Serial.print("\nX:  "); Serial.print(lis3mdl.x); 
     Serial.print("  \tY:  "); Serial.print(lis3mdl.y); 
     Serial.print("  \tZ:  "); Serial.println(lis3mdl.z); 
 
-    /* Or....get a new sensor event, normalized to uTesla */
+
     sensors_event_t event; 
     lis3mdl.getEvent(&event);
-    /* Display the results (magnetic field is measured in uTesla) */
+
     Serial.print("\nX: "); Serial.print(event.magnetic.x);
     Serial.print(" \tY: "); Serial.print(event.magnetic.y); 
     Serial.print(" \tZ: "); Serial.print(event.magnetic.z); 
     Serial.println(" uTesla ");
 
-    Serial.println();
+    Serial.println();*/
     if(getGPSLatLon()){
         char latLonBuf[UART_TX_BUF_SIZE];
         latitude = ((float)latitude_mdeg/10000000.0);
@@ -425,6 +442,8 @@ void loop(){
         //sendData(latLonBuf, 0, true, true, false);
     }
 
+    readPowerSys();
+    Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -477,6 +496,17 @@ void setupGPS(){
     myGPS.setI2COutput(COM_TYPE_UBX);
     myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
+}
+
+uint8_t readPowerSys(){
+    battVoltage = (float) analogRead(BATT_VSENSE) * VDIV_MULT;
+    int rawPCT = (int)(100 * (battVoltage - BAT_MIN)/(BAT_MAX - BAT_MIN));
+    if(rawPCT < 0) rawPCT = 0;
+    if(rawPCT > 100) rawPCT = 100;
+    battPercent = (uint8_t) rawPCT;
+    battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095;
+    solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
+    return battPercent;
 }
 
 bool getGPSLatLon(){
@@ -682,6 +712,17 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.printlnf("[INFO] Received BLE Message: %s",btBuf);
         logFile.close();
+    }
+}
+
+void motionHandler(){
+    if(driveMode == 0 && millis() - lastMtrTime > MTR_TIMEOUT){
+        setLSpeed = 0;
+        setRSpeed = 0;
+        updateMotorControl = true;
+        ESCL.write(setLSpeed);
+        ESCR.write(setRSpeed);
+        Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
     }
 }
 
