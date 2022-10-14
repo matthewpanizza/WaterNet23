@@ -118,7 +118,7 @@ void setupSPI();
 void setupLTE();
 void setupXBee();
 void setupGPS();
-bool getGPSLatLon();
+bool getPositionData();
 void sendResponseData();
 void timeInterval();
 void updateMotors();
@@ -143,9 +143,11 @@ LEDStatus status;
 //////////////////////
 
 bool waitForConnection;
-long latitude_mdeg, longitude_mdeg;
 float latitude, longitude;
+int compassHeading;
 float targetLat, targetLon;
+int travelHeading;
+float travelDistance;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
 uint8_t battPercent;
@@ -401,33 +403,18 @@ void setup(){
 }
 
 void loop(){
-    /*lis3mdl.read();      // get X Y and Z data at once
-    // Then print out the raw data
-    Serial.print("\nX:  "); Serial.print(lis3mdl.x); 
-    Serial.print("  \tY:  "); Serial.print(lis3mdl.y); 
-    Serial.print("  \tZ:  "); Serial.println(lis3mdl.z); 
+    
 
-
-    sensors_event_t event; 
-    lis3mdl.getEvent(&event);
-
-    Serial.print("\nX: "); Serial.print(event.magnetic.x);
-    Serial.print(" \tY: "); Serial.print(event.magnetic.y); 
-    Serial.print(" \tZ: "); Serial.print(event.magnetic.z); 
-    Serial.println(" uTesla ");
-
-    Serial.println();*/
-    if(getGPSLatLon()){
+    //Serial.println();
+    if(getPositionData()){
         char latLonBuf[UART_TX_BUF_SIZE];
-        latitude = ((float)latitude_mdeg/10000000.0);
-        longitude = ((float)longitude_mdeg/10000000.0);
         sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
-        Serial.println(latLonBuf);
+        //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }
 
     readPowerSys();
-    Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
+    //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -439,7 +426,7 @@ void loop(){
     }
     //sendData("B1CCptsbigbot",0,false,true,false);
     sendResponseData();
-    delay(100);
+    delay(500);
 }
 
 
@@ -493,18 +480,34 @@ uint8_t readPowerSys(){
     return battPercent;
 }
 
-bool getGPSLatLon(){
+float deg2rad(float deg) {
+  return deg * (3.14159/180);
+}
+
+bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
   //if(nmea.isValid() == true){
-    latitude_mdeg= myGPS.getLatitude();
-    longitude_mdeg = myGPS.getLongitude();
-    return true;
+    if(myGPS.isConnected()){
+        latitude = ((float)myGPS.getLatitude())/1000000.0;
+        longitude = ((float)myGPS.getLongitude())/1000000.0;
+        lis3mdl.read();      // get X Y and Z data at once
+        sensors_event_t event; 
+        lis3mdl.getEvent(&event);
+        compassHeading = (int) (atan2(event.magnetic.x, event.magnetic.y) * 180 / M_PI);
+        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= -90){
+            travelHeading = (int) (atan2(targetLat-latitude,targetLon-longitude) * 180 / M_PI);
+            float dLat = deg2rad(targetLat-latitude);
+            float dLon = deg2rad(targetLon-longitude);
+            float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
+            float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
+            travelDistance = 6.371 * c; // Distance in km
+        }
+        return true;
+    }
+    
   //}
-  //else{
-    //Log.warn("Location not available: %d Sattelites",nmea.getNumSatellites());
- // }
-  //return false;
+    
 }
 
 //Function to check if response data to a request needs to be sent out

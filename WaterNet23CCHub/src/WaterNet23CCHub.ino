@@ -125,6 +125,7 @@ uint32_t debounceTime;
 
 class WaterBot{
     public:
+    bool updatedStatus = true;
     uint8_t botNum;
     uint8_t battPercent;
     bool BLEAvail;
@@ -415,6 +416,15 @@ void loop() {
     XBeeLTEPairSet();
 }
 
+void logMessage(const char *message){
+    if(!logFile.isOpen()){
+        logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.println(message);
+        logFile.close();
+    }
+    else logFile.println(message);
+}
+
 void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
     if(highlighted){
         oled.fillRect(x,y,OLED_MAX_X - 40,16,1);
@@ -557,12 +567,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         if(checksum != strlen(command)-2){
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
-            if(!logFile.isOpen()){
-                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-                logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
-                logFile.close();
-            }
-            else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+            logMessage("[WARN] Warning, checksum does not match!");
             Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
@@ -584,7 +589,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             return;
         }
         else if(!strcmp(cmdStr,"sup")){
-            for(WaterBot w: WaterBots){
+            for(WaterBot &w: WaterBots){
                 if(rxBotID == w.botNum){
                     uint8_t battpct;
                     uint8_t statflags;
@@ -605,8 +610,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.dataRecording = (statflags >> 7) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
-                    Serial.println("Status Update!");
-                    Serial.println("##########################");
+                    
+                    logMessage("Status Update!");
+                    /*Serial.println("##########################");
                     Serial.println("##     STATUS UPDATE    ##");
                     Serial.printlnf("##       Bot #: %1d      ##",w.botNum);
                     Serial.printlnf("##      Batt %: %03d     ##",w.battPercent);
@@ -614,7 +620,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
                     Serial.println("##  Latitude Longitude  ##");
                     Serial.printlnf("## %.6f %.6f ##",w.GPSLat,w.GPSLon);
-                    Serial.println("##########################");
+                    Serial.println("##########################");*/
                 }
 
             }
@@ -676,6 +682,47 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     }
 }
 
+void processRPiCommand(const char *command, uint8_t mode){
+    if(command[0] == 'R' && command[1] == 'P'){  
+        uint8_t checksum;
+        char dataStr[strlen(command)-8];
+        dataStr[strlen(command)-9] = '\0';
+        char cmdStr[4];
+        cmdStr[3] = '\0';
+        char checkStr[3];
+        checkStr[0] = command[strlen(command)-2];
+        checkStr[1] = command[strlen(command)-1];
+        checkStr[2] = '\0';
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        //Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        for(uint8_t i = 4; i < strlen(command)-2;i++){
+            if(i < 7) cmdStr[i-4] = command[i];
+            else dataStr[i-7] = command[i];
+        }
+        if(checksum != strlen(command)-2){
+            //Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+                logFile.close();
+            }
+            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+            //Serial.println("Warning, checksum does not match");
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                rxBotNum[0] = command[0];
+                rxBotNum[1] = command[1];
+                sprintf(errBuf,"CC%2snak%3s",rxBotNum,cmdStr);
+                errModeReply = mode;
+            }
+            return;
+        }
+        if(!strcmp(cmdStr,"ctl")){
+                //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
+        }
+    }
+}
+
 void setupXBee(){
     Serial1.printf("\n");    //First character to set Bypass mode
     delay(20);              //Wait some time before sending next character
@@ -731,7 +778,7 @@ void BLEScan(int BotNumber){
                         newWaterbot.BLEAvail = true;
                         newWaterbot.botNum = bufName[0];
                         PairBots.push_back(newWaterbot);
-                        for(WaterBot w: WaterBots){
+                        for(WaterBot &w: WaterBots){
                             if(bufName[0] == w.botNum){
                                 newBot = false;
                                 w.BLEAvail = true;
@@ -784,6 +831,23 @@ void DataOffloader(uint8_t bot_id){
     //}
     if(logDir.isOpen()) logDir.close();
     offloadingMode = false;
+}
+
+void RPiStatusUpdate(){
+    for(WaterBot &wb: WaterBots){
+        if(wb.updatedStatus){
+            uint16_t statusFlags;
+            statusFlags = 0;
+            statusFlags = wb.LTEAvail;
+            statusFlags |= wb.XBeeAvail << 1;
+            statusFlags |= wb.BLEAvail << 2;
+            statusFlags |= wb.offloading << 3;
+            statusFlags |= wb.driveMode << 4;
+            statusFlags |= wb.lowBatt << 6;
+            statusFlags |= wb.dataRecording << 7;
+            Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags);
+        }
+    }
 }
 
 void RPiHandler(){
@@ -979,7 +1043,7 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
 
 void actionTimer5(){
     postStatus = true;
-    for(WaterBot w: WaterBots){
+    for(WaterBot &w: WaterBots){
         w.timeoutCount++;
     }
     //if(!BLE.connected)
@@ -987,7 +1051,7 @@ void actionTimer5(){
 
 void actionTimer60(){
     bool reqLTEStatus = false;
-    for(WaterBot w: WaterBots){
+    for(WaterBot &w: WaterBots){
         if(w.timeoutCount > XBEE_BLE_MAX_TIMEOUT){
             reqLTEStatus = true;
             w.timeoutCount = 0;            

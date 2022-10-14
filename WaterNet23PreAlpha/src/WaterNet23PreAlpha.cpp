@@ -417,33 +417,36 @@ void setup(){
 }
 
 void loop(){
-    /*lis3mdl.read();      // get X Y and Z data at once
+    lis3mdl.read();      // get X Y and Z data at once
     // Then print out the raw data
-    Serial.print("\nX:  "); Serial.print(lis3mdl.x); 
+    /*Serial.print("\nX:  "); Serial.print(lis3mdl.x); 
     Serial.print("  \tY:  "); Serial.print(lis3mdl.y); 
-    Serial.print("  \tZ:  "); Serial.println(lis3mdl.z); 
+    Serial.print("  \tZ:  "); Serial.println(lis3mdl.z); */
 
 
     sensors_event_t event; 
     lis3mdl.getEvent(&event);
 
-    Serial.print("\nX: "); Serial.print(event.magnetic.x);
+    /*Serial.print("\nX: "); Serial.print(event.magnetic.x);
     Serial.print(" \tY: "); Serial.print(event.magnetic.y); 
     Serial.print(" \tZ: "); Serial.print(event.magnetic.z); 
-    Serial.println(" uTesla ");
+    Serial.println(" uTesla ");*/
 
-    Serial.println();*/
+    float az = atan2(event.magnetic.x, event.magnetic.y) * 180 / M_PI;
+    Serial.printlnf("Heading: %f",az);
+
+    //Serial.println();
     if(getGPSLatLon()){
         char latLonBuf[UART_TX_BUF_SIZE];
         latitude = ((float)latitude_mdeg/10000000.0);
         longitude = ((float)longitude_mdeg/10000000.0);
         sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
-        Serial.println(latLonBuf);
+        //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }
 
     readPowerSys();
-    Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
+    //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -455,7 +458,7 @@ void loop(){
     }
     //sendData("B1CCptsbigbot",0,false,true,false);
     sendResponseData();
-    delay(100);
+    delay(500);
 }
 
 
