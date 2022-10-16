@@ -488,13 +488,9 @@ bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
   //if(nmea.isValid() == true){
-    //if(myGPS.isConnected()){
-        //latitude = ((float)myGPS.getLatitude())/1000000.0;
-        //longitude = ((float)myGPS.getLongitude())/1000000.0;
-        latitude = 35.771801;
-        longitude = -78.67406;
-        targetLat = 35.774783;
-        targetLon = -78.674157;
+    if(myGPS.isConnected()){
+        latitude = ((float)myGPS.getLatitude())/1000000.0;
+        longitude = ((float)myGPS.getLongitude())/1000000.0;
         lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
@@ -510,7 +506,7 @@ bool getPositionData(){
         }
         
         return true;
-    //}
+    }
     
   //}
     
