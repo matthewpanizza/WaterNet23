@@ -408,7 +408,7 @@ void loop(){
     //Serial.println();
     if(getPositionData()){
         char latLonBuf[UART_TX_BUF_SIZE];
-        sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
+        //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }
@@ -488,23 +488,29 @@ bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
   //if(nmea.isValid() == true){
-    if(myGPS.isConnected()){
-        latitude = ((float)myGPS.getLatitude())/1000000.0;
-        longitude = ((float)myGPS.getLongitude())/1000000.0;
+    //if(myGPS.isConnected()){
+        //latitude = ((float)myGPS.getLatitude())/1000000.0;
+        //longitude = ((float)myGPS.getLongitude())/1000000.0;
+        latitude = 35.771801;
+        longitude = -78.67406;
+        targetLat = 35.774783;
+        targetLon = -78.674157;
         lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
         compassHeading = (int) (atan2(event.magnetic.x, event.magnetic.y) * 180 / M_PI);
-        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= -90){
+        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (int) (atan2(targetLat-latitude,targetLon-longitude) * 180 / M_PI);
             float dLat = deg2rad(targetLat-latitude);
             float dLon = deg2rad(targetLon-longitude);
             float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
             float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
-            travelDistance = 6.371 * c; // Distance in km
+            travelDistance = 6371.0 * c; // Distance in km
+            Serial.printlnf("Distance: %f",travelDistance);
         }
+        
         return true;
-    }
+    //}
     
   //}
     
@@ -628,7 +634,7 @@ void sensorHandler(){
             char timestamp[16];
             snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
             if(!myFile.isOpen()) myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-            myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,((float)latitude_mdeg/1000000.0),((float)longitude_mdeg/1000000.0),senseTemp,sensePH,senseDO,senseMiniCond,senseCond);
+            myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMiniCond,senseCond);
             myFile.close();
         }
     }
