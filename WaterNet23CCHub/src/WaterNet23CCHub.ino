@@ -43,6 +43,12 @@
 #define OLED_MAX_X              128
 #define OLED MAX_Y              32
 
+//Control Parameters
+#define JOY_DEADZONE        55
+#define JOY_MID             2048
+#define JOY_MAX             3995
+#define JOY_MIN             100
+
 //Development Parameters
 #define VERBOSE 1
 
@@ -119,16 +125,18 @@ uint32_t debounceTime;
 
 class WaterBot{
     public:
+    bool updatedStatus = true;
     uint8_t botNum;
     uint8_t battPercent;
     bool BLEAvail;
     bool LTEAvail;
     bool XBeeAvail;
-    bool manualRC;
-    bool sentry;
+    uint8_t driveMode;
     bool lowBatt;
     bool dataRecording;
     bool offloading = false;
+    float TargetLat = -999.0;
+    float TargetLon = -999.0;
     float GPSLat = 0.0;
     float GPSLon= 0.0;
     float pH = 0.0;
@@ -335,7 +343,7 @@ void setup() {
     oled.display();
     
     //startupPair();
-    delay(3000);
+    //delay(3000);
 
     at1.start();
     at2.start();
@@ -369,6 +377,7 @@ void loop() {
         sprintf(statusStr,"CCB%dcnf%1d",ControlledBot->botNum,int(ControlledBot->dataRecording));
         sendData(statusStr,0,true,true,statusTimeout);
     }
+    manualMotorControl(botSelect);
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -403,7 +412,17 @@ void loop() {
         ControlledBot->offloading = false;
     }
     XBeeHandler();
+    RPiHandler();
     XBeeLTEPairSet();
+}
+
+void logMessage(const char *message){
+    if(!logFile.isOpen()){
+        logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.println(message);
+        logFile.close();
+    }
+    else logFile.println(message);
 }
 
 void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
@@ -548,12 +567,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         if(checksum != strlen(command)-2){
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
-            if(!logFile.isOpen()){
-                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-                logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
-                logFile.close();
-            }
-            else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
+            logMessage("[WARN] Warning, checksum does not match!");
             Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
@@ -575,7 +589,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             return;
         }
         else if(!strcmp(cmdStr,"sup")){
-            for(WaterBot w: WaterBots){
+            for(WaterBot &w: WaterBots){
                 if(rxBotID == w.botNum){
                     uint8_t battpct;
                     uint8_t statflags;
@@ -591,13 +605,14 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.XBeeAvail = (statflags >> 1) & 1;
                     w.BLEAvail = (statflags >> 2) & 1;
                     w.offloading = (statflags >> 3) & 1;
-                    w.manualRC = (statflags >> 4) & 1;
-                    w.lowBatt = (statflags >> 5) & 1;
-                    w.dataRecording = (statflags >> 6) & 1;
+                    w.driveMode = (statflags >> 4) & 3;
+                    w.lowBatt = (statflags >> 6) & 1;
+                    w.dataRecording = (statflags >> 7) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
-                    Serial.println("Status Update!");
-                    Serial.println("##########################");
+                    
+                    logMessage("Status Update!");
+                    /*Serial.println("##########################");
                     Serial.println("##     STATUS UPDATE    ##");
                     Serial.printlnf("##       Bot #: %1d      ##",w.botNum);
                     Serial.printlnf("##      Batt %: %03d     ##",w.battPercent);
@@ -605,7 +620,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
                     Serial.println("##  Latitude Longitude  ##");
                     Serial.printlnf("## %.6f %.6f ##",w.GPSLat,w.GPSLon);
-                    Serial.println("##########################");
+                    Serial.println("##########################");*/
                 }
 
             }
@@ -644,13 +659,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             botPairRx = true;
         }
         else if(!strcmp(cmdStr,"pts")){
-            Serial.println(dataStr);
-            myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
-            String modeStr[3] = {"LTE", "XBee", "Bluetooth"};
-            myFile.printf("New string from %s: ", modeStr[mode]);
-            myFile.println(dataStr);
-            delay(5);
-            myFile.close();
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+                logFile.close();
+            }
+            else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
         else{   //Didn't recognize command (may be corrupted?) send back error signal
             if(mode == 1){
@@ -665,6 +679,47 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
 
         }
 
+    }
+}
+
+void processRPiCommand(const char *command, uint8_t mode){
+    if(command[0] == 'R' && command[1] == 'P'){  
+        uint8_t checksum;
+        char dataStr[strlen(command)-8];
+        dataStr[strlen(command)-9] = '\0';
+        char cmdStr[4];
+        cmdStr[3] = '\0';
+        char checkStr[3];
+        checkStr[0] = command[strlen(command)-2];
+        checkStr[1] = command[strlen(command)-1];
+        checkStr[2] = '\0';
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        //Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        for(uint8_t i = 4; i < strlen(command)-2;i++){
+            if(i < 7) cmdStr[i-4] = command[i];
+            else dataStr[i-7] = command[i];
+        }
+        if(checksum != strlen(command)-2){
+            //Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+                logFile.close();
+            }
+            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+            //Serial.println("Warning, checksum does not match");
+            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
+                char rxBotNum[2];
+                rxBotNum[0] = command[0];
+                rxBotNum[1] = command[1];
+                sprintf(errBuf,"CC%2snak%3s",rxBotNum,cmdStr);
+                errModeReply = mode;
+            }
+            return;
+        }
+        if(!strcmp(cmdStr,"ctl")){
+                //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
+        }
     }
 }
 
@@ -723,7 +778,7 @@ void BLEScan(int BotNumber){
                         newWaterbot.BLEAvail = true;
                         newWaterbot.botNum = bufName[0];
                         PairBots.push_back(newWaterbot);
-                        for(WaterBot w: WaterBots){
+                        for(WaterBot &w: WaterBots){
                             if(bufName[0] == w.botNum){
                                 newBot = false;
                                 w.BLEAvail = true;
@@ -778,6 +833,41 @@ void DataOffloader(uint8_t bot_id){
     offloadingMode = false;
 }
 
+void RPiStatusUpdate(){
+    for(WaterBot &wb: WaterBots){
+        if(wb.updatedStatus){
+            uint16_t statusFlags;
+            statusFlags = 0;
+            statusFlags = wb.LTEAvail;
+            statusFlags |= wb.XBeeAvail << 1;
+            statusFlags |= wb.BLEAvail << 2;
+            statusFlags |= wb.offloading << 3;
+            statusFlags |= wb.driveMode << 4;
+            statusFlags |= wb.lowBatt << 6;
+            statusFlags |= wb.dataRecording << 7;
+            Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags);
+        }
+    }
+}
+
+void RPiHandler(){
+    while(Serial.available()){
+        while(Serial.available()){
+            String data = Serial.readStringUntil('\n');
+            //Serial.println(data);
+            char buffer[data.length()];
+            for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+            if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+            processCommand(buffer,3,true);
+            if(logMessages){
+                if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data);
+                logFile.close();
+            }
+        }
+    }
+}
+
 void XBeeHandler(){  
     while(Serial1.available()){
         String data = Serial1.readStringUntil('\n');
@@ -793,6 +883,90 @@ void XBeeHandler(){
             logFile.close();
         }
     }
+}
+
+void manualMotorControl(uint8_t commandedBot){
+
+    char mtrStr[15];
+    int VRead, HRead, VSet, HSet;
+    VRead = 4095-analogRead(JOYV_ADC);
+    HRead = analogRead(JOYH_ADC);
+    if(VRead < JOY_MID - JOY_DEADZONE){
+        VSet = -90 * (VRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(VSet < -90) VSet = -90;
+    }
+    else if(VRead > JOY_MID + JOY_DEADZONE){
+        VSet = 90 * (VRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(VSet > 90) VSet = 90;
+    }
+    else{
+        VSet = 0;
+    }
+    if(HRead < JOY_MID - JOY_DEADZONE){
+        HSet = -90 * (HRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(HSet < -90) HSet = -90;
+    }
+    else if(HRead > JOY_MID + JOY_DEADZONE){
+        HSet = 90 * (HRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(HSet > 90) HSet = 90;
+    }
+    else{
+        HSet = 0;
+    }
+    uint8_t LSpeed, RSpeed;
+    LSpeed = 90 + VSet/2;
+    if(VSet > 0){
+        if(HSet > 0){
+            if(HSet > VSet){
+                LSpeed = 90 + HSet/2 + VSet/2;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > VSet){
+                RSpeed = 90 - HSet/2 + VSet/2;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+    }
+    else{
+        if(HSet > 0){
+            if(HSet > (0-VSet)){
+                Serial.println("Hello World!!!!!!!");
+                LSpeed = (90 + HSet/2 + VSet/2);
+                RSpeed = (90 - HSet/2 + VSet);
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > (0-VSet)){
+                RSpeed = 90 + HSet/2 + VSet/2;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+    }
+    
+    
+    
+    sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
+    Serial.println(mtrStr);
+    sendData(mtrStr,0,true,false, false);
+    delay(100);
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
@@ -869,7 +1043,7 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
 
 void actionTimer5(){
     postStatus = true;
-    for(WaterBot w: WaterBots){
+    for(WaterBot &w: WaterBots){
         w.timeoutCount++;
     }
     //if(!BLE.connected)
@@ -877,7 +1051,7 @@ void actionTimer5(){
 
 void actionTimer60(){
     bool reqLTEStatus = false;
-    for(WaterBot w: WaterBots){
+    for(WaterBot &w: WaterBots){
         if(w.timeoutCount > XBEE_BLE_MAX_TIMEOUT){
             reqLTEStatus = true;
             w.timeoutCount = 0;            
@@ -925,7 +1099,7 @@ void createMenu(){
 
     MenuItem sentryToggle;
     sentryToggle.init(1,0,1,true,"Sentry");
-    sentryToggle.MethodPointerBool = &WaterBot::sentry;
+    sentryToggle.MethodPointer = &WaterBot::driveMode;
 
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);

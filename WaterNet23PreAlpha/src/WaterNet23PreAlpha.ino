@@ -5,8 +5,11 @@
  */
 
 #include "application.h"                    //Needed for I2C to GPS
-#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
-#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
+#include "SparkFun_u-blox_GNSS_Arduino_Library.h"
+#include <Adafruit_LIS3MDL.h>
+#include <Adafruit_Sensor.h>
+#define X_AXIS_ACCELERATION 0
+//#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
 #include "sdios.h"
 #undef min
@@ -17,16 +20,19 @@
 // BOT CONFIGURATION MACROS //
 //////////////////////////////
 
-#define BOTNUM              1
-#define STARTUP_WAIT_PAIR   0
+#define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
+#define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 
 //Pin Configuration
 
-#define ESC_PWM_L           D6
-#define ESC_PWM_R           D5
-#define SENSE_EN            D2
-#define chipSelect          D8
-#define PWR_EN              D22
+#define ESC_PWM_L           D6          //Left motor ESC output pin
+#define ESC_PWM_R           D5          //Right motor ESC output pin
+#define SENSE_EN            D2          //Output pin to enable/disable voltage regulator for sensors
+#define chipSelect          D8          //Chip select pin for Micro SD Card
+#define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
+#define SOL_ISENSE          A2          //Shunt monitor ADC input for solar array input current
+#define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
+#define PWR_EN              D22         
 #define LEAK_DET            D23
 
 ////////////////////
@@ -58,14 +64,25 @@
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
 
+#define BAT_MIN             13.2            //Voltage to read 0% battery
+#define BAT_MAX             16.4            //Voltage to read 100% battery
+#define BAT_LOW             14.0            //Voltage to set low battery flag
+#define VDIV_MULT           0.004835        //Calculate the ratio for ADC to voltage conversion 3.3V in on ADC = 4095 3.3V on 100kOhm + 20kOhm divider yields (3.3/20000)*120000 = 19.8V in MAX
+#define BAT_ISENSE_MULT     33.0            //Calculate the maximum current the shunt can measure for the battery. Rs = 0.001, RL = 100k. Vo = Is * 0.1, max current is 33A
+#define SLR_ISENSE_MULT     16.5            //Calculate the maximum current the shunt can measure for the solar array. Rs = 0.010, RL = 20k. Vo = Is * 0.2, max current is 16.5A
+
+#define MTR_TIMEOUT         4000
+
 #define REPL_NAK            false
 
 SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
 char nmeaBuffer[100];
-MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
-SFE_UBLOX_GPS myGPS;
+//MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
+SFE_UBLOX_GNSS myGPS;
+
+Adafruit_LIS3MDL lis3mdl;
 
 //SD File system object
 SdFat sd((SPIClass*)&SPI);
@@ -101,7 +118,7 @@ void setupSPI();
 void setupLTE();
 void setupXBee();
 void setupGPS();
-bool getGPSLatLon();
+bool getPositionData();
 void sendResponseData();
 void timeInterval();
 void updateMotors();
@@ -115,6 +132,7 @@ void statusUpdate();
 //Tmers
 Timer watchdog(WATCHDOG_PD, wdogHandler);   //Create timer object for watchdog
 Timer ledTimer(1000,LEDHandler);
+Timer motionTimer(2500, motionHandler);
 Timer statusPD(STATUS_PD,StatusHandler);
 
 //LED Control
@@ -125,13 +143,17 @@ LEDStatus status;
 //////////////////////
 
 bool waitForConnection;
-long latitude_mdeg, longitude_mdeg;
 float latitude, longitude;
+int compassHeading;
+float targetLat, targetLon;
+int travelHeading;
+float travelDistance;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
 uint8_t battPercent;
+float battVoltage, battCurrent, solarCurrent;
 bool updateMotorControl;
-bool manualRC;
+uint8_t driveMode = 0;
 bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
@@ -142,6 +164,7 @@ bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
+uint32_t lastMtrTime;
 uint32_t lastStatusTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 char txBuf[UART_TX_BUF_SIZE];
@@ -215,7 +238,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             ESCL.write(setLSpeed);
             ESCR.write(setRSpeed);
             updateMotorControl = true;
-            manualRC = true;
+            lastMtrTime = millis();
+            driveMode = 0;
         }
         else if(!strcmp(cmdStr,"req")){  //Data Request
             requestActive = mode;
@@ -260,6 +284,7 @@ void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
 
+    
     pinMode(SENSE_EN, OUTPUT);
     pinMode(PWR_EN, OUTPUT);
     pinMode(LEAK_DET, INPUT);
@@ -285,8 +310,6 @@ void setup(){
     setupXBee();                                //Setup XBee module
     setupGPS();                                 //Setup GPS module
     setupLTE();                                 //Initialize LTE Flags
-
-    manualRC = true;
 
     senseTimer = millis();
     dataTimer = millis();
@@ -316,6 +339,20 @@ void setup(){
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
+    if (! lis3mdl.begin_I2C()) {          // hardware I2C mode, can pass in address & alt Wire
+        Serial.println("Failed to find LIS3MDL chip");
+    }
+    else Serial.println("LIS3MDL Found!");
+    lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+    lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+    lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
+    lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
+    lis3mdl.setIntThreshold(500);
+    lis3mdl.configInterrupt(false, false, true, // enable z axis
+                          true, // polarity
+                          false, // don't latch
+                          true); // enabled!
+
     char timestamp[16];
     snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
     strcpy(filename,DEF_FILENAME);
@@ -328,6 +365,7 @@ void setup(){
     Serial.println(filenameMessages);
 
     watchdog.start();
+    motionTimer.start();
     ledTimer.start();
     statusPD.start();
 
@@ -365,14 +403,18 @@ void setup(){
 }
 
 void loop(){
-    /*if(getGPSLatLon()){
+    
+
+    //Serial.println();
+    if(getPositionData()){
         char latLonBuf[UART_TX_BUF_SIZE];
-        latitude = ((float)latitude_mdeg/1000000.0);
-        longitude = ((float)longitude_mdeg/1000000.0);
         //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
-    }*/
+    }
+
+    readPowerSys();
+    //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
     XBeeHandler();
     statusUpdate();
@@ -384,18 +426,19 @@ void loop(){
     }
     //sendData("B1CCptsbigbot",0,false,true,false);
     sendResponseData();
-    delay(100);
+    delay(500);
 }
+
 
 //This function gets called from the SparkFun Ublox Arduino Library
 //As each NMEA character comes in you can specify what to do with it
 //Useful for passing to other libraries like tinyGPS, MicroNMEA, or even
 //a buffer, radio, etc.
-void SFE_UBLOX_GPS::processNMEA(char incoming){
+//void SFE_UBLOX_GPS::processNMEA(char incoming){
   //Take the incoming char from the Ublox I2C port and pass it on to the MicroNMEA lib
   //for sentence cracking
-  nmea.process(incoming);
-}
+//  nmea.process(incoming);
+//}
 //Initialization for LTE events and flags
 void setupLTE(){
     Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
@@ -417,26 +460,56 @@ void setupXBee(){
 
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
-    myGPS.begin(Wire);
-    if (myGPS.isConnected() == false){
-        //Log.warn("Ublox GPS not detected at default I2C address, freezing.");
-        //while (1);
+    if(myGPS.begin() == false){
+        delay(1000);
+        Serial.println("Error, Could not initialize GPS");
     }
+    myGPS.setI2COutput(COM_TYPE_UBX);
+    myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 }
 
-bool getGPSLatLon(){
-    myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
+uint8_t readPowerSys(){
+    battVoltage = (float) analogRead(BATT_VSENSE) * VDIV_MULT;
+    int rawPCT = (int)(100 * (battVoltage - BAT_MIN)/(BAT_MAX - BAT_MIN));
+    if(rawPCT < 0) rawPCT = 0;
+    if(rawPCT > 100) rawPCT = 100;
+    battPercent = (uint8_t) rawPCT;
+    battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095;
+    solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
+    return battPercent;
+}
 
-  if(nmea.isValid() == true){
-    latitude_mdeg= nmea.getLatitude();
-    longitude_mdeg = nmea.getLongitude();
-    return true;
-  }
-  else{
-    //Log.warn("Location not available: %d Sattelites",nmea.getNumSatellites());
-  }
-  return false;
+float deg2rad(float deg) {
+  return deg * (3.14159/180);
+}
+
+bool getPositionData(){
+    //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
+
+  //if(nmea.isValid() == true){
+    if(myGPS.isConnected()){
+        latitude = ((float)myGPS.getLatitude())/1000000.0;
+        longitude = ((float)myGPS.getLongitude())/1000000.0;
+        lis3mdl.read();      // get X Y and Z data at once
+        sensors_event_t event; 
+        lis3mdl.getEvent(&event);
+        compassHeading = (int) (atan2(event.magnetic.x, event.magnetic.y) * 180 / M_PI);
+        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
+            travelHeading = (int) (atan2(targetLat-latitude,targetLon-longitude) * 180 / M_PI);
+            float dLat = deg2rad(targetLat-latitude);
+            float dLon = deg2rad(targetLon-longitude);
+            float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
+            float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
+            travelDistance = 6371.0 * c; // Distance in km
+            Serial.printlnf("Distance: %f",travelDistance);
+        }
+        
+        return true;
+    }
+    
+  //}
+    
 }
 
 //Function to check if response data to a request needs to be sent out
@@ -502,9 +575,9 @@ void StatusHandler(){
     statusFlags |= XBeeAvail << 1;
     statusFlags |= BLEAvail << 2;
     statusFlags |= offloadMode << 3;
-    statusFlags |= manualRC << 4;
-    statusFlags |= lowBattery << 5;
-    statusFlags |= logSensors << 6;
+    statusFlags |= driveMode << 4;
+    statusFlags |= lowBattery << 6;
+    statusFlags |= logSensors << 7;
     statusReady = true;
     Serial.println("Sending a status update!");
 }
@@ -557,7 +630,7 @@ void sensorHandler(){
             char timestamp[16];
             snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
             if(!myFile.isOpen()) myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-            myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,((float)latitude_mdeg/1000000.0),((float)longitude_mdeg/1000000.0),senseTemp,sensePH,senseDO,senseMiniCond,senseCond);
+            myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMiniCond,senseCond);
             myFile.close();
         }
     }
@@ -628,6 +701,17 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.printlnf("[INFO] Received BLE Message: %s",btBuf);
         logFile.close();
+    }
+}
+
+void motionHandler(){
+    if(driveMode == 0 && millis() - lastMtrTime > MTR_TIMEOUT){
+        setLSpeed = 90;
+        setRSpeed = 90;
+        updateMotorControl = true;
+        ESCL.write(setLSpeed);
+        ESCR.write(setRSpeed);
+        Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
     }
 }
 
@@ -733,7 +817,7 @@ void LEDHandler(){
         SetPattern = LED_PATTERN_SOLID;
         SetSpeed = LED_SPEED_NORMAL;
     }
-    else if(manualRC){
+    else if(driveMode == 0){
         SetPattern = LED_PATTERN_BLINK;
         SetSpeed = LED_SPEED_SLOW;
     }

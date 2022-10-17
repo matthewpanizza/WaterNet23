@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -23,6 +23,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck);
 void setupXBee();
 void BLEScan(int BotNumber);
 void DataOffloader(uint8_t bot_id);
+void RPiHandler();
+void manualMotorControl(uint8_t commandedBot);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
@@ -35,7 +37,7 @@ void lHandler();
 void uHandler();
 void dHandler();
 void jHandler();
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -70,6 +72,12 @@ void jHandler();
 #define DEBOUNCE_MS             100
 #define OLED_MAX_X              128
 #define OLED MAX_Y              32
+
+//Control Parameters
+#define JOY_DEADZONE        55
+#define JOY_MID             2048
+#define JOY_MAX             3995
+#define JOY_MIN             100
 
 //Development Parameters
 #define VERBOSE 1
@@ -152,11 +160,12 @@ class WaterBot{
     bool BLEAvail;
     bool LTEAvail;
     bool XBeeAvail;
-    bool manualRC;
-    bool sentry;
+    uint8_t driveMode;
     bool lowBatt;
     bool dataRecording;
     bool offloading = false;
+    float TargetLat = -999.0;
+    float TargetLon = -999.0;
     float GPSLat = 0.0;
     float GPSLon= 0.0;
     float pH = 0.0;
@@ -363,7 +372,7 @@ void setup() {
     oled.display();
     
     //startupPair();
-    delay(3000);
+    //delay(3000);
 
     at1.start();
     at2.start();
@@ -397,6 +406,7 @@ void loop() {
         sprintf(statusStr,"CCB%dcnf%1d",ControlledBot->botNum,int(ControlledBot->dataRecording));
         sendData(statusStr,0,true,true,statusTimeout);
     }
+    manualMotorControl(botSelect);
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -431,6 +441,7 @@ void loop() {
         ControlledBot->offloading = false;
     }
     XBeeHandler();
+    RPiHandler();
     XBeeLTEPairSet();
 }
 
@@ -619,9 +630,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.XBeeAvail = (statflags >> 1) & 1;
                     w.BLEAvail = (statflags >> 2) & 1;
                     w.offloading = (statflags >> 3) & 1;
-                    w.manualRC = (statflags >> 4) & 1;
-                    w.lowBatt = (statflags >> 5) & 1;
-                    w.dataRecording = (statflags >> 6) & 1;
+                    w.driveMode = (statflags >> 4) & 3;
+                    w.lowBatt = (statflags >> 6) & 1;
+                    w.dataRecording = (statflags >> 7) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
                     Serial.println("Status Update!");
@@ -672,13 +683,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             botPairRx = true;
         }
         else if(!strcmp(cmdStr,"pts")){
-            Serial.println(dataStr);
-            myFile.open("RawWrite.txt", O_RDWR | O_CREAT | O_AT_END);
-            String modeStr[3] = {"LTE", "XBee", "Bluetooth"};
-            myFile.printf("New string from %s: ", modeStr[mode]);
-            myFile.println(dataStr);
-            delay(5);
-            myFile.close();
+            if(!logFile.isOpen()){
+                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+                logFile.close();
+            }
+            else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
         else{   //Didn't recognize command (may be corrupted?) send back error signal
             if(mode == 1){
@@ -806,6 +816,24 @@ void DataOffloader(uint8_t bot_id){
     offloadingMode = false;
 }
 
+void RPiHandler(){
+    while(Serial.available()){
+        while(Serial.available()){
+            String data = Serial.readStringUntil('\n');
+            //Serial.println(data);
+            char buffer[data.length()];
+            for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
+            if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+            processCommand(buffer,3,true);
+            if(logMessages){
+                if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+                logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data);
+                logFile.close();
+            }
+        }
+    }
+}
+
 void XBeeHandler(){  
     while(Serial1.available()){
         String data = Serial1.readStringUntil('\n');
@@ -821,6 +849,90 @@ void XBeeHandler(){
             logFile.close();
         }
     }
+}
+
+void manualMotorControl(uint8_t commandedBot){
+
+    char mtrStr[15];
+    int VRead, HRead, VSet, HSet;
+    VRead = 4095-analogRead(JOYV_ADC);
+    HRead = analogRead(JOYH_ADC);
+    if(VRead < JOY_MID - JOY_DEADZONE){
+        VSet = -90 * (VRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(VSet < -90) VSet = -90;
+    }
+    else if(VRead > JOY_MID + JOY_DEADZONE){
+        VSet = 90 * (VRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(VSet > 90) VSet = 90;
+    }
+    else{
+        VSet = 0;
+    }
+    if(HRead < JOY_MID - JOY_DEADZONE){
+        HSet = -90 * (HRead - (JOY_MID - JOY_DEADZONE))/(JOY_MIN - (JOY_MID - JOY_DEADZONE));
+        if(HSet < -90) HSet = -90;
+    }
+    else if(HRead > JOY_MID + JOY_DEADZONE){
+        HSet = 90 * (HRead - (JOY_MID + JOY_DEADZONE))/(JOY_MAX - (JOY_MID + JOY_DEADZONE));
+        if(HSet > 90) HSet = 90;
+    }
+    else{
+        HSet = 0;
+    }
+    uint8_t LSpeed, RSpeed;
+    LSpeed = 90 + VSet/2;
+    if(VSet > 0){
+        if(HSet > 0){
+            if(HSet > VSet){
+                LSpeed = 90 + HSet/2 + VSet/2;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > VSet){
+                RSpeed = 90 - HSet/2 + VSet/2;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+    }
+    else{
+        if(HSet > 0){
+            if(HSet > (0-VSet)){
+                Serial.println("Hello World!!!!!!!");
+                LSpeed = (90 + HSet/2 + VSet/2);
+                RSpeed = (90 - HSet/2 + VSet);
+            }
+            else{
+                LSpeed = 90 + VSet;
+                RSpeed = 90 + HSet/2 + VSet;
+            }
+        }
+        else{
+            if((0-HSet) > (0-VSet)){
+                RSpeed = 90 + HSet/2 + VSet/2;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+            else{
+                RSpeed = 90 + VSet;
+                LSpeed = 90 - HSet/2 + VSet;
+            }
+        }
+    }
+    
+    
+    
+    sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
+    Serial.println(mtrStr);
+    sendData(mtrStr,0,true,false, false);
+    delay(100);
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
@@ -953,7 +1065,7 @@ void createMenu(){
 
     MenuItem sentryToggle;
     sentryToggle.init(1,0,1,true,"Sentry");
-    sentryToggle.MethodPointerBool = &WaterBot::sentry;
+    sentryToggle.MethodPointer = &WaterBot::driveMode;
 
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);
