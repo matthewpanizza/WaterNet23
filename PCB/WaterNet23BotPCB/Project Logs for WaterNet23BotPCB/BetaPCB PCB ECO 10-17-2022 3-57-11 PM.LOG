@@ -1,0 +1,17 @@
+Added Component: Designator=J8(JST_SM04B-SRSS-TB(LF)(SN))
+Add component (AddParameter): Name = "Availability"; Value = "Unavailable"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MF"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "MP"; Value = "SM04B-SRSS-TB(LF)(SN)"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Price"; Value = "None"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = ""; VariantName = "[No Variations]"
+Added Pin To Net: NetName=3V3 Pin=J8-2
+Added Net: Name=3V3
+Added Pin To Net: NetName=GND Pin=J8-1
+Added Pin To Net: NetName=GND Pin=J8-S1
+Added Pin To Net: NetName=GND Pin=J8-S2
+Added Net: Name=GND
+Added Pin To Net: NetName=SCL Pin=J8-4
+Added Net: Name=SCL
+Added Pin To Net: NetName=SDA Pin=J8-3
+Added Net: Name=SDA
