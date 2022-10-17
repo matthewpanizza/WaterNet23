@@ -718,7 +718,24 @@ void processRPiCommand(const char *command, uint8_t mode){
             return;
         }
         if(!strcmp(cmdStr,"ctl")){
-                //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
+            char idStr[10];
+            char GPSLatstr[12];
+            char GPSLonstr[12];
+            uint8_t offloading, drivemode, recording;
+            sscanf("%s %s %s %d %d %d",idStr,GPSLatstr,GPSLonstr,drivemode,offloading,recording);
+            char botChar[2] = {command[8], '\0'};
+            uint8_t targetBot = atoi(botChar);
+            for(WaterBot wb: WaterBots){
+                if(wb.botNum == targetBot){
+                    wb.TargetLat = atof(GPSLatstr);
+                    wb.TargetLon = atof(GPSLonstr);
+                    wb.driveMode = drivemode;
+                    wb.offloading = offloading;
+                    wb.dataRecording = recording;
+                    return;
+                }
+            }
+            //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
         }
     }
 }
@@ -917,7 +934,7 @@ void manualMotorControl(uint8_t commandedBot){
     LSpeed = 90 + VSet/2;
     if(VSet > 0){
         if(HSet > 0){
-            if(HSet > VSet){
+            if(HSet > VSet){        //H = 90, V = 0 -> LS = 135, RS = 45, H = 90, V = 90 -> LS = 180, RS = 135
                 LSpeed = 90 + HSet/2 + VSet/2;
                 RSpeed = 90 - HSet/2 + VSet;
             }
@@ -939,10 +956,10 @@ void manualMotorControl(uint8_t commandedBot){
     }
     else{
         if(HSet > 0){
-            if(HSet > (0-VSet)){
+            if(HSet > (0-VSet)){        // H = 90, V = 0 -> LS = 135, RS = 45, H = 90, V = -90 -> LS = 0; RS = 45
                 Serial.println("Hello World!!!!!!!");
-                LSpeed = (90 + HSet/2 + VSet/2);
-                RSpeed = (90 - HSet/2 + VSet);
+                LSpeed = (90 + HSet/2 + VSet*1.5 );
+                RSpeed = (90 - HSet/2);      
             }
             else{
                 LSpeed = 90 + VSet;
@@ -950,9 +967,9 @@ void manualMotorControl(uint8_t commandedBot){
             }
         }
         else{
-            if((0-HSet) > (0-VSet)){
-                RSpeed = 90 + HSet/2 + VSet/2;
-                LSpeed = 90 - HSet/2 + VSet;
+            if((0-HSet) > (0-VSet)){    //H = -90, V = 0 -> LS = 45, RS = 135, H = -90, V = -90 -> LS = 45, RS = 0
+                RSpeed = 90 - HSet/2 + (VSet*1.5);
+                LSpeed = 90 + HSet/2;
             }
             else{
                 RSpeed = 90 + VSet;
