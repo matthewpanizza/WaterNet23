@@ -41,8 +41,8 @@
 
 //Menu Parameters
 #define i2c_Address 0x3c //initialize with the I2C addr 0x3C Typically eBay OLED's
-#define MAX_MENU_ITEMS          4
-#define DEBOUNCE_MS             100
+#define MAX_MENU_ITEMS          5
+#define DEBOUNCE_MS             150
 #define OLED_MAX_X              128
 #define OLED MAX_Y              32
 
@@ -136,6 +136,7 @@ class WaterBot{
     bool LTEAvail;
     bool XBeeAvail;
     uint8_t driveMode;
+    bool signal = false;
     bool lowBatt;
     bool dataRecording;
     bool offloading = false;
@@ -284,19 +285,19 @@ void rHandler(void);
 
 void setup() {
 
-    pinMode(E_DPAD,INPUT_PULLUP);
-    pinMode(U_DPAD,INPUT_PULLUP);
-    pinMode(D_DPAD,INPUT_PULLUP);
-    pinMode(L_DPAD,INPUT_PULLUP);
-    pinMode(R_DPAD,INPUT_PULLUP);
-    pinMode(JOY_BTN,INPUT_PULLUP);
+    pinMode(E_DPAD,INPUT_PULLDOWN);
+    pinMode(U_DPAD,INPUT_PULLDOWN);
+    pinMode(D_DPAD,INPUT_PULLDOWN);
+    pinMode(L_DPAD,INPUT_PULLDOWN);
+    pinMode(R_DPAD,INPUT_PULLDOWN);
+    pinMode(JOY_BTN,INPUT_PULLDOWN);
     
-    attachInterrupt(E_DPAD,entHandler,FALLING);
-    attachInterrupt(U_DPAD,uHandler,FALLING);
-    attachInterrupt(D_DPAD,dHandler,FALLING);
-    attachInterrupt(L_DPAD,lHandler,FALLING);
-    attachInterrupt(R_DPAD,rHandler,FALLING);
-    attachInterrupt(JOY_BTN,jHandler,FALLING);
+    attachInterrupt(E_DPAD,entHandler,RISING);
+    attachInterrupt(U_DPAD,uHandler,RISING);
+    attachInterrupt(D_DPAD,dHandler,RISING);
+    attachInterrupt(L_DPAD,lHandler,RISING);
+    attachInterrupt(R_DPAD,rHandler,RISING);
+    attachInterrupt(JOY_BTN,jHandler,RISING);
 
     debounceTime = millis();
 
@@ -375,7 +376,6 @@ void loop() {
     updateMenu();
     //Serial.printlnf("Selected Bot: %d ",botSelect);
 
-    if(!logMessages) Serial.println("Error, SD Card Not working");
     if(updateControl){
         updateControl = false;
         ControlledBot = NULL;
@@ -1110,7 +1110,7 @@ void WaterBotSim(uint8_t count){
         }
         if(dupeBot) continue;
         WaterBot simBot;
-        simBot.driveMode = 1;
+        simBot.driveMode = 0;
         simBot.botNum = temp;
         simBot.BLEAvail = false;
         simBot.XBeeAvail = true;
@@ -1137,36 +1137,42 @@ void createMenu(){
 
     MenuItem sentryToggle;
     sentryToggle.init(1,0,2,false,"Sentry");
-    sentryToggle.customLabel = false;// true;
+    sentryToggle.customLabel = true;
     sentryToggle.statOnly = false;
     sentryToggle.labels.push_back("Rem");
     sentryToggle.labels.push_back("Sen");
     sentryToggle.labels.push_back("Aut");
     sentryToggle.MethodPointer = &WaterBot::driveMode;
 
+    MenuItem signalToggle;
+    signalToggle.init(1,0,1,true,"Signal");
+    signalToggle.statOnly = false;
+    signalToggle.MethodPointerBool = &WaterBot::signal;
+
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);
     MenuItems.push_back(sentryToggle);
     MenuItems.push_back(offloadItem);
+    MenuItems.push_back(signalToggle);
 
     SelectedItem = &MenuItems.at(menuItem);
 }
 
 void entHandler(){
+    redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     Serial.println("Enter trigger");
     debounceTime = millis();
     
-    redrawMenu = true;  
     selectingBots = !selectingBots;
     if(modifiedValue) updateControl = true;
 }
 
 void rHandler(){
+    redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     Serial.println("Right trigger");
-    redrawMenu = true;  
     if(selectingBots){
         if(botSelect != WaterBots.back().botNum){
             bool findCurrent = false;
@@ -1184,16 +1190,18 @@ void rHandler(){
         //int index = 0;
         for(WaterBot &ws: WaterBots){
             if(ws.botNum == botSelect){
-                MenuItem curItem = *SelectedItem;
-                Serial.println(curItem.itemName);
-                if(curItem.statOnly) return;
-                if(curItem.onOffSetting){
+                MenuItem *curItem = SelectedItem;
+                Serial.println(curItem->itemName);
+                if(curItem == nullptr) return;
+                if(curItem->statOnly) return;
+                if(curItem->onOffSetting){
                     Serial.println("Modified an On/Off Control");
-                    ws.*(curItem.MethodPointerBool) = true;
+                    ws.*(curItem->MethodPointerBool) = true;
                     Serial.printlnf("Bot: %d, Modified ",ws.botNum);
                 }
                 else{
-                    if(ws.*(curItem.MethodPointer) < curItem.maxVal) ws.*(curItem.MethodPointer) += curItem.stepSize;
+                    
+                    if(ws.*(curItem->MethodPointer) < curItem->maxVal) ws.*(curItem->MethodPointer) += curItem->stepSize;
                 }
                 modifiedValue = true;
             }
@@ -1203,6 +1211,7 @@ void rHandler(){
 }
 
 void lHandler(){
+    redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     Serial.println("Right trigger");
     debounceTime = millis();
@@ -1218,43 +1227,43 @@ void lHandler(){
         }
     }
     else{
-        int index = 0;
-        for(WaterBot ws: WaterBots){
+        for(WaterBot &ws: WaterBots){
             if(ws.botNum == botSelect){
-                MenuItem curItem = *SelectedItem;
-                Serial.println(curItem.itemName);
-                if(curItem.statOnly) return;
-                if(curItem.onOffSetting){
+                MenuItem *curItem = SelectedItem;
+                Serial.println(curItem->itemName);
+                if(curItem == nullptr) return;
+                if(curItem->statOnly) return;
+                if(curItem->onOffSetting){
                     Serial.println("Modified an On/Off Control");
-                    WaterBots.at(index).*(curItem.MethodPointerBool) = false;//!(WaterBots.at(index).*(curItem.MethodPointerBool));
-                    Serial.printlnf("Bot: %d, Modified ",WaterBots.at(index).botNum);
+                    ws.*(curItem->MethodPointerBool) = true;
+                    Serial.printlnf("Bot: %d, Modified ",ws.botNum);
                 }
                 else{
-                    if(WaterBots.at(index).*(curItem.MethodPointer) > curItem.minVal) WaterBots.at(index).*(curItem.MethodPointer) -= curItem.stepSize;
+                    
+                    if(ws.*(curItem->MethodPointer) > curItem->minVal) ws.*(curItem->MethodPointer) -= curItem->stepSize;
                 }
                 modifiedValue = true;
             }
-            index++;
         }
     }
 }
 
 void uHandler(){
+    redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     if(menuItem) menuItem--;
     SelectedItem = &MenuItems.at(menuItem);
     Serial.println("Up trigger");
-    redrawMenu = true;  
 }
 
 void dHandler(){
+    redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     if(menuItem < MAX_MENU_ITEMS-1) menuItem++;
     SelectedItem = &MenuItems.at(menuItem);
     Serial.println("Down trigger");
-    redrawMenu = true;  
 }
 
 void jHandler(){
