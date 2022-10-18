@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -40,14 +40,16 @@ void lHandler();
 void uHandler();
 void dHandler();
 void jHandler();
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
-#include "oled-wing-adafruit.h"
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
 
 // Pin Definitions
 
+#define OLED_RESET              A0
 #define JOYH_ADC                A2              //Horizontal Joystick
 #define JOYV_ADC                A3              //Vertical Joystick ADC pin
 #define JOY_BTN                 D23             //Joystick button press
@@ -71,6 +73,7 @@ void jHandler();
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 
 //Menu Parameters
+#define i2c_Address 0x3c //initialize with the I2C addr 0x3C Typically eBay OLED's
 #define MAX_MENU_ITEMS          4
 #define DEBOUNCE_MS             100
 #define OLED_MAX_X              128
@@ -115,7 +118,8 @@ BleCharacteristic peerOffloadCharacteristic;
 BlePeerDevice peer;
 
 //OLED Object
-OledWingAdafruit oled;
+//OledWingAdafruit oled;
+Adafruit_SH1107 oled = Adafruit_SH1107(64, 128, &Wire, OLED_RESET);
 
 //SD File system object
 SdFat sd((SPIClass*)&SPI1);
@@ -188,6 +192,7 @@ class PairBot{
 
 class MenuItem{
     public:
+        std::vector<String> labels;
         void init(uint8_t inStep, uint8_t minV, uint8_t maxV, bool switchOnOff, const char * itemString){
             minVal = minV;
             maxVal = maxV;
@@ -198,7 +203,8 @@ class MenuItem{
         uint8_t (WaterBot::*MethodPointer);
         bool (WaterBot::*MethodPointerBool);
         uint8_t stepSize;
-        bool onOffSetting;
+        bool onOffSetting = false;
+        bool customLabel = false;
         bool statOnly = false;
         uint8_t minVal;
         uint8_t maxVal;
@@ -237,7 +243,7 @@ void startupPair(){
     oled.clearDisplay();
     oled.setCursor(0,0);
     oled.print("Scanning ");
-    oled.fillCircle(115,7,3,WHITE);
+    oled.fillCircle(115,7,3,SH110X_WHITE);
     oled.display();
     uint8_t loadAnim = 0;
     while(!startConnect){
@@ -245,7 +251,7 @@ void startupPair(){
         oled.fillRect(72,16,35,15,0);
         oled.printlnf("Bots: %d",BLEPair.size());
         Serial.printlnf("Array size: %d",BLEPair.size());
-        oled.drawCircle(115,7,loadAnim,WHITE);
+        oled.drawCircle(115,7,loadAnim,SH110X_WHITE);
         if(loadAnim-1) oled.fillCircle(115,7,loadAnim-1,0);
         oled.display();
         loadAnim++;
@@ -294,6 +300,7 @@ void startupPair(){
             oled.display();
             selectingBots = true;
         }
+        
     }
 }
 
@@ -354,9 +361,13 @@ void setup() {
 
     createMenu();
 
-    oled.setup(); 
+    delay(250);
+
+    //oled.setup(); 
+    oled.begin(i2c_Address, true); // Address 0x3C default
     oled.clearDisplay();
     oled.display();
+    oled.setRotation(1);
 
     /*BleAdvertisingData advData;                 //Advertising data
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
@@ -370,7 +381,7 @@ void setup() {
         logMessages = false;
     }
     oled.setTextSize(2);
-    oled.setTextColor(WHITE);
+    oled.setTextColor(SH110X_WHITE);
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
@@ -473,6 +484,9 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
                 if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
                 else oled.printf("Off");
             }
+            else if(MenuItems.at(id).customLabel){
+                oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
+            }
             else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
         }
         else{
@@ -482,6 +496,9 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
             if(MenuItems.at(id).onOffSetting){
                 if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
                 else oled.printf("Off");
+            }
+            else if(MenuItems.at(id).customLabel){
+                oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
             }
             else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
         }
@@ -499,6 +516,9 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
         if(MenuItems.at(id).onOffSetting){
             if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
             else oled.printf("Off");
+        }
+        else if(MenuItems.at(id).customLabel){
+            oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
         }
         else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
     }
@@ -1123,6 +1143,7 @@ void WaterBotSim(uint8_t count){
         }
         if(dupeBot) continue;
         WaterBot simBot;
+        simBot.driveMode = 1;
         simBot.botNum = temp;
         simBot.BLEAvail = false;
         simBot.XBeeAvail = true;
@@ -1148,13 +1169,18 @@ void createMenu(){
     offloadItem.MethodPointerBool = &WaterBot::offloading;
 
     MenuItem sentryToggle;
-    sentryToggle.init(1,0,1,true,"Sentry");
+    sentryToggle.init(1,0,2,false,"Sentry");
+    sentryToggle.customLabel = false;// true;
+    sentryToggle.statOnly = false;
+    sentryToggle.labels.push_back("Rem");
+    sentryToggle.labels.push_back("Sen");
+    sentryToggle.labels.push_back("Aut");
     sentryToggle.MethodPointer = &WaterBot::driveMode;
 
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);
-    MenuItems.push_back(offloadItem);
     MenuItems.push_back(sentryToggle);
+    MenuItems.push_back(offloadItem);
 
     SelectedItem = &MenuItems.at(menuItem);
 }
@@ -1188,23 +1214,23 @@ void rHandler(){
         }
     }
     else{
-        int index = 0;
-        for(WaterBot ws: WaterBots){
+        //int index = 0;
+        for(WaterBot &ws: WaterBots){
             if(ws.botNum == botSelect){
                 MenuItem curItem = *SelectedItem;
                 Serial.println(curItem.itemName);
                 if(curItem.statOnly) return;
                 if(curItem.onOffSetting){
                     Serial.println("Modified an On/Off Control");
-                    WaterBots.at(index).*(curItem.MethodPointerBool) = true;
-                    Serial.printlnf("Bot: %d, Modified ",WaterBots.at(index).botNum);
+                    ws.*(curItem.MethodPointerBool) = true;
+                    Serial.printlnf("Bot: %d, Modified ",ws.botNum);
                 }
                 else{
-                    if(WaterBots.at(index).*(curItem.MethodPointer) < curItem.maxVal) WaterBots.at(index).*(curItem.MethodPointer) += curItem.stepSize;
+                    if(ws.*(curItem.MethodPointer) < curItem.maxVal) ws.*(curItem.MethodPointer) += curItem.stepSize;
                 }
                 modifiedValue = true;
             }
-            index++;
+            //index++;
         }
     }
 }
