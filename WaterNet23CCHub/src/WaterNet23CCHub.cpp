@@ -398,15 +398,20 @@ void setup() {
     advData.appendLocalName("RemoteTest");           //Local advertising name
     BLE.advertise(&advData);                    //Start advertising the characteristics*/
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
-        Serial.println("Error: could not connect to SD card!");
-        logMessages = false;
-    }
+    
+    
     oled.setTextSize(2);
     oled.setTextColor(SH110X_WHITE);
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
+
+    delay(100);
+
+    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
+        Serial.println("Error: could not connect to SD card!");
+        logMessages = false;
+    }
 
     MenuPopUp m;
     sprintf(m.primaryLine,"Hello!\0");
@@ -467,22 +472,22 @@ void loop() {
     	}
 
     }
-    if(offloadingMode){
+    /*if(offloadingMode){
         DataOffloader(ControlledBot->botNum);
         ControlledBot->offloading = false;
-    }
+    }*/
     XBeeHandler();
     RPiHandler();
     XBeeLTEPairSet();
 }
 
 void logMessage(const char *message){
-    if(!logFile.isOpen()){
+    /*if(!logFile.isOpen()){
         logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.println(message);
         logFile.close();
     }
-    else logFile.println(message);
+    else logFile.println(message);*/
 }
 
 void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
@@ -845,12 +850,12 @@ void processRPiCommand(const char *command, uint8_t mode){
         }
         if(checksum != strlen(command)-2){
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
-            if(!logFile.isOpen()){
+            /*if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
                 logFile.close();
             }
-            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);*/
             Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
