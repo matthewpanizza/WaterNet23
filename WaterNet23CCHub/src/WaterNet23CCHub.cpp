@@ -827,6 +827,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
 
 void processRPiCommand(const char *command, uint8_t mode){
     if(command[0] == 'R' && command[1] == 'P'){  
+        Serial.println("Received Pi command");
         uint8_t checksum;
         char dataStr[strlen(command)-8];
         dataStr[strlen(command)-9] = '\0';
@@ -843,14 +844,14 @@ void processRPiCommand(const char *command, uint8_t mode){
             else dataStr[i-7] = command[i];
         }
         if(checksum != strlen(command)-2){
-            //Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
+            Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
                 logFile.close();
             }
             else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
-            //Serial.println("Warning, checksum does not match");
+            Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
                 rxBotNum[0] = command[0];
@@ -864,17 +865,22 @@ void processRPiCommand(const char *command, uint8_t mode){
             char idStr[10];
             char GPSLatstr[12];
             char GPSLonstr[12];
-            uint8_t offloading, drivemode, recording;
-            sscanf("%s %s %s %d %d %d",idStr,GPSLatstr,GPSLonstr,drivemode,offloading,recording);
+            uint8_t offloading, drivemode, recording, signal;
+            sscanf(dataStr,"%s %s %s %d %d %d %d",idStr,GPSLatstr,GPSLonstr,&drivemode,&offloading,&recording,&signal);
             char botChar[2] = {command[8], '\0'};
             uint8_t targetBot = atoi(botChar);
-            for(WaterBot wb: WaterBots){
+            Serial.printlnf("Got a command packet from Pi for Bot %d",targetBot);
+            for(WaterBot &wb: WaterBots){
                 if(wb.botNum == targetBot){
                     wb.TargetLat = atof(GPSLatstr);
                     wb.TargetLon = atof(GPSLonstr);
                     wb.driveMode = drivemode;
                     wb.offloading = offloading;
                     wb.dataRecording = recording;
+                    wb.signal = signal;
+                    if(botSelect == wb.botNum) redrawMenu = true;
+                    wb.updatedControl = true;
+                    updateControl = true;
                     return;
                 }
             }
@@ -1013,19 +1019,17 @@ void RPiStatusUpdate(){
 
 void RPiHandler(){
     while(Serial.available()){
-        while(Serial.available()){
             String data = Serial.readStringUntil('\n');
-            //Serial.println(data);
+            Serial.println(data);
             char buffer[data.length()];
             for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
             if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
-            processCommand(buffer,3,true);
+            processRPiCommand(buffer,3);
             if(logMessages){
                 if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data);
                 logFile.close();
             }
-        }
     }
 }
 
