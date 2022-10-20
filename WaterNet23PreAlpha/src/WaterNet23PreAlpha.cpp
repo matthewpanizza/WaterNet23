@@ -83,7 +83,7 @@ void LEDHandler();
 
 #define BAT_MIN             13.2            //Voltage to read 0% battery
 #define BAT_MAX             16.4            //Voltage to read 100% battery
-#define BAT_LOW             14.0            //Voltage to set low battery flag
+#define LOW_BATT_PCT        20            //Voltage to set low battery flag
 #define VDIV_MULT           0.004835        //Calculate the ratio for ADC to voltage conversion 3.3V in on ADC = 4095 3.3V on 100kOhm + 20kOhm divider yields (3.3/20000)*120000 = 19.8V in MAX
 #define BAT_ISENSE_MULT     33.0            //Calculate the maximum current the shunt can measure for the battery. Rs = 0.001, RL = 100k. Vo = Is * 0.1, max current is 33A
 #define SLR_ISENSE_MULT     16.5            //Calculate the maximum current the shunt can measure for the solar array. Rs = 0.010, RL = 20k. Vo = Is * 0.2, max current is 16.5A
@@ -179,6 +179,7 @@ uint8_t statusFlags;
 bool LTEAvail, XBeeAvail, BLEAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
+bool signalLED;
 uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
 uint32_t lastMtrTime;
@@ -190,7 +191,6 @@ uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
 char filenameMessages[MAX_FILENAME_LEN];
-String xbeeBuf;
 
 int i = 0;
 
@@ -198,16 +198,12 @@ int i = 0;
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'B' && command[3] == BOTNUM+48)){
-        
         uint8_t checksum;
         char dataStr[strlen(command)-8];
         dataStr[strlen(command)-9] = '\0';
         char cmdStr[4];
         cmdStr[3] = '\0';
-        char checkStr[3];
-        checkStr[0] = command[strlen(command)-2];
-        checkStr[1] = command[strlen(command)-1];
-        checkStr[2] = '\0';
+        char checkStr[3] = {command[strlen(command)-2], command[strlen(command)-1], '\0'};
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
         for(uint8_t i = 4; i < strlen(command)-2;i++){
@@ -245,6 +241,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 
             }
             return;
+        }
+        if(!strcmp(cmdStr,"ctl")){
+            char tLat[8];
+            char tLon[8];
+            sscanf(dataStr,"%s %s %d %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal 
         }
         if(!strcmp(cmdStr,"mtr")){  //Motor Speed Control
             char lSpd[3] = {dataStr[0],dataStr[1],dataStr[2]};
@@ -492,6 +493,8 @@ uint8_t readPowerSys(){
     if(rawPCT < 0) rawPCT = 0;
     if(rawPCT > 100) rawPCT = 100;
     battPercent = (uint8_t) rawPCT;
+    if(battPercent <= LOW_BATT_PCT) lowBattery = true;
+    else lowBattery = false;
     battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095;
     solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
     return battPercent;
@@ -505,13 +508,9 @@ bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
   //if(nmea.isValid() == true){
-    //if(myGPS.isConnected()){
-        //latitude = ((float)myGPS.getLatitude())/1000000.0;
-        //longitude = ((float)myGPS.getLongitude())/1000000.0;
-        latitude = 35.771801;
-        longitude = -78.67406;
-        targetLat = 35.774783l;
-        targetLon = -78.674157;
+    if(myGPS.isConnected()){
+        latitude = ((float)myGPS.getLatitude())/1000000.0;
+        longitude = ((float)myGPS.getLongitude())/1000000.0;
         lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
@@ -527,8 +526,8 @@ bool getPositionData(){
         }
         
         return true;
-    //}
-    
+    }
+    return false;
   //}
     
 }
@@ -824,6 +823,12 @@ void LEDHandler(){
     LEDPattern SetPattern;
     LEDSpeed SetSpeed;
     uint8_t statusMode;
+    if(signalLED){
+        status.setPattern(LED_PATTERN_BLINK);
+        status.setColor(RGB_COLOR_ORANGE);
+        status.setSpeed(LED_SPEED_FAST);
+        return;
+    }
     if(offloadMode){
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_BLUE);

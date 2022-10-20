@@ -20,6 +20,7 @@ void setup();
 void loop();
 void logMessage(const char *message);
 void updateMenu();
+void updateBotControl();
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void processRPiCommand(const char *command, uint8_t mode);
 void setupXBee();
@@ -71,19 +72,21 @@ void jHandler();
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define MAX_LTE_STATUSES        25
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
+#define CONTROL_PUB_TIME        5000
+#define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
 
 //Menu Parameters
 #define i2c_Address 0x3c //initialize with the I2C addr 0x3C Typically eBay OLED's
 #define MAX_MENU_ITEMS          5
 #define DEBOUNCE_MS             150
 #define OLED_MAX_X              128
-#define OLED MAX_Y              32
+#define OLED_MAX_Y              64
 
 //Control Parameters
-#define JOY_DEADZONE        55
+#define JOY_DEADZONE        35
 #define JOY_MID             2048
-#define JOY_MAX             3995
-#define JOY_MIN             100
+#define JOY_MAX             4094
+#define JOY_MIN             1
 
 //Development Parameters
 #define VERBOSE 1
@@ -143,6 +146,8 @@ bool postStatus;
 bool meshPair;
 bool botPairRx;
 bool statusTimeout;
+int controlUpdateID;
+uint32_t controlUpdateTime;
 uint8_t errCmdMode;
 uint8_t errModeReply;
 char errCmdStr[3];
@@ -163,15 +168,17 @@ uint32_t debounceTime;
 class WaterBot{
     public:
     bool updatedStatus = true;
+    bool updatedControl = true;
     uint8_t botNum;
-    uint8_t battPercent;
+    uint8_t battPercent = 0;
     bool BLEAvail;
     bool LTEAvail;
     bool XBeeAvail;
-    uint8_t driveMode;
+    uint8_t driveMode = 0;
     bool signal = false;
-    bool lowBatt;
-    bool dataRecording;
+    bool lowBatt = false;
+    bool warnedLowBatt = false;
+    bool dataRecording = true;
     bool offloading = false;
     float TargetLat = -999.0;
     float TargetLon = -999.0;
@@ -182,6 +189,7 @@ class WaterBot{
     float DO = 0.0;
     float Cond = 0.0;
     float MCond = 0.0;
+    uint32_t publishTime = 0;
     uint32_t timeoutCount;
 };
 
@@ -212,11 +220,22 @@ class MenuItem{
         char itemName[10];
 };
 
+class MenuPopUp{
+    public:
+        char primaryLine[10];
+        char secondaryLine[30];
+        char tertiaryLine [30];
+        uint8_t primaryStart = 0;
+        uint8_t secondaryStart = 0;
+        uint8_t tertiaryStart = 0;
+};
+
 WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
 WaterBot *ControlledBot;
 std::vector<WaterBot> WaterBots;
 std::vector<WaterBot> PairBots;
 std::vector<PairBot> BLEPair;
+std::vector<MenuPopUp> PopUps;
 
 Timer at1(5000,actionTimer5);
 Timer at2(60000,actionTimer60);
@@ -333,6 +352,8 @@ void setup() {
     attachInterrupt(JOY_BTN,jHandler,RISING);
 
     debounceTime = millis();
+    controlUpdateTime = millis();
+    controlUpdateID = -1;
 
     Serial.begin(115200);
     Serial1.begin(9600);                        //Start serial for XBee module
@@ -386,6 +407,16 @@ void setup() {
     oled.setCursor(0,0);
     oled.print(" Starting ");
     oled.display();
+
+    MenuPopUp m;
+    sprintf(m.primaryLine,"Hello!\0");
+    sprintf(m.secondaryLine,"Scanning for Bots\0", 1);
+    sprintf(m.tertiaryLine, "OK when bots ready\0",15);
+    m.primaryStart = 32;
+    m.secondaryStart = 12;
+    m.tertiaryStart = 10;
+    //delay(10000);
+    PopUps.push_back(m);
     
     //startupPair();
     //delay(3000);
@@ -393,7 +424,9 @@ void setup() {
     at1.start();
     at2.start();
 
-    WaterBotSim(2);
+    WaterBotSim(1);
+
+    
 }
 
 void loop() {
@@ -405,24 +438,9 @@ void loop() {
         postStatus = false;
         statusTimeout = false;
     }
-
     updateMenu();
-    //Serial.printlnf("Selected Bot: %d ",botSelect);
-
-    if(!logMessages) Serial.println("Error, SD Card Not working");
-    if(updateControl){
-        updateControl = false;
-        ControlledBot = NULL;
-        for(uint8_t i = 0; i < WaterBots.size(); i++){
-            if(WaterBots.at(i).botNum == botSelect) ControlledBot =  &WaterBots.at(i);
-        }
-        if(ControlledBot == NULL) return;
-        if(ControlledBot->offloading) offloadingMode = true;
-        char statusStr[30];
-        sprintf(statusStr,"CCB%dcnf%1d",ControlledBot->botNum,int(ControlledBot->dataRecording));
-        sendData(statusStr,0,true,true,statusTimeout);
-    }
-    manualMotorControl(botSelect);
+    updateBotControl();
+    if(ControlledBot != nullptr) manualMotorControl(ControlledBot->botNum);
 
     if (BLE.connected()) {
         //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
@@ -431,8 +449,6 @@ void loop() {
         //memcpy(testStr,testBuf,30);
         //peerRxCharacteristic.setValue(testStr);
         //sendData("CCB1ptsbigbot",0,true,false,false);
-        if(!digitalRead(D_DPAD)) sendData("CCB1req",0,true,false,false);//offloadingMode = true;
-
         for(WaterBot ws: WaterBots) Serial.printlnf("Temp: %0.6f",ws.temp);
 
         //char sendStr[18];
@@ -444,7 +460,6 @@ void loop() {
         delay(250);
     }
     else {
-        //digitalWrite(D7,LOW);
     	if (millis() - lastScan >= SCAN_PERIOD_MS) {
     		// Time to scan
     		lastScan = millis();
@@ -531,7 +546,29 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
 
 void updateMenu(){
     if(redrawMenu){
-        oled.fillRect(0,0,OLED_MAX_X,15,0);
+        oled.fillRect(0,0,OLED_MAX_X,OLED_MAX_Y,0);
+        if(PopUps.size() != 0){  //If there is a queue of pop-ups to be displayed
+            oled.drawRect(1,1,126,62,1);
+            oled.drawRect(2,2,124,60,1);
+            oled.setTextColor(1);
+            oled.setCursor(PopUps.back().primaryStart,4);
+            oled.setTextSize(2);
+            oled.printf(PopUps.back().primaryLine);
+            oled.setCursor(PopUps.back().secondaryStart,22);
+            oled.setTextSize(1);
+            oled.printf(PopUps.back().secondaryLine);
+            oled.setCursor(PopUps.back().tertiaryStart,32);
+            oled.setTextSize(1);
+            oled.printf(PopUps.back().tertiaryLine);
+            oled.setCursor(48,45);
+            oled.setTextSize(2);
+            oled.fillRect(45,44,32,16,1);
+            oled.setTextColor(0);
+            oled.printf("OK");
+            oled.display();
+            redrawMenu = false;
+            return;
+        }
         uint8_t menuSelect = 0;
         for(uint8_t i = 0; i < WaterBots.size(); i++){
             if(WaterBots.at(i).botNum == botSelect){
@@ -552,7 +589,7 @@ void updateMenu(){
         }
         if(menuItem == 0){
             Serial.println("Menu item 0");
-            if(MenuItems.size()) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));
+            if(MenuItems.size() != 0) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));
             uint8_t loopIter = MenuItems.size();
             if(loopIter > 2) loopIter = 2;
             for(int mi = 1; mi <= loopIter; mi++){
@@ -581,6 +618,41 @@ void updateMenu(){
     }
 }
 
+void updateBotControl(){
+    if(updateControl){
+        updateControl = false;
+        //ControlledBot = nullptr;
+        for(WaterBot &wb: WaterBots){
+            //if(wb.botNum == botSelect) ControlledBot =  &wb;
+            if(wb.updatedControl){
+                wb.updatedControl = false;
+                wb.publishTime = millis();
+                char statusStr[42];
+                sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum, wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);
+                Serial.printlnf("Control Packet: %s",statusStr);
+                sendData(statusStr,0,true,true,statusTimeout);
+            }
+        }
+        //if(ControlledBot == NULL) return;
+        //if(ControlledBot->offloading) offloadingMode = true;
+        
+    }
+    if(millis() - controlUpdateTime > CONTROL_PUB_TIME){
+        controlUpdateTime = millis();
+        if(controlUpdateID == -1){
+            if(WaterBots.size() != 0) controlUpdateID = 0;
+            else return;
+        }
+        if(controlUpdateID > WaterBots.size()-1) controlUpdateID = 0;
+        WaterBot wb = WaterBots.at(controlUpdateID);
+        char statusStr[42];
+        sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum,wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);
+        sendData(statusStr,0,true,true,statusTimeout);
+        if(controlUpdateID < WaterBots.size()-1) controlUpdateID++;
+        else controlUpdateID = 0;
+    }
+}
+
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
@@ -603,6 +675,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             newWaterbot.botNum = rxBotID;
             WaterBots.push_back(newWaterbot);
             TargetWB = &WaterBots.back();
+            redrawMenu = true;
         }
         uint8_t checksum;
         char dataStr[strlen(command)-8];
@@ -658,13 +731,28 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.LTEAvail = statflags & 1;
                     w.XBeeAvail = (statflags >> 1) & 1;
                     w.BLEAvail = (statflags >> 2) & 1;
-                    w.offloading = (statflags >> 3) & 1;
-                    w.driveMode = (statflags >> 4) & 3;
                     w.lowBatt = (statflags >> 6) & 1;
-                    w.dataRecording = (statflags >> 7) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
-                    
+                    if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){
+                        w.offloading = (statflags >> 3) & 1;
+                        w.driveMode = (statflags >> 4) & 3;
+                        w.dataRecording = (statflags >> 7) & 1;
+                    }
+                    if(w.lowBatt && !w.warnedLowBatt){
+                        w.warnedLowBatt = true;
+                        MenuPopUp m;
+                        sprintf(m.primaryLine,"Warning\0");
+                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
+                        sprintf(m.tertiaryLine, "Low Battery: %d\0",w.battPercent);
+                        m.primaryStart = 20;
+                        m.secondaryStart = 40;
+                        m.tertiaryStart = 20;
+                        PopUps.push_back(m);
+                        redrawMenu = true;
+                        
+                    }
+                    if(botSelect = w.botNum) redrawMenu = true;
                     logMessage("Status Update!");
                     /*Serial.println("##########################");
                     Serial.println("##     STATUS UPDATE    ##");
@@ -709,6 +797,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 newWaterbot.botNum = rxBotID;
                 WaterBots.push_back(newWaterbot);
                 PairBots.push_back(newWaterbot);
+                redrawMenu = true;
             }
             botPairRx = true;
         }
@@ -860,6 +949,7 @@ void BLEScan(int BotNumber){
                             Serial.println("Found a new water bot ID");
                             WaterBots.push_back(newWaterbot);
                             BLEBot = &WaterBots.back();
+                            redrawMenu = true;
                         }
                     }
                     break;
@@ -1197,9 +1287,15 @@ void entHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     Serial.println("Enter trigger");
     debounceTime = millis();
-    
+    if(PopUps.size() != 0){
+        PopUps.pop_back();
+        return;
+    }
     selectingBots = !selectingBots;
-    if(modifiedValue) updateControl = true;
+    if(modifiedValue){
+        updateControl = true;
+        modifiedValue = false;
+    }
 }
 
 void rHandler(){
@@ -1210,14 +1306,14 @@ void rHandler(){
     if(selectingBots){
         if(botSelect != WaterBots.back().botNum){
             bool findCurrent = false;
-            for(WaterBot ws: WaterBots){
+            for(WaterBot &ws: WaterBots){
                 if(findCurrent){
                     botSelect = ws.botNum;
+                    ControlledBot = &ws;
                     break;
                 }
                 if(ws.botNum == botSelect) findCurrent = true;
             }
-             
         }
     }
     else{
@@ -1238,6 +1334,7 @@ void rHandler(){
                     if(ws.*(curItem->MethodPointer) < curItem->maxVal) ws.*(curItem->MethodPointer) += curItem->stepSize;
                 }
                 modifiedValue = true;
+                ws.updatedControl = true;
             }
             //index++;
         }
@@ -1253,8 +1350,11 @@ void lHandler(){
     if(selectingBots){
         if(botSelect != WaterBots.front().botNum){
             uint8_t newBotNum = WaterBots.front().botNum;
-            for(WaterBot ws: WaterBots){
-                if(ws.botNum == botSelect) botSelect = newBotNum;
+            for(WaterBot &ws: WaterBots){
+                if(ws.botNum == botSelect){
+                    botSelect = newBotNum;
+                    ControlledBot = &ws;
+                }
                 else newBotNum = ws.botNum;
             }
                
@@ -1269,7 +1369,7 @@ void lHandler(){
                 if(curItem->statOnly) return;
                 if(curItem->onOffSetting){
                     Serial.println("Modified an On/Off Control");
-                    ws.*(curItem->MethodPointerBool) = true;
+                    ws.*(curItem->MethodPointerBool) = false;
                     Serial.printlnf("Bot: %d, Modified ",ws.botNum);
                 }
                 else{
@@ -1277,6 +1377,7 @@ void lHandler(){
                     if(ws.*(curItem->MethodPointer) > curItem->minVal) ws.*(curItem->MethodPointer) -= curItem->stepSize;
                 }
                 modifiedValue = true;
+                ws.updatedControl = true;
             }
         }
     }
