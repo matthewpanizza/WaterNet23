@@ -1,0 +1,2 @@
+Removed Pin From Net: NetName=VBAT Pin=P2-1
+Added Pin To Net: NetName=Battery_VCC Pin=P2-1

@@ -1,0 +1,17 @@
+Removed Pin From Net: NetName=Battery_VCC Pin=C15-1
+Removed Pin From Net: NetName=VBAT Pin=C15-2
+Removed Pin From Net: NetName=VBAT Pin=Q1-5
+Removed Pin From Net: NetName=VBAT Pin=Q1-6
+Removed Pin From Net: NetName=Battery_VCC Pin=R8-1
+Removed Pin From Net: NetName=VBAT Pin=R8-2
+Removed Pin From Net: NetName=Battery_VCC Pin=U3-1
+Removed Pin From Net: NetName=VBAT Pin=U3-2
+Added Pin To Net: NetName=VBAT Pin=C15-1
+Added Pin To Net: NetName=VBAT Pin=R8-1
+Added Pin To Net: NetName=VBAT Pin=U3-1
+Added Pin To Net: NetName=Batt_Curr_Sense Pin=C15-2
+Added Pin To Net: NetName=Batt_Curr_Sense Pin=Q1-5
+Added Pin To Net: NetName=Batt_Curr_Sense Pin=Q1-6
+Added Pin To Net: NetName=Batt_Curr_Sense Pin=R8-2
+Added Pin To Net: NetName=Batt_Curr_Sense Pin=U3-2
+Added Net: Name=Batt_Curr_Sense
