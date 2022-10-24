@@ -236,6 +236,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             setLSpeed = atoi(lSpd);
             setRSpeed = atoi(rSpd);
             Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",setLSpeed,setRSpeed);
+            if(setLSpeed > 90 && setLSpeed <=123) setLSpeed = 123;
+            if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
+            if(setLSpeed < 90 && setLSpeed >=123) setLSpeed = 67;
+            if(setRSpeed < 90 && setRSpeed >=123) setRSpeed = 67;
             ESCL.write(setLSpeed);
             ESCR.write(setRSpeed);
             updateMotorControl = true;
@@ -549,6 +553,10 @@ void statusUpdate(){
 
 void updateMotors(){
     if(updateMotorControl){
+        if(setLSpeed > 90 && setLSpeed <=123) setLSpeed = 123;
+        if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
+        if(setLSpeed < 90 && setLSpeed >=123) setLSpeed = 67;
+        if(setRSpeed < 90 && setRSpeed >=123) setRSpeed = 67;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);
         updateMotorControl = false;        
