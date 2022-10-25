@@ -1,0 +1,6 @@
+Removed Pin From Net: NetName=GND Pin=Q5-1
+Removed Pin From Net: NetName=MCU_RGBB Pin=Q5-2
+Removed Pin From Net: NetName=VSetB Pin=Q5-6
+Added Pin To Net: NetName=VSetB Pin=Q5-3
+Added Pin To Net: NetName=GND Pin=Q5-4
+Added Pin To Net: NetName=MCU_RGBB Pin=Q5-5

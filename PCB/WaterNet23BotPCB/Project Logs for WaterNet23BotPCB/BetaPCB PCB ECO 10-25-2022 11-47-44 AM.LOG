@@ -1,0 +1,6 @@
+Change Component Comment : Designator=Q9 Old Comment=YJL3400A New Comment=YJL3415A
+Change component parameters: Designator = "Q9" ("Q9"); Footprint = "SOT23-3"; UniqueID = "\UCYGJGCL" ("\UCYGJGCL")
+Added Pin To Net: NetName=D2 Pin=Q9-1
+Added Pin To Net: NetName=3V3_S Pin=Q9-2
+Added Pin To Net: NetName=3V3 Pin=Q9-3
+Added Member To Class: ClassName=Power Member=Component Q9 YJL3415A

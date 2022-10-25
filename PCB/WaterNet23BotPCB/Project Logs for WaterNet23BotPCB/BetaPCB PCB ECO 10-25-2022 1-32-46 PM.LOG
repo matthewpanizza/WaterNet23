@@ -1,0 +1,48 @@
+Added Component: Designator=P17(HDR2X13)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Component: Designator=P18(HDR2X6)
+Add component (AddParameter): Name = "LatestRevisionDate"; Value = "17-Jul-2002"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "LatestRevisionNote"; Value = "Re-released for DXP Platform."; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Publisher"; Value = "Altium Limited"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=A0 Pin=P17-1
+Added Pin To Net: NetName=SCL Pin=P17-2
+Added Pin To Net: NetName=A1 Pin=P17-3
+Added Pin To Net: NetName=SDA Pin=P17-4
+Added Pin To Net: NetName=A2 Pin=P17-5
+Added Pin To Net: NetName=MCU_Tx Pin=P17-6
+Added Pin To Net: NetName=A3 Pin=P17-7
+Added Pin To Net: NetName=MCU_Rx Pin=P17-8
+Added Pin To Net: NetName=A4 Pin=P17-9
+Added Pin To Net: NetName=CS Pin=P17-10
+Added Pin To Net: NetName=A5 Pin=P17-11
+Added Pin To Net: NetName=MISO Pin=P17-12
+Added Pin To Net: NetName=A6 Pin=P17-13
+Added Pin To Net: NetName=MOSI Pin=P17-14
+Added Pin To Net: NetName=A7 Pin=P17-15
+Added Pin To Net: NetName=SCK Pin=P17-16
+Added Pin To Net: NetName=PWM0 Pin=P17-17
+Added Pin To Net: NetName=D3 Pin=P17-18
+Added Pin To Net: NetName=PWM1 Pin=P17-19
+Added Pin To Net: NetName=D2 Pin=P17-20
+Added Pin To Net: NetName=PWM2 Pin=P17-21
+Added Pin To Net: NetName=D22 Pin=P17-22
+Added Pin To Net: NetName=PWM3 Pin=P17-23
+Added Pin To Net: NetName=D23 Pin=P17-24
+Added Pin To Net: NetName=Mode Pin=P17-25
+Added Pin To Net: NetName=Reset Pin=P17-26
+Added Pin To Net: NetName=GND Pin=P18-1
+Added Pin To Net: NetName=3V3 Pin=P18-2
+Added Pin To Net: NetName=GND Pin=P18-3
+Added Pin To Net: NetName=3V3 Pin=P18-4
+Added Pin To Net: NetName=GND Pin=P18-5
+Added Pin To Net: NetName=3V8 Pin=P18-6
+Added Pin To Net: NetName=GND Pin=P18-7
+Added Pin To Net: NetName=3V8 Pin=P18-8
+Added Pin To Net: NetName=GND Pin=P18-9
+Added Pin To Net: NetName=VBAT Pin=P18-10
+Added Pin To Net: NetName=GND Pin=P18-11
+Added Pin To Net: NetName=VBAT Pin=P18-12
+Added Member To Class: ClassName=MainPCB Member=Component P17 Header 13X2
+Added Member To Class: ClassName=MainPCB Member=Component P18 Power Debug
