@@ -40,14 +40,14 @@
 // Compass Calibration //
 /////////////////////////
 
-#define N_BEARING   -86
-#define NW_BEARING  
-#define W_BEARING
-#define SW_BEARING
-#define S_BEARING
-#define SE_BEARING
-#define E_BEARING
-#define NE_BEARING
+#define N_BEARING   2
+#define NW_BEARING  -23
+#define W_BEARING   -52
+#define SW_BEARING  -90
+#define S_BEARING   -174
+#define SE_BEARING  97
+#define E_BEARING   54
+#define NE_BEARING  27
 
 ////////////////////
 // PROGRAM MACROS //
@@ -514,9 +514,43 @@ float deg2rad(float deg) {
   return deg * (3.14159/180);
 }
 
-float compassCal(float rawHeading){
+float readCompassHeading(float x_accel, float y_accel){
 
-    return 1;
+    /*#define N_BEARING   2
+    #define NW_BEARING  -23
+    #define W_BEARING   -52
+    #define SW_BEARING  -90
+    #define S_BEARING   -174
+    #define SE_BEARING  97
+    #define E_BEARING   54
+    #define NE_BEARING  27*/
+    float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;
+    if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
+        float diff = N_BEARING - NE_BEARING;
+        return 45.0-(45.0 * (rawHeading-NE_BEARING)/diff);
+    }
+    else if(rawHeading >= NE_BEARING && rawHeading < E_BEARING){
+        float diff = NE_BEARING - E_BEARING;
+    }
+    else if(rawHeading >= E_BEARING && rawHeading < SE_BEARING){
+
+    }
+    else if(rawHeading >= NW_BEARING && rawHeading < N_BEARING){
+
+    }
+    else if(rawHeading >= W_BEARING && rawHeading < NW_BEARING){
+
+    }
+    else if(rawHeading >=SW_BEARING && rawHeading < W_BEARING){
+
+    }
+    else if(rawHeading >= S_BEARING && rawHeading < SW_BEARING){
+
+    }
+    else{   //Somewhere between south and southeast
+
+    }
+    return rawHeading;
 }
 
 bool getPositionData(){
@@ -534,7 +568,7 @@ bool getPositionData(){
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
         Serial.printlnf("X: %d, Y: %d",event.magnetic.x,event.magnetic.y);
-        compassHeading = atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI;
+        compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
             float dLat = deg2rad(targetLat-latitude);
@@ -545,6 +579,7 @@ bool getPositionData(){
             char tempbuf[100];
             sprintf(tempbuf,"X: %f, Y: %f, Z: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", event.magnetic.x,event.magnetic.y,event.magnetic.z, compassHeading, travelHeading,compassHeading-travelHeading);
             printBLE(tempbuf);
+            Serial.println(tempbuf);
             //Serial.printlnf("Distance: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", travelDistance, compassHeading, travelHeading,compassHeading-travelHeading);
         }
         

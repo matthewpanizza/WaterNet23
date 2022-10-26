@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -18,7 +18,7 @@ void setup();
 void loop();
 uint8_t readPowerSys();
 float deg2rad(float deg);
-float compassCal(float rawHeading);
+float readCompassHeading(float x_accel, float y_accel);
 void printBLE(const char *dataOut);
 void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
@@ -26,7 +26,7 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 void motionHandler();
 void wdogHandler();
 void LEDHandler();
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -59,14 +59,14 @@ void LEDHandler();
 // Compass Calibration //
 /////////////////////////
 
-#define N_BEARING   -86
-#define NW_BEARING  
-#define W_BEARING
-#define SW_BEARING
-#define S_BEARING
-#define SE_BEARING
-#define E_BEARING
-#define NE_BEARING
+#define N_BEARING   6
+#define NW_BEARING  -110
+#define W_BEARING   -120
+#define SW_BEARING  -142
+#define S_BEARING   70
+#define SE_BEARING  90
+#define E_BEARING   61
+#define NE_BEARING  36
 
 ////////////////////
 // PROGRAM MACROS //
@@ -533,9 +533,10 @@ float deg2rad(float deg) {
   return deg * (3.14159/180);
 }
 
-float compassCal(float rawHeading){
+float readCompassHeading(float x_accel, float y_accel){
+    float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;
 
-    return 1;
+    return rawHeading;
 }
 
 bool getPositionData(){
@@ -553,7 +554,7 @@ bool getPositionData(){
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
         Serial.printlnf("X: %d, Y: %d",event.magnetic.x,event.magnetic.y);
-        compassHeading = atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI;
+        compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
             float dLat = deg2rad(targetLat-latitude);
@@ -564,6 +565,7 @@ bool getPositionData(){
             char tempbuf[100];
             sprintf(tempbuf,"X: %f, Y: %f, Z: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", event.magnetic.x,event.magnetic.y,event.magnetic.z, compassHeading, travelHeading,compassHeading-travelHeading);
             printBLE(tempbuf);
+            Serial.println(tempbuf);
             //Serial.printlnf("Distance: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", travelDistance, compassHeading, travelHeading,compassHeading-travelHeading);
         }
         
