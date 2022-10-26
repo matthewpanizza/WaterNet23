@@ -161,9 +161,9 @@ LEDStatus status;
 
 bool waitForConnection;
 float latitude, longitude;
-int compassHeading;
+float compassHeading;
 float targetLat, targetLon;
-int travelHeading;
+float travelHeading;
 float travelDistance;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
@@ -512,25 +512,30 @@ bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
   //if(nmea.isValid() == true){
-    if(myGPS.isConnected()){
-        latitude = ((float)myGPS.getLatitude())/1000000.0;
-        longitude = ((float)myGPS.getLongitude())/1000000.0;
-        lis3mdl.read();      // get X Y and Z data at once
+    //if(myGPS.isConnected()){
+        targetLat = 35.769889;
+        targetLon = -78.673824;
+        latitude = 35.771801;
+        longitude = -78.674378;
+        //latitude = ((float)myGPS.getLatitude())/1000000.0;
+        //longitude = ((float)myGPS.getLongitude())/1000000.0;
+        //lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
-        compassHeading = (int) (atan2(event.magnetic.x, event.magnetic.y) * 180 / M_PI);
+        Serial.printlnf("X: %d, Y: %d",lis3mdl.x,lis3mdl.y);
+        compassHeading = 0-atan2(lis3mdl.x, lis3mdl.y) * 180.0 / M_PI;
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
-            travelHeading = (int) (atan2(targetLat-latitude,targetLon-longitude) * 180 / M_PI);
+            travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
             float dLat = deg2rad(targetLat-latitude);
             float dLon = deg2rad(targetLon-longitude);
             float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
             float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
             travelDistance = 6371.0 * c; // Distance in km
-            Serial.printlnf("Distance: %f",travelDistance);
+            //Serial.printlnf("Distance: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", travelDistance, compassHeading, travelHeading,compassHeading-travelHeading);
         }
         
         return true;
-    }
+    //}
     return false;
   //}
     
