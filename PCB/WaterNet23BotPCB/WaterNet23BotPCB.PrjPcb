@@ -694,91 +694,112 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=CBGIULNN
 
+[Document39]
+DocumentPath=WaterNet23BotPCB.Annotation
+AnnotationEnabled=1
+AnnotateStartValue=1
+AnnotationIndexControlEnabled=0
+AnnotateSuffix=
+AnnotateScope=All
+AnnotateOrder=-1
+DoLibraryUpdate=1
+DoDatabaseUpdate=1
+ClassGenCCAutoEnabled=1
+ClassGenCCAutoRoomEnabled=1
+ClassGenNCAutoScope=None
+DItemRevisionGUID=
+GenerateClassCluster=0
+DocumentUniqueId=
+
 [GeneratedDocument1]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Design Rule Check - BetaPCB.html
+DocumentPath=BetaPCB 10-25-2022 1-41-20 PM.WAS
 DItemRevisionGUID=
 
 [GeneratedDocument2]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Design Rule Check - Main.html
+DocumentPath=Project Outputs for WaterNet23BotPCB\Design Rule Check - BetaPCB.html
 DItemRevisionGUID=
 
 [GeneratedDocument3]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main-RoundHoles.TXT
+DocumentPath=Project Outputs for WaterNet23BotPCB\Design Rule Check - Main.html
 DItemRevisionGUID=
 
 [GeneratedDocument4]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main-SlotHoles.TXT
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main-RoundHoles.TXT
 DItemRevisionGUID=
 
 [GeneratedDocument5]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.DRR
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main-SlotHoles.TXT
 DItemRevisionGUID=
 
 [GeneratedDocument6]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.EXTREP
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.DRR
 DItemRevisionGUID=
 
 [GeneratedDocument7]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBL
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.EXTREP
 DItemRevisionGUID=
 
 [GeneratedDocument8]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBO
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBL
 DItemRevisionGUID=
 
 [GeneratedDocument9]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBP
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBO
 DItemRevisionGUID=
 
 [GeneratedDocument10]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBS
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBP
 DItemRevisionGUID=
 
 [GeneratedDocument11]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GKO
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GBS
 DItemRevisionGUID=
 
 [GeneratedDocument12]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GM1
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GKO
 DItemRevisionGUID=
 
 [GeneratedDocument13]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GM21
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GM1
 DItemRevisionGUID=
 
 [GeneratedDocument14]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GPB
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GM21
 DItemRevisionGUID=
 
 [GeneratedDocument15]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GPT
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GPB
 DItemRevisionGUID=
 
 [GeneratedDocument16]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTL
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GPT
 DItemRevisionGUID=
 
 [GeneratedDocument17]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTO
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTL
 DItemRevisionGUID=
 
 [GeneratedDocument18]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTP
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTO
 DItemRevisionGUID=
 
 [GeneratedDocument19]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTS
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTP
 DItemRevisionGUID=
 
 [GeneratedDocument20]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.LDP
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.GTS
 DItemRevisionGUID=
 
 [GeneratedDocument21]
-DocumentPath=Project Outputs for WaterNet23BotPCB\Main.REP
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.LDP
 DItemRevisionGUID=
 
 [GeneratedDocument22]
+DocumentPath=Project Outputs for WaterNet23BotPCB\Main.REP
+DItemRevisionGUID=
+
+[GeneratedDocument23]
 DocumentPath=Project Outputs for WaterNet23BotPCB\Main.RUL
 DItemRevisionGUID=
 
@@ -1789,6 +1810,46 @@ MatchStrictly2=1
 PhysicalNamingFormat=$Component_$RoomName
 GlobalIndexSortOrder=3
 GlobalIndexSortLocation=0
+UniqueIDPath0=
+DocumentName0=Power.SchDoc
+IsEnabled0=1
+SelectionScope0=All
+Order0=3
+IndexEnabled0=0
+IndexStartValue0=1
+Suffix0=
+UniqueIDPath1=
+DocumentName1=UserInputs.SchDoc
+IsEnabled1=1
+SelectionScope1=All
+Order1=5
+IndexEnabled1=0
+IndexStartValue1=1
+Suffix1=
+UniqueIDPath2=
+DocumentName2=MainPCB.SchDoc
+IsEnabled2=1
+SelectionScope2=All
+Order2=2
+IndexEnabled2=0
+IndexStartValue2=1
+Suffix2=
+UniqueIDPath3=
+DocumentName3=Sensors.SchDoc
+IsEnabled3=1
+SelectionScope3=All
+Order3=4
+IndexEnabled3=0
+IndexStartValue3=1
+Suffix3=
+UniqueIDPath4=
+DocumentName4=LEDs.SchDoc
+IsEnabled4=1
+SelectionScope4=All
+Order4=1
+IndexEnabled4=0
+IndexStartValue4=1
+Suffix4=
 
 [PrjClassGen]
 CompClassManualEnabled=0
