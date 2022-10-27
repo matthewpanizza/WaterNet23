@@ -24,7 +24,9 @@
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 #define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 
-//Pin Configuration
+///////////////////////
+// Pin Configuration //
+///////////////////////
 
 #define ESC_PWM_L           D6          //Left motor ESC output pin
 #define ESC_PWM_R           D5          //Right motor ESC output pin
@@ -78,6 +80,10 @@
 #define CUSTOM_DATA_LEN     8
 #define MAX_FILENAME_LEN    30
 
+/////////////////////////
+// Power System Macros //
+/////////////////////////
+
 #define BAT_MIN             13.2            //Voltage to read 0% battery
 #define BAT_MAX             16.4            //Voltage to read 100% battery
 #define LOW_BATT_PCT        20            //Voltage to set low battery flag
@@ -85,7 +91,17 @@
 #define BAT_ISENSE_MULT     33.0            //Calculate the maximum current the shunt can measure for the battery. Rs = 0.001, RL = 100k. Vo = Is * 0.1, max current is 33A
 #define SLR_ISENSE_MULT     16.5            //Calculate the maximum current the shunt can measure for the solar array. Rs = 0.010, RL = 20k. Vo = Is * 0.2, max current is 16.5A
 
-#define MTR_TIMEOUT         4000
+////////////////////////
+// Motor Drive Macros //
+////////////////////////
+
+#define MTR_ST_FWD          123         //Minimum commanded speed for motors going forward
+#define MTR_ST_REV          67          //Minimum commanded speed for motors in reverse
+#define MTR_TIMEOUT         4000        //Timeout in milliseconds for turning off motors when being manually controlled
+#define MTR_RAMP_SPD        1           //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
+#define MTR_TRAVEL_SPD      0.5         //Percentage maximum travel speed for autonomous movement default
+#define MTR_CUTOFF_RAD      1.5         //Radius to consider "arrived" at a target point
+#define SENTRY_IDLE_RAD     4           //Radius to keep motors off in sentry mode after reaching the cutoff radius
 
 #define REPL_NAK            false
 
@@ -167,8 +183,11 @@ float latitude, longitude;
 float compassHeading, travelHeading, targetDelta;
 float targetLat, targetLon;
 float travelDistance;
+bool telemetryAvail;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
+float autoMoveRate = MTR_TRAVEL_SPD;
+bool pointArrived;
 uint8_t battPercent;
 float battVoltage, battCurrent, solarCurrent;
 bool updateMotorControl;
@@ -184,10 +203,10 @@ bool offloadMode;
 bool signalLED;
 uint32_t senseTimer, dataTimer;
 uint32_t XBeeRxTime, BLERxTime;
-uint32_t lastMtrTime;
+uint32_t lastMtrTime, lastTelemTime;
 uint32_t lastStatusTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
-char txBuf[UART_TX_BUF_SIZE];
+//char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t errModeReply;
 size_t txLen = 0;
@@ -335,9 +354,7 @@ void setup(){
     setupGPS();                                 //Setup GPS module
     setupLTE();                                 //Initialize LTE Flags
 
-    senseTimer = millis();
-    dataTimer = millis();
-    lastStatusTime = millis();
+    lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();
     XBeeRxTime = 0;
     BLERxTime = 0;
     dataWait = false;
@@ -346,6 +363,7 @@ void setup(){
     offloadMode = false;
     requestActive = false;
     LTEStatusCount = LTE_MAX_STATUS;
+    telemetryAvail = false;
 
     battPercent = 50;
 
@@ -573,7 +591,30 @@ float calcDistance(float lat1, float lat2, float lon1, float lon2){
     float dLon = deg2rad(lon1-lon2);
     float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(lat2)) * cosf(deg2rad(lat1)) * sinf(dLon/2) * sinf(dLon/2); 
     float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
-    return 6371.0 * c; // Distance in km
+    return 6371000.0 * c; // Distance in km
+}
+
+float calcDelta(float compassHead, float targetHead){
+    if(targetHead > 0){
+        if(compassHead > 0){
+            return targetHead - compassHead;
+        }
+        else{
+            float diff = -(180.0 - targetHead);
+            if(diff < compassHead) return targetHead - compassHead;
+            else return 0 - (180.0 + compassHead) - (180.0 - targetHead);
+        }
+    }
+    else{
+        if(compassHead > 0){
+            float diff = 180.0 + targetHead;
+            if(diff > compassHead) return targetHead - compassHead;
+            else return (180.0 - compassHead) + (180.0 + targetHead);
+        }
+        else{
+            return targetHead - compassHead;
+        }
+    }
 }
 
 bool getPositionData(){
@@ -588,38 +629,20 @@ bool getPositionData(){
         //latitude = ((float)myGPS.getLatitude())/1000000.0;
         //longitude = ((float)myGPS.getLongitude())/1000000.0;
         lis3mdl.read();      // get X Y and Z data at once
-        sensors_event_t event; 
-        lis3mdl.getEvent(&event);
-        compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
+        sensors_event_t event;
+        bool compassAvail = lis3mdl.getEvent(&event);
+        if(compassAvail) compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
             travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);
-            if(travelHeading > 0){
-                if(compassHeading > 0){
-                    targetDelta = travelHeading - compassHeading;
-                }
-                else{
-                    float diff = -(180.0 - travelHeading);
-                    if(diff < compassHeading) targetDelta = travelHeading - compassHeading;
-                    else targetDelta = 0 - (180.0 + compassHeading) - (180.0 - travelHeading);
-                }
-            }
-            else{
-                if(compassHeading > 0){
-                    float diff = 180.0 + travelHeading;
-                    if(diff > compassHeading) targetDelta = travelHeading - compassHeading;
-                    else targetDelta = (180.0 - compassHeading) + (180.0 + travelHeading);
-                }
-                else{
-                    targetDelta = travelHeading - compassHeading;
-                }
-            }
+            targetDelta = calcDelta(compassHeading, travelHeading);
+            lastTelemTime = millis();
+            if(compassAvail) telemetryAvail = true;
             char tempbuf[100];
             sprintf(tempbuf,"Raw : %f, Compass : %f, Travel hd: %f, T Delta: %f", atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI, compassHeading, travelHeading, targetDelta);
             printBLE(tempbuf);
             Serial.println(tempbuf);
-        }
-        
+        }        
         return true;
     //}
     return false;
@@ -632,8 +655,7 @@ void sendResponseData(){
     if(requestActive){
         char responseStr[65];
         memset(responseStr,0,65);
-        //sprintf(responseStr,"B%dCCsns %0.6f %0.6f %0.4f %0.4f %0.4f %0.4f %0.4f",BOTNUM,latitude,longitude,senseDO,sensePH,senseCond,senseMiniCond,senseTemp);
-        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),69000);
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),(int)(senseTemp*1000));
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
@@ -661,12 +683,51 @@ void statusUpdate(){
 
 void updateMotors(){
     if(updateMotorControl){
+        if(driveMode == 1 || driveMode == 2){       //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
+            if(travelDistance < MTR_CUTOFF_RAD){
+                pointArrived = true;
+                setLSpeed = 90;
+                setRSpeed = 90;
+            }
+            else if(travelDistance < SENTRY_IDLE_RAD){
+                if(pointArrived){
+                    setLSpeed = 90;
+                    setRSpeed = 90;
+                }
+                else{
+
+                }
+            }
+            else{
+                pointArrived = false;
+                autoMoveRate;
+            }
+        }
+
         if(setLSpeed > 90 && setLSpeed <=123) setLSpeed = 123;
         if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
-        if(setLSpeed < 90 && setLSpeed >=123) setLSpeed = 67;
-        if(setRSpeed < 90 && setRSpeed >=123) setRSpeed = 67;
-        ESCL.write(setLSpeed);
-        ESCR.write(setRSpeed);
+        if(setLSpeed < 90 && setLSpeed >=67) setLSpeed = 67;
+        if(setRSpeed < 90 && setRSpeed >=67) setRSpeed = 67;
+
+        if(leftMotorSpeed < setLSpeed){
+            if(setLSpeed - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;
+            else leftMotorSpeed = setLSpeed;
+        }
+        else if(leftMotorSpeed > setLSpeed){
+            if(leftMotorSpeed - setLSpeed > MTR_RAMP_SPD) leftMotorSpeed -= MTR_RAMP_SPD;
+            else leftMotorSpeed = setLSpeed;
+        }
+        if(rightMotorSpeed < setRSpeed){
+            if(setRSpeed - rightMotorSpeed > MTR_RAMP_SPD) rightMotorSpeed += MTR_RAMP_SPD;
+            else rightMotorSpeed = setRSpeed;
+        }
+        else if(rightMotorSpeed > setRSpeed){
+            if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD;
+            else rightMotorSpeed = setRSpeed;
+        }
+        
+        ESCL.write(leftMotorSpeed);
+        ESCR.write(180-rightMotorSpeed);
         updateMotorControl = false;        
     }
 }
@@ -832,13 +893,28 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 }
 
 void motionHandler(){
-    if(driveMode == 0 && millis() - lastMtrTime > MTR_TIMEOUT){
+    if(driveMode == 0 && setLSpeed != 90 && setRSpeed != 90 && millis() - lastMtrTime > MTR_TIMEOUT){
         setLSpeed = 90;
         setRSpeed = 90;
+        leftMotorSpeed = 90;
+        rightMotorSpeed = 90;
         updateMotorControl = true;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);
         Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
+    }
+    if(!telemetryAvail && driveMode != 0 && millis() - lastTelemTime > MTR_TIMEOUT){
+        driveMode = 0;
+        telemetryAvail = false;
+        pointArrived = false;
+        setLSpeed = 90;
+        setRSpeed = 90;
+        leftMotorSpeed = 90;
+        rightMotorSpeed = 90;
+        updateMotorControl = true;
+        ESCL.write(setLSpeed);
+        ESCR.write(setRSpeed);
+        Serial.printlnf("Warning, GPS or Compass data not available for greater than %dms, exiting autonomous mode", MTR_TIMEOUT);
     }
 }
 
