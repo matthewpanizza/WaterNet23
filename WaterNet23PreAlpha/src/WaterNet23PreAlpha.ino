@@ -40,14 +40,14 @@
 // Compass Calibration //
 /////////////////////////
 
-#define N_BEARING   2
-#define NW_BEARING  -23
-#define W_BEARING   -52
-#define SW_BEARING  -90
-#define S_BEARING   -174
-#define SE_BEARING  97
-#define E_BEARING   54
-#define NE_BEARING  27
+#define N_BEARING   6.0
+#define NW_BEARING  -18.0
+#define W_BEARING   -40.0
+#define SW_BEARING  -78.0
+#define S_BEARING   125.0
+#define SE_BEARING  86.0
+#define E_BEARING   58.0
+#define NE_BEARING  31.0
 
 ////////////////////
 // PROGRAM MACROS //
@@ -164,9 +164,8 @@ LEDStatus status;
 
 bool waitForConnection;
 float latitude, longitude;
-float compassHeading;
+float compassHeading, travelHeading, targetDelta;
 float targetLat, targetLon;
-float travelHeading;
 float travelDistance;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
@@ -515,42 +514,66 @@ float deg2rad(float deg) {
 }
 
 float readCompassHeading(float x_accel, float y_accel){
-
-    /*#define N_BEARING   2
-    #define NW_BEARING  -23
-    #define W_BEARING   -52
-    #define SW_BEARING  -90
-    #define S_BEARING   -174
-    #define SE_BEARING  97
-    #define E_BEARING   54
-    #define NE_BEARING  27*/
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;
+    //Serial.printlnf("Raw Heading: %f", rawHeading);
     if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
-        float diff = N_BEARING - NE_BEARING;
-        return 45.0-(45.0 * (rawHeading-NE_BEARING)/diff);
+        //Serial.println("Between N and NE");
+        float diff = NE_BEARING - N_BEARING;
+        return (45.0 * (rawHeading-N_BEARING)/diff);
     }
     else if(rawHeading >= NE_BEARING && rawHeading < E_BEARING){
-        float diff = NE_BEARING - E_BEARING;
+        //Serial.println("Between E and NE");
+        float diff = E_BEARING - NE_BEARING;
+        return (45.0 * (rawHeading-NE_BEARING)/diff) + 45.0;
     }
     else if(rawHeading >= E_BEARING && rawHeading < SE_BEARING){
-
+        //Serial.println("Between E and SE");
+        float diff = SE_BEARING - E_BEARING;
+        return (45.0 * (rawHeading-E_BEARING)/diff) + 90.0;
+    }
+    else if(rawHeading >= SE_BEARING && rawHeading < S_BEARING){
+        //Serial.println("Between S and SE");
+        float diff = S_BEARING - SE_BEARING;
+        return (45.0 * (rawHeading-SE_BEARING)/diff) + 135.0;
     }
     else if(rawHeading >= NW_BEARING && rawHeading < N_BEARING){
-
+        //Serial.println("Between N and NW");
+        float diff = NW_BEARING - N_BEARING;
+        return (-45.0 * (rawHeading-N_BEARING)/diff);
     }
     else if(rawHeading >= W_BEARING && rawHeading < NW_BEARING){
-
+        //Serial.println("Between W and NW");
+        float diff = W_BEARING - NW_BEARING;
+        return (-45.0 * (rawHeading-NW_BEARING)/diff) - 45.0;
     }
     else if(rawHeading >=SW_BEARING && rawHeading < W_BEARING){
-
+        //Serial.println("Between W and SW");
+        float diff = SW_BEARING - W_BEARING;
+        return (-45.0 * (rawHeading-W_BEARING)/diff) - 90.0;
     }
-    else if(rawHeading >= S_BEARING && rawHeading < SW_BEARING){
-
-    }
-    else{   //Somewhere between south and southeast
-
+    
+    else{   //Somewhere between south and southwest
+        float maindiff = (180 + SW_BEARING) + (180 - S_BEARING);
+        if(rawHeading > 0){
+            //Serial.println("Between S and SW");
+            float diff = 180.0 - S_BEARING;
+            return -180.0 + (45.0 * (rawHeading - S_BEARING)/maindiff) ;
+        }
+        else{
+            //Serial.println("Between S and SW, NR");
+            float diff = 180.0 + SW_BEARING;
+            return (45.0 * (diff/maindiff) * (rawHeading - SW_BEARING)/diff) - 135.0;
+        }
     }
     return rawHeading;
+}
+
+float calcDistance(float lat1, float lat2, float lon1, float lon2){
+    float dLat = deg2rad(lat1-lat2);
+    float dLon = deg2rad(lon1-lon2);
+    float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(lat2)) * cosf(deg2rad(lat1)) * sinf(dLon/2) * sinf(dLon/2); 
+    float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
+    return 6371.0 * c; // Distance in km
 }
 
 bool getPositionData(){
@@ -567,20 +590,34 @@ bool getPositionData(){
         lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
-        Serial.printlnf("X: %d, Y: %d",event.magnetic.x,event.magnetic.y);
         compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
-            float dLat = deg2rad(targetLat-latitude);
-            float dLon = deg2rad(targetLon-longitude);
-            float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
-            float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
-            travelDistance = 6371.0 * c; // Distance in km
+            travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);
+            if(travelHeading > 0){
+                if(compassHeading > 0){
+                    targetDelta = travelHeading - compassHeading;
+                }
+                else{
+                    float diff = -(180.0 - travelHeading);
+                    if(diff < compassHeading) targetDelta = travelHeading - compassHeading;
+                    else targetDelta = 0 - (180.0 + compassHeading) - (180.0 - travelHeading);
+                }
+            }
+            else{
+                if(compassHeading > 0){
+                    float diff = 180.0 + travelHeading;
+                    if(diff > compassHeading) targetDelta = travelHeading - compassHeading;
+                    else targetDelta = (180.0 - compassHeading) + (180.0 + travelHeading);
+                }
+                else{
+                    targetDelta = travelHeading - compassHeading;
+                }
+            }
             char tempbuf[100];
-            sprintf(tempbuf,"X: %f, Y: %f, Z: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", event.magnetic.x,event.magnetic.y,event.magnetic.z, compassHeading, travelHeading,compassHeading-travelHeading);
+            sprintf(tempbuf,"Raw : %f, Compass : %f, Travel hd: %f, T Delta: %f", atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI, compassHeading, travelHeading, targetDelta);
             printBLE(tempbuf);
             Serial.println(tempbuf);
-            //Serial.printlnf("Distance: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", travelDistance, compassHeading, travelHeading,compassHeading-travelHeading);
         }
         
         return true;
