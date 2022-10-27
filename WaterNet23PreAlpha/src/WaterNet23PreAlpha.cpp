@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -18,13 +18,16 @@ void setup();
 void loop();
 uint8_t readPowerSys();
 float deg2rad(float deg);
+float readCompassHeading(float x_accel, float y_accel);
+float calcDistance(float lat1, float lat2, float lon1, float lon2);
+void printBLE(const char *dataOut);
 void StatusHandler();
 void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void motionHandler();
 void wdogHandler();
 void LEDHandler();
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -39,6 +42,7 @@ void LEDHandler();
 
 #define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
+#define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 
 //Pin Configuration
 
@@ -51,6 +55,19 @@ void LEDHandler();
 #define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
 #define PWR_EN              D22         
 #define LEAK_DET            D23
+
+/////////////////////////
+// Compass Calibration //
+/////////////////////////
+
+#define N_BEARING   6.0
+#define NW_BEARING  -18.0
+#define W_BEARING   -40.0
+#define SW_BEARING  -78.0
+#define S_BEARING   125.0
+#define SE_BEARING  86.0
+#define E_BEARING   58.0
+#define NE_BEARING  31.0
 
 ////////////////////
 // PROGRAM MACROS //
@@ -122,9 +139,15 @@ const char* rxUuid          = "b4206912-dc4b-5743-c8b1-92d0e75182b0"; //GPS Lati
 const char* txUuid          = "b4206913-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 const char* offldUuid       = "b4206914-dc4b-5743-c8b1-92d0e75182b0"; //GPS Longitude Service
 
+
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, WaterNetService);
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, WaterNetService, BLEDataReceived, NULL);
 BleCharacteristic offloadCharacteristic("off", BleCharacteristicProperty::NOTIFY, offldUuid, WaterNetService);
+
+#ifdef BLE_DEBUG_ENABLED
+    const char* bledbgUuid      = "b4206915-dc4b-5743-c8b1-92d0e75182b0"; //BLE Debug Console characteristic
+    BleCharacteristic bledbgCharacteristic("dbg", BleCharacteristicProperty::NOTIFY, bledbgUuid, WaterNetService);
+#endif
 
 BleAdvertisingData advData;                 //Advertising data
 
@@ -161,9 +184,8 @@ LEDStatus status;
 
 bool waitForConnection;
 float latitude, longitude;
-float compassHeading;
+float compassHeading, travelHeading, targetDelta;
 float targetLat, targetLon;
-float travelHeading;
 float travelDistance;
 uint8_t leftMotorSpeed, setLSpeed;
 uint8_t rightMotorSpeed, setRSpeed;
@@ -350,6 +372,9 @@ void setup(){
     BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
     BLE.addCharacteristic(rxCharacteristic);
     BLE.addCharacteristic(offloadCharacteristic);
+    #ifdef BLE_DEBUG_ENABLED
+        BLE.addCharacteristic(bledbgCharacteristic);
+    #endif
 
     BLECustomData[0] = BOTNUM;
 
@@ -365,10 +390,10 @@ void setup(){
         Serial.println("Failed to find LIS3MDL chip");
     }
     else Serial.println("LIS3MDL Found!");
-    lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+    lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
     lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
     lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
-    lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
+    lis3mdl.setRange(LIS3MDL_RANGE_8_GAUSS);
     lis3mdl.setIntThreshold(500);
     lis3mdl.configInterrupt(false, false, true, // enable z axis
                           true, // polarity
@@ -508,6 +533,69 @@ float deg2rad(float deg) {
   return deg * (3.14159/180);
 }
 
+float readCompassHeading(float x_accel, float y_accel){
+    float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;
+    //Serial.printlnf("Raw Heading: %f", rawHeading);
+    if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
+        //Serial.println("Between N and NE");
+        float diff = NE_BEARING - N_BEARING;
+        return (45.0 * (rawHeading-N_BEARING)/diff);
+    }
+    else if(rawHeading >= NE_BEARING && rawHeading < E_BEARING){
+        //Serial.println("Between E and NE");
+        float diff = E_BEARING - NE_BEARING;
+        return (45.0 * (rawHeading-NE_BEARING)/diff) + 45.0;
+    }
+    else if(rawHeading >= E_BEARING && rawHeading < SE_BEARING){
+        //Serial.println("Between E and SE");
+        float diff = SE_BEARING - E_BEARING;
+        return (45.0 * (rawHeading-E_BEARING)/diff) + 90.0;
+    }
+    else if(rawHeading >= SE_BEARING && rawHeading < S_BEARING){
+        //Serial.println("Between S and SE");
+        float diff = S_BEARING - SE_BEARING;
+        return (45.0 * (rawHeading-SE_BEARING)/diff) + 135.0;
+    }
+    else if(rawHeading >= NW_BEARING && rawHeading < N_BEARING){
+        //Serial.println("Between N and NW");
+        float diff = NW_BEARING - N_BEARING;
+        return (-45.0 * (rawHeading-N_BEARING)/diff);
+    }
+    else if(rawHeading >= W_BEARING && rawHeading < NW_BEARING){
+        //Serial.println("Between W and NW");
+        float diff = W_BEARING - NW_BEARING;
+        return (-45.0 * (rawHeading-NW_BEARING)/diff) - 45.0;
+    }
+    else if(rawHeading >=SW_BEARING && rawHeading < W_BEARING){
+        //Serial.println("Between W and SW");
+        float diff = SW_BEARING - W_BEARING;
+        return (-45.0 * (rawHeading-W_BEARING)/diff) - 90.0;
+    }
+    
+    else{   //Somewhere between south and southwest
+        float maindiff = (180 + SW_BEARING) + (180 - S_BEARING);
+        if(rawHeading > 0){
+            //Serial.println("Between S and SW");
+            float diff = 180.0 - S_BEARING;
+            return -180.0 + (45.0 * (rawHeading - S_BEARING)/maindiff) ;
+        }
+        else{
+            //Serial.println("Between S and SW, NR");
+            float diff = 180.0 + SW_BEARING;
+            return (45.0 * (diff/maindiff) * (rawHeading - SW_BEARING)/diff) - 135.0;
+        }
+    }
+    return rawHeading;
+}
+
+float calcDistance(float lat1, float lat2, float lon1, float lon2){
+    float dLat = deg2rad(lat1-lat2);
+    float dLon = deg2rad(lon1-lon2);
+    float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(lat2)) * cosf(deg2rad(lat1)) * sinf(dLon/2) * sinf(dLon/2); 
+    float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
+    return 6371.0 * c; // Distance in km
+}
+
 bool getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
 
@@ -519,19 +607,37 @@ bool getPositionData(){
         longitude = -78.674378;
         //latitude = ((float)myGPS.getLatitude())/1000000.0;
         //longitude = ((float)myGPS.getLongitude())/1000000.0;
-        //lis3mdl.read();      // get X Y and Z data at once
+        lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event; 
         lis3mdl.getEvent(&event);
-        Serial.printlnf("X: %d, Y: %d",lis3mdl.x,lis3mdl.y);
-        compassHeading = 0-atan2(lis3mdl.x, lis3mdl.y) * 180.0 / M_PI;
+        compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
-            float dLat = deg2rad(targetLat-latitude);
-            float dLon = deg2rad(targetLon-longitude);
-            float a = sinf(dLat/2) * sinf(dLat/2) + cosf(deg2rad(latitude)) * cosf(deg2rad(targetLat)) * sinf(dLon/2) * sinf(dLon/2); 
-            float c = 2 * atan2(sqrt(a), sqrt(1.0-a)); 
-            travelDistance = 6371.0 * c; // Distance in km
-            //Serial.printlnf("Distance: %f, Compass heading: %f, Travel Heading: %f, Bearing diff: %f", travelDistance, compassHeading, travelHeading,compassHeading-travelHeading);
+            travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);
+            if(travelHeading > 0){
+                if(compassHeading > 0){
+                    targetDelta = travelHeading - compassHeading;
+                }
+                else{
+                    float diff = -(180.0 - travelHeading);
+                    if(diff < compassHeading) targetDelta = travelHeading - compassHeading;
+                    else targetDelta = 0 - (180.0 + compassHeading) - (180.0 - travelHeading);
+                }
+            }
+            else{
+                if(compassHeading > 0){
+                    float diff = 180.0 + travelHeading;
+                    if(diff > compassHeading) targetDelta = travelHeading - compassHeading;
+                    else targetDelta = (180.0 - compassHeading) + (180.0 + travelHeading);
+                }
+                else{
+                    targetDelta = travelHeading - compassHeading;
+                }
+            }
+            char tempbuf[100];
+            sprintf(tempbuf,"Raw : %f, Compass : %f, Travel hd: %f, T Delta: %f", atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI, compassHeading, travelHeading, targetDelta);
+            printBLE(tempbuf);
+            Serial.println(tempbuf);
         }
         
         return true;
@@ -600,6 +706,14 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
     if(sendXBee || sendMode == 2){
         Serial1.println(outStr);
     }
+}
+
+void printBLE(const char *dataOut){
+    #ifdef BLE_DEBUG_ENABLED
+        uint8_t txBuf_tmp[strlen(dataOut)];
+        memcpy(txBuf_tmp,dataOut,strlen(dataOut));
+        bledbgCharacteristic.setValue(txBuf_tmp, strlen(dataOut));
+    #endif
 }
 
 void StatusHandler(){
