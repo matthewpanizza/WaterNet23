@@ -695,12 +695,26 @@ void updateMotors(){
                     setRSpeed = 90;
                 }
                 else{
-
+                    int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);
+                    int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
+                    if(Lset < 0) setLSpeed = 0;
+                    else if(Lset > 180) setLSpeed = 180;
+                    else Lset = setLSpeed;
+                    if(Rset < 0) setRSpeed = 0;
+                    else if(Rset > 180) setRSpeed = 180;
+                    else Rset = setRSpeed;
                 }
             }
             else{
                 pointArrived = false;
-                autoMoveRate;
+                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate);
+                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate);
+                if(Lset < 0) setLSpeed = 0;
+                else if(Lset > 180) setLSpeed = 180;
+                else Lset = setLSpeed;
+                if(Rset < 0) setRSpeed = 0;
+                else if(Rset > 180) setRSpeed = 180;
+                else Rset = setRSpeed;
             }
         }
 
