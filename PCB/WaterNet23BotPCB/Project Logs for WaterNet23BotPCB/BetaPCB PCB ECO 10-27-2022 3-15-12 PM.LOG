@@ -1,0 +1,16 @@
+Removed Pin From Net: NetName=SCK Pin=P17-10
+Removed Pin From Net: NetName=MOSI Pin=P17-12
+Removed Pin From Net: NetName=MISO Pin=P17-14
+Removed Pin From Net: NetName=CS Pin=P17-16
+Removed Pin From Net: NetName=D3 Pin=P17-18
+Removed Pin From Net: NetName=D2 Pin=P17-20
+Removed Pin From Net: NetName=D22 Pin=P17-22
+Removed Pin From Net: NetName=D23 Pin=P17-24
+Added Pin To Net: NetName=D23 Pin=P17-10
+Added Pin To Net: NetName=D22 Pin=P17-12
+Added Pin To Net: NetName=SCK Pin=P17-14
+Added Pin To Net: NetName=MOSI Pin=P17-16
+Added Pin To Net: NetName=MISO Pin=P17-18
+Added Pin To Net: NetName=CS Pin=P17-20
+Added Pin To Net: NetName=D2 Pin=P17-22
+Added Pin To Net: NetName=D3 Pin=P17-24
