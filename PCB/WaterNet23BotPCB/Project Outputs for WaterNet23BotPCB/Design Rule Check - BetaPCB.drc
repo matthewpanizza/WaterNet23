@@ -1,18 +1,18 @@
 Protel Design System Design Rule Check
 PCB File : C:\Users\jakem\OneDrive\Documents\Git\WaterNet23\PCB\WaterNet23BotPCB\BetaPCB.PcbDoc
 Date     : 10/28/2022
-Time     : 2:11:24 AM
+Time     : 3:41:35 PM
 
-Processing Rule : Clearance Constraint (Gap=10mil) (InNet('GND') And OnLayer('Inner Layer2')),(All)
-Rule Violations :0
-
-Processing Rule : Clearance Constraint (Gap=8mil) (All),(All)
+Processing Rule : Clearance Constraint (Gap=8mil) (InNet('3V3')),(InNet('Board Water'))
 Rule Violations :0
 
 Processing Rule : Clearance Constraint (Gap=20mil) (InNet('VBAT') And OnLayer('Inner Layer3')),(All)
 Rule Violations :0
 
-Processing Rule : Clearance Constraint (Gap=8mil) (InNet('3V3')),(InNet('Board Water'))
+Processing Rule : Clearance Constraint (Gap=8mil) (All),(All)
+Rule Violations :0
+
+Processing Rule : Clearance Constraint (Gap=10mil) (InNet('GND') And OnLayer('Inner Layer2')),(All)
 Rule Violations :0
 
 Processing Rule : Short-Circuit Constraint (Allowed=No) (All),(All)

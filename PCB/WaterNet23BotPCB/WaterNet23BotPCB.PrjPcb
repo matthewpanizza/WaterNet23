@@ -49,6 +49,40 @@ PrefsVaultGUID=
 PrefsRevisionGUID=
 
 [Document1]
+DocumentPath=SI7463DP\SI7463DP\SIR165DP.SchLib
+AnnotationEnabled=1
+AnnotateStartValue=1
+AnnotationIndexControlEnabled=0
+AnnotateSuffix=
+AnnotateScope=All
+AnnotateOrder=-1
+DoLibraryUpdate=1
+DoDatabaseUpdate=1
+ClassGenCCAutoEnabled=1
+ClassGenCCAutoRoomEnabled=1
+ClassGenNCAutoScope=None
+DItemRevisionGUID=
+GenerateClassCluster=0
+DocumentUniqueId=SYOBOLSP
+
+[Document2]
+DocumentPath=SI7463DP\SI7463DP\SIR165DP.PcbLib
+AnnotationEnabled=1
+AnnotateStartValue=1
+AnnotationIndexControlEnabled=0
+AnnotateSuffix=
+AnnotateScope=All
+AnnotateOrder=-1
+DoLibraryUpdate=1
+DoDatabaseUpdate=1
+ClassGenCCAutoEnabled=1
+ClassGenCCAutoRoomEnabled=1
+ClassGenNCAutoScope=None
+DItemRevisionGUID=
+GenerateClassCluster=0
+DocumentUniqueId=JJABPAQP
+
+[Document3]
 DocumentPath=TSM2N7002KDCU6_RFG\TSM2N7002KDCU6_RFG\SOT65P210X110-6N.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -65,7 +99,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GKVFLFVI
 
-[Document2]
+[Document4]
 DocumentPath=CLMVC-FKA-CL1D1L71BB7C3C3\CLMVC-FKA-CL1D1L71BB7C3C3\LED_CLMVC-FKA-CL1D1L71BB7C3C3.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -82,7 +116,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=QKWNWFSB
 
-[Document3]
+[Document5]
 DocumentPath=TSM2N7002KDCU6_RFG\TSM2N7002KDCU6_RFG\TSM2N7002KDCU6_RFG.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -99,7 +133,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=UCHTRTJC
 
-[Document4]
+[Document6]
 DocumentPath=CLMVC-FKA-CL1D1L71BB7C3C3\CLMVC-FKA-CL1D1L71BB7C3C3\CLMVC-FKA-CL1D1L71BB7C3C3.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -116,7 +150,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=UBZRDCTL
 
-[Document5]
+[Document7]
 DocumentPath=K7803-3AR3\K7803-3AR3\CONV_K7803-3AR3.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -133,7 +167,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=TBFWINWC
 
-[Document6]
+[Document8]
 DocumentPath=K7803-3AR3\K7803-3AR3\K7803-3AR3.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -150,7 +184,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=HRYUDLDX
 
-[Document7]
+[Document9]
 DocumentPath=Quiic JST-SH-4\SM04B-SRSS-TB_LF__SN_\SM04B-SRSS-TB(LF)(SN).SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -167,7 +201,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=KHUIVNCH
 
-[Document8]
+[Document10]
 DocumentPath=Quiic JST-SH-4\SM04B-SRSS-TB_LF__SN_\JST_SM04B-SRSS-TB(LF)(SN).PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -184,7 +218,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=XQAYBMYR
 
-[Document9]
+[Document11]
 DocumentPath=MAX14933ASE_T\MAX14933ASE_T\MAX14933ASE+T.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -201,7 +235,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=WTAHRBOA
 
-[Document10]
+[Document12]
 DocumentPath=MAX14933ASE_T\MAX14933ASE_T\SOIC127P600X175-16N.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -218,7 +252,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=PTBSEWWT
 
-[Document11]
+[Document13]
 DocumentPath=NR6028T4R7M\NR6028T4R7M\NR6028T4R7M.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -235,7 +269,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GMIVLSFD
 
-[Document12]
+[Document14]
 DocumentPath=ISL85003AFRZ\DFN12LD 3x4.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -252,7 +286,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=SNPVCVTW
 
-[Document13]
+[Document15]
 DocumentPath=21992304\21992304\TE_21992304.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -269,7 +303,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=DXFHKHJQ
 
-[Document14]
+[Document16]
 DocumentPath=AL8861Y-13\AL8861Y-13\AAL8861Y-13.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -286,7 +320,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=QKVCWELX
 
-[Document15]
+[Document17]
 DocumentPath=6-440054-2\6-440054-2\6-440054-2.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -303,7 +337,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=EJUBOEDU
 
-[Document16]
+[Document18]
 DocumentPath=Custom_Footprints.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -320,7 +354,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=UHNTQRHO
 
-[Document17]
+[Document19]
 DocumentPath=2512 Resistor\2512 Resistor\2512 Resistor.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -337,7 +371,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=LAGIWPJZ
 
-[Document18]
+[Document20]
 DocumentPath=1586039-6\1586039-6\TE_1586039-6.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -354,7 +388,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=RBYNVFTJ
 
-[Document19]
+[Document21]
 DocumentPath=350761-4\350761-4\350761-4.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -371,7 +405,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=JZZSCVEK
 
-[Document20]
+[Document22]
 DocumentPath=SRR1280-101M\SRR1280-101M\INDPM125125X800N.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -388,7 +422,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=DFQGXLXX
 
-[Document21]
+[Document23]
 DocumentPath=SS26FL\SS26FL\DIO_SS26FL.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -405,7 +439,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=DVCJPJMI
 
-[Document22]
+[Document24]
 DocumentPath=USB4105-GF-A\USB4105-GF-A\GCT_USB4105-GF-A.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -422,7 +456,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=YJABGEUR
 
-[Document23]
+[Document25]
 DocumentPath=GRM21BR61H106KE43K\GRM21BR61H106KE43K\CAPC2012X145N.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -439,7 +473,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GQTLAXTY
 
-[Document24]
+[Document26]
 DocumentPath=ANTC1608X90N\ANTC1608X90N.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -456,7 +490,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=TUHJLXSG
 
-[Document25]
+[Document27]
 DocumentPath=ISL85003AFRZ\ISL85003AFRZ.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -473,7 +507,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GHUOZJOP
 
-[Document26]
+[Document28]
 DocumentPath=INA139\INA139\SnapEDAsch.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -490,7 +524,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=JVHTISAB
 
-[Document27]
+[Document29]
 DocumentPath=ISO1640QDWRQ1\2022-08-30_21-57-50\ISO1640QDWRQ1.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -507,7 +541,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=VSOXAGBO
 
-[Document28]
+[Document30]
 DocumentPath=ISO1640QDWRQ1\2022-08-30_21-57-50\ISO1640QDWRQ1.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -524,7 +558,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=QPLKKTJO
 
-[Document29]
+[Document31]
 DocumentPath=USB4105-GF-A\USB4105-GF-A\USB4105-GF-A.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -541,7 +575,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=UNJTOBID
 
-[Document30]
+[Document32]
 DocumentPath=MEM2051-00-195-00-A\GCT_MEM2051-00-195-00-A.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -558,7 +592,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=DFOXVJWB
 
-[Document31]
+[Document33]
 DocumentPath=MEM2051-00-195-00-A\MEM2051-00-195-00-A.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -575,7 +609,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=ZZCVEFRN
 
-[Document32]
+[Document34]
 DocumentPath=B402.SCHLIB
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -592,7 +626,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GYXGEGKK
 
-[Document33]
+[Document35]
 DocumentPath=MainPCB.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -609,7 +643,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=KBTVKDOK
 
-[Document34]
+[Document36]
 DocumentPath=UserInputs.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -626,7 +660,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=RBEOASKC
 
-[Document35]
+[Document37]
 DocumentPath=Power.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -643,7 +677,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=CTWGKBXG
 
-[Document36]
+[Document38]
 DocumentPath=LEDs.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -660,7 +694,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=ACGWXPFJ
 
-[Document37]
+[Document39]
 DocumentPath=WaterNet23BotPCB.BomDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -677,7 +711,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=
 
-[Document38]
+[Document40]
 DocumentPath=Sensors.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -694,7 +728,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=YBELZEHK
 
-[Document39]
+[Document41]
 DocumentPath=Main.PcbDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -711,7 +745,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=GWRRKVCR
 
-[Document40]
+[Document42]
 DocumentPath=WaterNet23BotPCB.SCHLIB
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -728,7 +762,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=VXJLBHAY
 
-[Document41]
+[Document43]
 DocumentPath=WaterNet23BotPCB.OutJob
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -745,7 +779,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=
 
-[Document42]
+[Document44]
 DocumentPath=BetaPCB.PcbDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -762,7 +796,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=CBGIULNN
 
-[Document43]
+[Document45]
 DocumentPath=WaterNet23BotPCB.Annotation
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -1929,178 +1963,16 @@ NetClassManualEnabled=1
 NetClassSeparateForBusSections=0
 
 [LibraryUpdateOptions]
-SelectedOnly=0
+SelectedOnly=1
 UpdateVariants=1
 UpdateToLatestRevision=1
 PartTypes=0
 ComponentLibIdentifierKind0=Library Name And Type
-ComponentLibraryIdentifier0=AL8861Y-13.SchLib
-ComponentDesignItemID0=AL8861Y-13
-ComponentSymbolReference0=AL8861Y-13
-ComponentUpdate0=0
+ComponentLibraryIdentifier0=SIR165DP.SchLib
+ComponentDesignItemID0=SI7463DP
+ComponentSymbolReference0=SI7463DP
+ComponentUpdate0=1
 ComponentIsDeviceSheet0=0
-ComponentLibIdentifierKind1=Library Name And Type
-ComponentLibraryIdentifier1=CLMVC-FKA-CL1D1L71BB7C3C3.IntLib
-ComponentDesignItemID1=CLMVC-FKA-CL1D1L71BB7C3C3
-ComponentSymbolReference1=CLMVC-FKA-CL1D1L71BB7C3C3
-ComponentUpdate1=1
-ComponentIsDeviceSheet1=0
-ComponentLibIdentifierKind2=Library Name And Type
-ComponentLibraryIdentifier2=INA139.IntLib
-ComponentDesignItemID2=INA139
-ComponentSymbolReference2=INA139
-ComponentUpdate2=0
-ComponentIsDeviceSheet2=0
-ComponentLibIdentifierKind3=Library Name And Type
-ComponentLibraryIdentifier3=K7803-3AR3.IntLib
-ComponentDesignItemID3=K7803-3AR3
-ComponentSymbolReference3=K7803-3AR3
-ComponentUpdate3=1
-ComponentIsDeviceSheet3=0
-ComponentLibIdentifierKind4=Library Name And Type
-ComponentLibraryIdentifier4=MAX14933ASE+T.SchLib
-ComponentDesignItemID4=MAX14933ASE+T
-ComponentSymbolReference4=MAX14933ASE+T
-ComponentUpdate4=0
-ComponentIsDeviceSheet4=0
-ComponentLibIdentifierKind5=Library Name And Type
-ComponentLibraryIdentifier5=MEM2051-00-195-00-A.SchLib
-ComponentDesignItemID5=MEM2051-00-195-00-A
-ComponentSymbolReference5=MEM2051-00-195-00-A
-ComponentUpdate5=0
-ComponentIsDeviceSheet5=0
-ComponentLibIdentifierKind6=Library Name And Type
-ComponentLibraryIdentifier6=Miscellaneous Connectors.IntLib
-ComponentDesignItemID6=Header 2
-ComponentSymbolReference6=Header 2
-ComponentUpdate6=0
-ComponentIsDeviceSheet6=0
-ComponentLibIdentifierKind7=Library Name And Type
-ComponentLibraryIdentifier7=Miscellaneous Connectors.IntLib
-ComponentDesignItemID7=Header 3
-ComponentSymbolReference7=Header 3
-ComponentUpdate7=0
-ComponentIsDeviceSheet7=0
-ComponentLibIdentifierKind8=Library Name And Type
-ComponentLibraryIdentifier8=Miscellaneous Connectors.IntLib
-ComponentDesignItemID8=Header 3X2
-ComponentSymbolReference8=Header 3X2
-ComponentUpdate8=0
-ComponentIsDeviceSheet8=0
-ComponentLibIdentifierKind9=Library Name And Type
-ComponentLibraryIdentifier9=Miscellaneous Connectors.IntLib
-ComponentDesignItemID9=Header 4
-ComponentSymbolReference9=Header 4
-ComponentUpdate9=0
-ComponentIsDeviceSheet9=0
-ComponentLibIdentifierKind10=Library Name And Type
-ComponentLibraryIdentifier10=Miscellaneous Connectors.IntLib
-ComponentDesignItemID10=Header 4X2
-ComponentSymbolReference10=Header 4X2
-ComponentUpdate10=0
-ComponentIsDeviceSheet10=0
-ComponentLibIdentifierKind11=Library Name And Type
-ComponentLibraryIdentifier11=Miscellaneous Connectors.IntLib
-ComponentDesignItemID11=Header 6
-ComponentSymbolReference11=Header 6
-ComponentUpdate11=0
-ComponentIsDeviceSheet11=0
-ComponentLibIdentifierKind12=Library Name And Type
-ComponentLibraryIdentifier12=Miscellaneous Devices.IntLib
-ComponentDesignItemID12=MOSFET-N
-ComponentSymbolReference12=MOSFET-N
-ComponentUpdate12=0
-ComponentIsDeviceSheet12=0
-ComponentLibIdentifierKind13=Library Name And Type
-ComponentLibraryIdentifier13=Simulation Generic Components.IntLib
-ComponentDesignItemID13=Capacitor
-ComponentSymbolReference13=Capacitor
-ComponentUpdate13=0
-ComponentIsDeviceSheet13=0
-ComponentLibIdentifierKind14=Library Name And Type
-ComponentLibraryIdentifier14=Simulation Generic Components.IntLib
-ComponentDesignItemID14=Inductor
-ComponentSymbolReference14=Inductor
-ComponentUpdate14=0
-ComponentIsDeviceSheet14=0
-ComponentLibIdentifierKind15=Library Name And Type
-ComponentLibraryIdentifier15=Simulation Generic Components.IntLib
-ComponentDesignItemID15=Resistor
-ComponentSymbolReference15=Resistor
-ComponentUpdate15=0
-ComponentIsDeviceSheet15=0
-ComponentLibIdentifierKind16=Library Name And Type
-ComponentLibraryIdentifier16=Simulation Generic Components.IntLib
-ComponentDesignItemID16=Shottky Diode
-ComponentSymbolReference16=Shottky Diode
-ComponentUpdate16=0
-ComponentIsDeviceSheet16=0
-ComponentLibIdentifierKind17=Library Name And Type
-ComponentLibraryIdentifier17=Simulation Generic Components.IntLib
-ComponentDesignItemID17=SW NO
-ComponentSymbolReference17=SW NO
-ComponentUpdate17=0
-ComponentIsDeviceSheet17=0
-ComponentLibIdentifierKind18=Library Name And Type
-ComponentLibraryIdentifier18=SM04B-SRSS-TB(LF)(SN).SchLib
-ComponentDesignItemID18=SM04B-SRSS-TB(LF)(SN)
-ComponentSymbolReference18=SM04B-SRSS-TB(LF)(SN)
-ComponentUpdate18=1
-ComponentIsDeviceSheet18=0
-ComponentLibIdentifierKind19=Library Name And Type
-ComponentLibraryIdentifier19=TSM2N7002KDCU6_RFG.IntLib
-ComponentDesignItemID19=TSM2N7002KDCU6_RFG
-ComponentSymbolReference19=TSM2N7002KDCU6_RFG
-ComponentUpdate19=1
-ComponentIsDeviceSheet19=0
-ComponentLibIdentifierKind20=Library Name And Type
-ComponentLibraryIdentifier20=USB4105-GF-A.SchLib
-ComponentDesignItemID20=USB4105-GF-A
-ComponentSymbolReference20=USB4105-GF-A
-ComponentUpdate20=0
-ComponentIsDeviceSheet20=0
-ComponentLibIdentifierKind21=Library Name And Type
-ComponentLibraryIdentifier21=WaterNet23BotPCB.SCHLIB
-ComponentDesignItemID21=AO4616
-ComponentSymbolReference21=AO4616
-ComponentUpdate21=1
-ComponentIsDeviceSheet21=0
-ComponentLibIdentifierKind22=Library Name And Type
-ComponentLibraryIdentifier22=WaterNet23BotPCB.SCHLIB
-ComponentDesignItemID22=B0303S-1WR3
-ComponentSymbolReference22=B0303S-1WR3
-ComponentUpdate22=0
-ComponentIsDeviceSheet22=0
-ComponentLibIdentifierKind23=Library Name And Type
-ComponentLibraryIdentifier23=WaterNet23BotPCB.SCHLIB
-ComponentDesignItemID23=B402
-ComponentSymbolReference23=B402
-ComponentUpdate23=0
-ComponentIsDeviceSheet23=0
-ComponentLibIdentifierKind24=Library Name And Type
-ComponentLibraryIdentifier24=WaterNet23BotPCB.SCHLIB
-ComponentDesignItemID24=U-Blox NEO-M8U Breakout
-ComponentSymbolReference24=U-Blox NEO-M8U Breakout
-ComponentUpdate24=1
-ComponentIsDeviceSheet24=0
-ComponentLibIdentifierKind25=Library Name Only
-ComponentLibraryIdentifier25=Altium Content Vault
-ComponentDesignItemID25=CMP-1054-00102-1
-ComponentSymbolReference25=ONSC-D-A1A2K3-3
-ComponentUpdate25=0
-ComponentIsDeviceSheet25=0
-ComponentLibIdentifierKind26=Library Name Only
-ComponentLibraryIdentifier26=Altium Content Vault
-ComponentDesignItemID26=CMP-111093-000003-1
-ComponentSymbolReference26=9c40ac4d87bbbe9fcb330bd20f98ca3
-ComponentUpdate26=0
-ComponentIsDeviceSheet26=0
-ComponentLibIdentifierKind27=Library Name Only
-ComponentLibraryIdentifier27=Altium Content Vault
-ComponentDesignItemID27=CMP-84319-000004-1
-ComponentSymbolReference27=053d8e65a610ce00d52093c0e212ca3
-ComponentUpdate27=0
-ComponentIsDeviceSheet27=0
 FullReplace=1
 UpdateDesignatorLock=1
 UpdatePartIDLock=1
@@ -2114,415 +1986,41 @@ RemoveParameters=0
 AddModels=1
 RemoveModels=1
 UpdateCurrentModels=1
-ParameterName0=AF
+ParameterName0=Availability
 ParameterUpdate0=1
-ParameterName1=Area Factor
+ParameterName1=Check_prices
 ParameterUpdate1=1
-ParameterName2=Availability
+ParameterName2=Comment
 ParameterUpdate2=1
-ParameterName3=Body Material
+ParameterName3=Component Kind
 ParameterUpdate3=1
-ParameterName4=Body Plating
+ParameterName4=Description
 ParameterUpdate4=1
-ParameterName5=BV
+ParameterName5=Library Reference
 ParameterUpdate5=1
-ParameterName6=BV_MAX
+ParameterName6=MF
 ParameterUpdate6=1
-ParameterName7=Case/Package
+ParameterName7=MP
 ParameterUpdate7=1
-ParameterName8=Center Contact Plating
+ParameterName8=Package
 ParameterUpdate8=1
-ParameterName9=Check_prices
+ParameterName9=Price
 ParameterUpdate9=1
-ParameterName10=CJO
+ParameterName10=Purchase-URL
 ParameterUpdate10=1
-ParameterName11=CJP
+ParameterName11=SnapEDA_Link
 ParameterUpdate11=1
-ParameterName12=closed
+ParameterName12=Supplier 1
 ParameterUpdate12=1
-ParameterName13=Comment
+ParameterName13=Supplier Part Number 1
 ParameterUpdate13=1
-ParameterName14=Component Kind
+ParameterName14=Value
 ParameterUpdate14=1
-ParameterName15=ComponentLink1Description
-ParameterUpdate15=1
-ParameterName16=ComponentLink1URL
-ParameterUpdate16=1
-ParameterName17=ComponentLink2Description
-ParameterUpdate17=1
-ParameterName18=ComponentLink2URL
-ParameterUpdate18=1
-ParameterName19=ComponentLink3Description
-ParameterUpdate19=1
-ParameterName20=ComponentLink3URL
-ParameterUpdate20=1
-ParameterName21=Configuration
-ParameterUpdate21=1
-ParameterName22=Connector Type
-ParameterUpdate22=1
-ParameterName23=Contact Material
-ParameterUpdate23=1
-ParameterName24=Contact Plating
-ParameterUpdate24=1
-ParameterName25=CPAR
-ParameterUpdate25=1
-ParameterName26=CTA
-ParameterUpdate26=1
-ParameterName27=CTP
-ParameterUpdate27=1
-ParameterName28=Current - Receiving
-ParameterUpdate28=1
-ParameterName29=Current - Transmitting
-ParameterUpdate29=1
-ParameterName30=Data Rate
-ParameterUpdate30=1
-ParameterName31=DatasheetVersion
-ParameterUpdate31=1
-ParameterName32=Description
-ParameterUpdate32=1
-ParameterName33=Dielectric Material
-ParameterUpdate33=1
-ParameterName34=Digi-Key_Part_Number
-ParameterUpdate34=1
-ParameterName35=DTEMP
-ParameterUpdate35=1
-ParameterName36=EG
-ParameterUpdate36=1
-ParameterName37=Fastening Type
-ParameterUpdate37=1
-ParameterName38=FC
-ParameterUpdate38=1
-ParameterName39=FCS
-ParameterUpdate39=1
-ParameterName40=Frequency
-ParameterUpdate40=1
-ParameterName41=FV_MAX
-ParameterUpdate41=1
-ParameterName42=Housing Color
-ParameterUpdate42=1
-ParameterName43=IBV
-ParameterUpdate43=1
-ParameterName44=IF Max (A)
-ParameterUpdate44=1
-ParameterName45=IKF
-ParameterUpdate45=1
-ParameterName46=IKR
-ParameterUpdate46=1
-ParameterName47=Impedance
-ParameterUpdate47=1
-ParameterName48=Initial Current
-ParameterUpdate48=1
-ParameterName49=Initial Voltage
-ParameterUpdate49=1
-ParameterName50=Interface
-ParameterUpdate50=1
-ParameterName51=IS
-ParameterUpdate51=1
-ParameterName52=ISR
-ParameterUpdate52=1
-ParameterName53=JSW
-ParameterUpdate53=1
-ParameterName54=JTUN
-ParameterUpdate54=1
-ParameterName55=JTUNSW
-ParameterUpdate55=1
-ParameterName56=KEG
-ParameterUpdate56=1
-ParameterName57=KF
-ParameterUpdate57=1
-ParameterName58=L
-ParameterUpdate58=1
-ParameterName59=LatestRevisionDate
-ParameterUpdate59=1
-ParameterName60=LatestRevisionNote
-ParameterUpdate60=1
-ParameterName61=LEVEL
-ParameterUpdate61=1
-ParameterName62=Library Reference
-ParameterUpdate62=1
-ParameterName63=LSER
-ParameterUpdate63=1
-ParameterName64=M
-ParameterUpdate64=1
-ParameterName65=Manufacturer
-ParameterUpdate65=1
-ParameterName66=Max Frequency
-ParameterUpdate66=1
-ParameterName67=Max Operating Temperature
-ParameterUpdate67=1
-ParameterName68=Max Supply Voltage
-ParameterUpdate68=1
-ParameterName69=Memory Size
-ParameterUpdate69=1
-ParameterName70=MF
-ParameterUpdate70=1
-ParameterName71=Min Frequency
-ParameterUpdate71=1
-ParameterName72=Min Operating Temperature
-ParameterUpdate72=1
-ParameterName73=Min Supply Voltage
-ParameterUpdate73=1
-ParameterName74=MJSW
-ParameterUpdate74=1
-ParameterName75=Mount
-ParameterUpdate75=1
-ParameterName76=Mounting Technology
-ParameterUpdate76=1
-ParameterName77=MP
-ParameterUpdate77=1
-ParameterName78=N
-ParameterUpdate78=1
-ParameterName79=NBV
-ParameterUpdate79=1
-ParameterName80=NR
-ParameterUpdate80=1
-ParameterName81=NS
-ParameterUpdate81=1
-ParameterName82=NTUN
-ParameterUpdate82=1
-ParameterName83=Number of Pins
-ParameterUpdate83=1
-ParameterName84=Number of Ports
-ParameterUpdate84=1
-ParameterName85=Operating Frequency
-ParameterUpdate85=1
-ParameterName86=Orientation
-ParameterUpdate86=1
-ParameterName87=Output Power (dBm)
-ParameterUpdate87=1
-ParameterName88=Package
-ParameterUpdate88=1
-ParameterName89=Package Quantity
-ParameterUpdate89=1
-ParameterName90=PackageDescription
-ParameterUpdate90=1
-ParameterName91=PackageReference
-ParameterUpdate91=1
-ParameterName92=PackageVersion
-ParameterUpdate92=1
-ParameterName93=Packaging
-ParameterUpdate93=1
-ParameterName94=Packing
-ParameterUpdate94=1
-ParameterName95=PartNumber
-ParameterUpdate95=1
-ParameterName96=PHP
-ParameterUpdate96=1
-ParameterName97=PJ
-ParameterUpdate97=1
-ParameterName98=Price
-ParameterUpdate98=1
-ParameterName99=Published
-ParameterUpdate99=1
-ParameterName100=Publisher
-ParameterUpdate100=1
-ParameterName101=Purchase-URL
-ParameterUpdate101=1
-ParameterName102=Radiation Hardening
-ParameterUpdate102=1
-ParameterName103=RAM Size
-ParameterUpdate103=1
-ParameterName104=Rclosed
-ParameterUpdate104=1
-ParameterName105=RLSHUNT
-ParameterUpdate105=1
-ParameterName106=RoHS
-ParameterUpdate106=1
-ParameterName107=Ropen
-ParameterUpdate107=1
-ParameterName108=RPAR
-ParameterUpdate108=1
-ParameterName109=RS
-ParameterUpdate109=1
-ParameterName110=RSER
-ParameterUpdate110=1
-ParameterName111=SENS_AREA
-ParameterUpdate111=1
-ParameterName112=Sensitivity
-ParameterUpdate112=1
-ParameterName113=Series
-ParameterUpdate113=1
-ParameterName114=SimulationGenericComponent
-ParameterUpdate114=1
-ParameterName115=SnapEDA_Link
-ParameterUpdate115=1
-ParameterName116=Starting Condition
-ParameterUpdate116=1
-ParameterName117=Supplier 1
-ParameterUpdate117=1
-ParameterName118=Supplier Part Number 1
-ParameterUpdate118=1
-ParameterName119=T_REL_LOCAL
-ParameterUpdate119=1
-ParameterName120=TC
-ParameterUpdate120=1
-ParameterName121=TC1
-ParameterUpdate121=1
-ParameterName122=TC2
-ParameterUpdate122=1
-ParameterName123=TCV
-ParameterUpdate123=1
-ParameterName124=TEMP
-ParameterUpdate124=1
-ParameterName125=Temperature
-ParameterUpdate125=1
-ParameterName126=Termination
-ParameterUpdate126=1
-ParameterName127=TLEV
-ParameterUpdate127=1
-ParameterName128=TLEVC
-ParameterUpdate128=1
-ParameterName129=TM1
-ParameterUpdate129=1
-ParameterName130=TM2
-ParameterUpdate130=1
-ParameterName131=TNOM
-ParameterUpdate131=1
-ParameterName132=TPB
-ParameterUpdate132=1
-ParameterName133=TPHP
-ParameterUpdate133=1
-ParameterName134=trr Max (ns)
-ParameterUpdate134=1
-ParameterName135=TRS
-ParameterUpdate135=1
-ParameterName136=TRS2
-ParameterUpdate136=1
-ParameterName137=TT
-ParameterUpdate137=1
-ParameterName138=TTT1
-ParameterUpdate138=1
-ParameterName139=TTT2
-ParameterUpdate139=1
-ParameterName140=Value
-ParameterUpdate140=1
-ParameterName141=VJ
-ParameterUpdate141=1
-ParameterName142=Voltage Rating
-ParameterUpdate142=1
-ParameterName143=W
-ParameterUpdate143=1
-ParameterName144=XTI
-ParameterUpdate144=1
-ParameterName145=XTITUN
-ParameterUpdate145=1
 ModelTypeGroup0=PCBLIB
 ModelTypeUpdate0=1
 ModelType0=PCBLIB
-ModelName0=1x2 Header
+ModelName0=SIR165DP
 ModelUpdate0=1
-ModelType1=PCBLIB
-ModelName1=1x3 Header
-ModelUpdate1=1
-ModelType2=PCBLIB
-ModelName2=2x3 Header
-ModelUpdate2=1
-ModelType3=PCBLIB
-ModelName3=4x2 Header
-ModelUpdate3=1
-ModelType4=PCBLIB
-ModelName4=ANTC1608X90N
-ModelUpdate4=1
-ModelType5=PCBLIB
-ModelName5=B0303S-1WR3
-ModelUpdate5=1
-ModelType6=PCBLIB
-ModelName6=B402 Full
-ModelUpdate6=1
-ModelType7=PCBLIB
-ModelName7=CAPC2012X145N
-ModelUpdate7=1
-ModelType8=PCBLIB
-ModelName8=CONV_AL8861Y-13
-ModelUpdate8=1
-ModelType9=PCBLIB
-ModelName9=CONV_K7803-3AR3
-ModelUpdate9=1
-ModelType10=PCBLIB
-ModelName10=DIO_SS26FL
-ModelUpdate10=1
-ModelType11=PCBLIB
-ModelName11=FP-PCB_SMAFRA_HT-MFG
-ModelUpdate11=1
-ModelType12=PCBLIB
-ModelName12=FP-XBP9B-DMUTB002-MFG
-ModelUpdate12=1
-ModelType13=PCBLIB
-ModelName13=GCT_MEM2051-00-195-00-A
-ModelUpdate13=1
-ModelType14=PCBLIB
-ModelName14=GCT_USB4105-GF-A
-ModelUpdate14=1
-ModelType15=PCBLIB
-ModelName15=INA139-Q1
-ModelUpdate15=1
-ModelType16=PCBLIB
-ModelName16=INDPM125125X800N
-ModelUpdate16=1
-ModelType17=PCBLIB
-ModelName17=JST_SM04B-SRSS-TB(LF)(SN)
-ModelUpdate17=1
-ModelType18=PCBLIB
-ModelName18=LED_CLMVC-FKA-CL1D1L71BB7C3C3
-ModelUpdate18=1
-ModelType19=PCBLIB
-ModelName19=ONSC-SOT-23-3-318-08_V
-ModelUpdate19=1
-ModelType20=PCBLIB
-ModelName20=RESC6331X70N
-ModelUpdate20=1
-ModelType21=PCBLIB
-ModelName21=SOIC127P600X175-16N
-ModelUpdate21=1
-ModelType22=PCBLIB
-ModelName22=SOT23-3
-ModelUpdate22=1
-ModelType23=PCBLIB
-ModelName23=SOT65P210X110-6N
-ModelUpdate23=1
-ModelType24=PCBLIB
-ModelName24=TE_1586039-6
-ModelUpdate24=1
-ModelType25=PCBLIB
-ModelName25=TE_350761-4
-ModelUpdate25=1
-ModelType26=PCBLIB
-ModelName26=TE_6-440054-2
-ModelUpdate26=1
-ModelType27=PCBLIB
-ModelName27=TL3313AF250QG
-ModelUpdate27=1
-ModelType28=PCBLIB
-ModelName28=U-Blox NEO-M8U
-ModelUpdate28=1
-ModelType29=PCBLIB
-ModelName29=XT30_Horizontal
-ModelUpdate29=1
-ModelTypeGroup1=SI
-ModelTypeUpdate1=1
-ModelType30=SI
-ModelName30=Connector
-ModelUpdate30=1
-ModelTypeGroup2=SIM
-ModelTypeUpdate2=1
-ModelType31=SIM
-ModelName31=C_Capacitor_Default
-ModelUpdate31=1
-ModelType32=SIM
-ModelName32=diode
-ModelUpdate32=1
-ModelType33=SIM
-ModelName33=L_Inductor_Default
-ModelUpdate33=1
-ModelType34=SIM
-ModelName34=NMOS
-ModelUpdate34=1
-ModelType35=SIM
-ModelName35=R_Resistor_Default
-ModelUpdate35=1
-ModelType36=SIM
-ModelName36=SPST_SWITCH
-ModelUpdate36=1
 
 [DatabaseUpdateOptions]
 SelectedOnly=0
