@@ -1,7 +1,7 @@
 Protel Design System Design Rule Check
 PCB File : C:\Users\jakem\OneDrive\Documents\Git\WaterNet23\PCB\WaterNet23BotPCB\BetaPCB.PcbDoc
-Date     : 10/27/2022
-Time     : 10:50:17 PM
+Date     : 10/28/2022
+Time     : 2:11:24 AM
 
 Processing Rule : Clearance Constraint (Gap=10mil) (InNet('GND') And OnLayer('Inner Layer2')),(All)
 Rule Violations :0
@@ -10,6 +10,9 @@ Processing Rule : Clearance Constraint (Gap=8mil) (All),(All)
 Rule Violations :0
 
 Processing Rule : Clearance Constraint (Gap=20mil) (InNet('VBAT') And OnLayer('Inner Layer3')),(All)
+Rule Violations :0
+
+Processing Rule : Clearance Constraint (Gap=8mil) (InNet('3V3')),(InNet('Board Water'))
 Rule Violations :0
 
 Processing Rule : Short-Circuit Constraint (Allowed=No) (All),(All)
@@ -39,7 +42,7 @@ Rule Violations :0
 Processing Rule : Hole To Hole Clearance (Gap=10mil) (IsVia),(All)
 Rule Violations :0
 
-Processing Rule : Minimum Solder Mask Sliver (Gap=10mil) (All),(All)
+Processing Rule : Minimum Solder Mask Sliver (Gap=9.842mil) (All),(All)
 Rule Violations :0
 
 Processing Rule : Silk To Solder Mask (Clearance=8mil) (IsPad),(All)
@@ -57,7 +60,25 @@ Rule Violations :0
 Processing Rule : Height Constraint (Min=0mil) (Max=1000mil) (Prefered=500mil) (All)
 Rule Violations :0
 
+Waived Violations Of Rule : Net Antennae (Tolerance=0mil) (All)
+   Waived Violation between Net Antennae: Track (2105mil,318.031mil)(2105mil,1571.642mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2105mil,318.031mil)(2105mil,1571.642mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2125.5mil,296mil)(2125.5mil,1596mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2363.343mil,2138.849mil)(3095mil,2138.849mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2363.343mil,2138.849mil)(3095mil,2138.849mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2374.349mil,2114.349mil)(3095mil,2114.349mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (2374.349mil,2114.349mil)(3095mil,2114.349mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (288.994mil,5549.5mil)(820mil,5549.5mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (288.994mil,5549.5mil)(820mil,5549.5mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (297.278mil,5529.5mil)(820mil,5529.5mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (297.278mil,5529.5mil)(820mil,5529.5mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (5985mil,5530mil)(6590mil,5530mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (5985mil,5530mil)(6590mil,5530mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (5985mil,5550mil)(6598.284mil,5550mil) on Bottom Layer4 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+   Waived Violation between Net Antennae: Track (5985mil,5550mil)(6598.284mil,5550mil) on Top Layer1 Waived by Jake Meckley at 10/28/2022 2:07:00 AMI don't care.
+Waived Violations :15
+
 
 Violations Detected : 0
-Waived Violations : 0
+Waived Violations : 15
 Time Elapsed        : 00:00:02
