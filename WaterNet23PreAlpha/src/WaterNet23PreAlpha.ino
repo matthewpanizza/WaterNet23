@@ -95,13 +95,14 @@
 // Motor Drive Macros //
 ////////////////////////
 
+#define MTR_IDLE_ARM        2000
 #define MTR_ST_FWD          123         //Minimum commanded speed for motors going forward
 #define MTR_ST_REV          67          //Minimum commanded speed for motors in reverse
 #define MTR_TIMEOUT         4000        //Timeout in milliseconds for turning off motors when being manually controlled
-#define MTR_RAMP_SPD        1           //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
+#define MTR_RAMP_SPD        3           //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_TRAVEL_SPD      0.5         //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5         //Radius to consider "arrived" at a target point
-#define SENTRY_IDLE_RAD     4           //Radius to keep motors off in sentry mode after reaching the cutoff radius
+#define SENTRY_IDLE_RAD     4.0           //Radius to keep motors off in sentry mode after reaching the cutoff radius
 
 #define REPL_NAK            false
 
@@ -191,7 +192,7 @@ bool pointArrived;
 uint8_t battPercent;
 float battVoltage, battCurrent, solarCurrent;
 bool updateMotorControl;
-uint8_t driveMode = 0;
+uint8_t driveMode = 1;
 bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
@@ -335,8 +336,8 @@ void setup(){
     digitalWrite(PWR_EN,LOW);
 
     uint32_t mtrArmTime = millis();
-    setLSpeed = 90;
-    setRSpeed = 90;
+    leftMotorSpeed = setLSpeed = 90;
+    rightMotorSpeed = setRSpeed = 90;
     ESCL.attach(ESC_PWM_L,1000,2000);
     ESCR.attach(ESC_PWM_R,1000,2000);
     ESCL.write(setLSpeed);
@@ -410,7 +411,7 @@ void setup(){
     Serial.println(filenameMessages);
 
     watchdog.start();
-    motionTimer.start();
+    //motionTimer.start();
     ledTimer.start();
     statusPD.start();
 
@@ -444,12 +445,10 @@ void setup(){
         }
         Serial.println("Successfully paired with controller");
     }
-    
+    while(millis() - mtrArmTime < MTR_IDLE_ARM) delay(5);
 }
 
 void loop(){
-    
-
     //Serial.println();
     if(getPositionData()){
         char latLonBuf[UART_TX_BUF_SIZE];
@@ -457,7 +456,6 @@ void loop(){
         //Serial.println(latLonBuf);
         //sendData(latLonBuf, 0, true, true, false);
     }
-
     readPowerSys();
     //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
@@ -641,7 +639,7 @@ bool getPositionData(){
             char tempbuf[100];
             sprintf(tempbuf,"Raw : %f, Compass : %f, Travel hd: %f, T Delta: %f", atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI, compassHeading, travelHeading, targetDelta);
             printBLE(tempbuf);
-            Serial.println(tempbuf);
+            //Serial.println(tempbuf);
         }        
         return true;
     //}
@@ -682,7 +680,7 @@ void statusUpdate(){
 }
 
 void updateMotors(){
-    if(updateMotorControl){
+    //if(updateMotorControl){
         if(driveMode == 1 || driveMode == 2){       //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
             if(travelDistance < MTR_CUTOFF_RAD){
                 pointArrived = true;
@@ -695,8 +693,8 @@ void updateMotors(){
                     setRSpeed = 90;
                 }
                 else{
-                    int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);
-                    int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
+                    int Lset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);
+                    int Rset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
                     if(Lset < 0) setLSpeed = 0;
                     else if(Lset > 180) setLSpeed = 180;
                     else Lset = setLSpeed;
@@ -707,14 +705,14 @@ void updateMotors(){
             }
             else{
                 pointArrived = false;
-                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate);
-                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate);
+                int Lset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate);
+                int Rset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate);
                 if(Lset < 0) setLSpeed = 0;
                 else if(Lset > 180) setLSpeed = 180;
-                else Lset = setLSpeed;
+                else setLSpeed = Lset;
                 if(Rset < 0) setRSpeed = 0;
                 else if(Rset > 180) setRSpeed = 180;
-                else Rset = setRSpeed;
+                else setRSpeed = Rset;
             }
         }
 
@@ -739,11 +737,11 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD;
             else rightMotorSpeed = setRSpeed;
         }
-        
+        Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         ESCL.write(leftMotorSpeed);
         ESCR.write(180-rightMotorSpeed);
         updateMotorControl = false;        
-    }
+    //}
 }
 
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
@@ -1053,7 +1051,7 @@ void LEDHandler(){
     statusMode = LTEAvail;
     statusMode |= XBeeAvail << 1;
     statusMode |= BLEAvail << 2;
-    Serial.printlnf("Status: %d",statusMode);
+    //Serial.printlnf("Status: %d",statusMode);
     switch (statusMode){
     case 7:
         SetColor = RGB_COLOR_CYAN;
