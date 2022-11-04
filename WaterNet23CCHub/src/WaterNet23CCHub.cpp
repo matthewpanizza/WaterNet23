@@ -41,6 +41,7 @@ void lHandler();
 void uHandler();
 void dHandler();
 void jHandler();
+int LTEInputCommand(String cmd);
 #line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
@@ -68,10 +69,14 @@ void jHandler();
 #define CUSTOM_DATA_LEN         8
 #define MAX_FILENAME_LEN        30
 #define MAX_ERR_BUF_SIZE        15              //Buffer size for error-return string
+#define MAX_LTE_STATUSES        25
+
+//Timing Control
+
 #define XBEE_BLE_MAX_TIMEOUT    36
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
-#define MAX_LTE_STATUSES        25
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
+#define MTR_UPDATE_TIME         200             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
 
@@ -89,7 +94,7 @@ void jHandler();
 #define JOY_MIN             1
 
 //Development Parameters
-#define VERBOSE 1
+//#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -102,14 +107,6 @@ const BleUuid rxUuid("b4206912-dc4b-5743-c8b1-92d0e75182b0");
 const BleUuid txUuid("b4206913-dc4b-5743-c8b1-92d0e75182b0");
 const BleUuid offldUuid("b4206914-dc4b-5743-c8b1-92d0e75182b0");
 
-
-//const BleUuid RemoteService("b4206920-dc4b-5743-c8b1-92d0e75182b0");
-//const BleUuid rxUuid2("b4206922-dc4b-5743-c8b1-92d0e75182b0");
-//const BleUuid txUuid2("b4206923-dc4b-5743-c8b1-92d0e75182b0");
-
-//BleCharacteristic txCharacteristic("txr", BleCharacteristicProperty::NOTIFY, txUuid, RemoteService);
-//BleCharacteristic rxCharacteristic("rxr", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, RemoteService, BLEDataReceived, NULL);
-
 const size_t UART_TX_BUF_SIZE = 30;
 const size_t SCAN_RESULT_COUNT = 20;
 
@@ -121,7 +118,6 @@ BleCharacteristic peerOffloadCharacteristic;
 BlePeerDevice peer;
 
 //OLED Object
-//OledWingAdafruit oled;
 Adafruit_SH1107 oled = Adafruit_SH1107(64, 128, &Wire, OLED_RESET);
 
 //SD File system object
@@ -148,6 +144,7 @@ bool botPairRx;
 bool statusTimeout;
 int controlUpdateID;
 uint32_t controlUpdateTime;
+uint32_t rcTime;
 uint8_t errCmdMode;
 uint8_t errModeReply;
 char errCmdStr[3];
@@ -174,6 +171,8 @@ class WaterBot{
     bool BLEAvail;
     bool LTEAvail;
     bool XBeeAvail;
+    bool GPSAvail;
+    bool CompassAvail;
     uint8_t driveMode = 0;
     bool signal = false;
     bool lowBatt = false;
@@ -270,7 +269,9 @@ void startupPair(){
         oled.setCursor(0,16);
         oled.fillRect(72,16,35,15,0);
         oled.printlnf("Bots: %d",BLEPair.size());
-        Serial.printlnf("Array size: %d",BLEPair.size());
+        #ifdef VERBOSE
+            Serial.printlnf("Array size: %d",BLEPair.size());
+        #endif
         oled.drawCircle(115,7,loadAnim,SH110X_WHITE);
         if(loadAnim-1) oled.fillCircle(115,7,loadAnim-1,0);
         oled.display();
@@ -291,7 +292,6 @@ void startupPair(){
                 if(pb.rssi > minRSSI){
                     minRSSI = pb.rssi;
                     selectedBot = pb.botNum;
-                    Serial.println("Found a local bot");
                 }
                 
             }
@@ -353,6 +353,7 @@ void setup() {
 
     debounceTime = millis();
     controlUpdateTime = millis();
+    rcTime = millis();
     controlUpdateID = -1;
 
     Serial.begin(115200);
@@ -367,6 +368,7 @@ void setup() {
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
 
     Particle.subscribe("Bot1dat",dataLTEHandler);
+    Particle.function("Input Command", LTEInputCommand);
 
     offloadingMode = false;
     offloadingDone = false;
@@ -409,7 +411,9 @@ void setup() {
     delay(100);
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
+        #ifdef VERBOSE
         Serial.println("Error: could not connect to SD card!");
+        #endif
         logMessages = false;
     }
 
@@ -445,49 +449,38 @@ void loop() {
     }
     updateMenu();
     updateBotControl();
-    if(ControlledBot != nullptr) manualMotorControl(ControlledBot->botNum);
-
+    if((millis() - rcTime) > MTR_UPDATE_TIME){
+        manualMotorControl(botSelect);
+        rcTime = millis();
+    }
     if (BLE.connected()) {
-        //if(BLEBot) Serial.printlnf("Connected to Waterbot %d", BLEBot->botNum);
-        //char testStr[30] = "CCB1ptsHello from CC Hub!";
-        //uint8_t testBuf[30];
-        //memcpy(testStr,testBuf,30);
-        //peerRxCharacteristic.setValue(testStr);
-        //sendData("CCB1ptsbigbot",0,true,false,false);
-        for(WaterBot ws: WaterBots) Serial.printlnf("Temp: %0.6f",ws.temp);
-
-        //char sendStr[18];
-        //sprintf(sendStr,"CCB1mtr%03d%03d",(int)(analogRead(JOYV_ADC)/22.75)%1000,(int)(analogRead(JOYV_ADC)/22.75)%1000);
-        //Serial.printlnf("Motor Speed: %03d",(int)(analogRead(JOYV_ADC)/22.75));
-        //Serial.println(sendStr);
-        //sendData(sendStr,0,true,false,false);
-        //digitalWrite(D7,HIGH);
-        delay(250);
+        
     }
     else {
     	if (millis() - lastScan >= SCAN_PERIOD_MS) {
-    		// Time to scan
     		lastScan = millis();
     		BLEScan(-1);
     	}
 
     }
-    /*if(offloadingMode){
-        DataOffloader(ControlledBot->botNum);
-        ControlledBot->offloading = false;
-    }*/
+    for(WaterBot &wb: WaterBots){
+        if(wb.offloading){
+            DataOffloader(wb.botNum);
+            wb.offloading = false;
+        }
+    }
     XBeeHandler();
     RPiHandler();
     XBeeLTEPairSet();
 }
 
 void logMessage(const char *message){
-    /*if(!logFile.isOpen()){
+    if(!logFile.isOpen()){
         logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.println(message);
         logFile.close();
     }
-    else logFile.println(message);*/
+    else logFile.println(message);
 }
 
 void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
@@ -523,7 +516,9 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
             }
             else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
         }
+        #ifdef VERBOSE
         Serial.printlnf("Printed Highlighted Menu item with name: %s",MenuItems.at(id).itemName);
+        #endif
     }
     else{
         oled.fillRect(x,y,OLED_MAX_X - 40,16,0);
@@ -593,29 +588,29 @@ void updateMenu(){
             }
         }
         if(menuItem == 0){
-            Serial.println("Menu item 0");
+            //Serial.println("Menu item 0");
             if(MenuItems.size() != 0) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));
             uint8_t loopIter = MenuItems.size();
             if(loopIter > 2) loopIter = 2;
             for(int mi = 1; mi <= loopIter; mi++){
-                Serial.printlnf("Menu item %d", mi);
+                //Serial.printlnf("Menu item %d", mi);
                 printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
             }
         }
         else if(menuItem == MAX_MENU_ITEMS-1){
-            Serial.printlnf("Menu item %d", menuItem);
+            //Serial.printlnf("Menu item %d", menuItem);
             printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));
-            Serial.printlnf("Menu item %d", menuItem-1);
+            //Serial.printlnf("Menu item %d", menuItem-1);
             printMenuItem(menuItem-1,false,!selectingBots,0,32,WaterBots.at(menuSelect));
-            Serial.printlnf("Menu item %d", menuItem-2);
+            //Serial.printlnf("Menu item %d", menuItem-2);
             printMenuItem(menuItem-2,false,!selectingBots,0,16,WaterBots.at(menuSelect));
         }
         else{
-            Serial.printlnf("Menu item %d", menuItem+1);
+            //Serial.printlnf("Menu item %d", menuItem+1);
             printMenuItem(menuItem+1,false,!selectingBots,0,48,WaterBots.at(menuSelect));
-            Serial.printlnf("Menu item %d", menuItem);
+            //Serial.printlnf("Menu item %d", menuItem);
             printMenuItem(menuItem,true,!selectingBots,0,32,WaterBots.at(menuSelect));
-            Serial.printlnf("Menu item %d", menuItem-1);
+            //Serial.printlnf("Menu item %d", menuItem-1);
             printMenuItem(menuItem-1,false,!selectingBots,0,16,WaterBots.at(menuSelect));
         }
         oled.display();
@@ -634,7 +629,9 @@ void updateBotControl(){
                 wb.publishTime = millis();
                 char statusStr[42];
                 sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum, wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);
+                #ifdef VERBOSE
                 Serial.printlnf("Control Packet: %s",statusStr);
+                #endif
                 sendData(statusStr,0,true,true,statusTimeout);
             }
         }
@@ -692,7 +689,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         checkStr[1] = command[strlen(command)-1];
         checkStr[2] = '\0';
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        #ifdef VERBOSE
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        #endif
         for(uint8_t i = 4; i < strlen(command)-2;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
@@ -737,6 +736,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.XBeeAvail = (statflags >> 1) & 1;
                     w.BLEAvail = (statflags >> 2) & 1;
                     w.lowBatt = (statflags >> 6) & 1;
+                    w.GPSAvail = (statflags >> 8) & 1;
+                    w.CompassAvail = (statflags >> 9) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
                     if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){
@@ -843,19 +844,19 @@ void processRPiCommand(const char *command, uint8_t mode){
         checkStr[1] = command[strlen(command)-1];
         checkStr[2] = '\0';
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
-        //Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        Serial.printlnf("Checksum: %02x, %03d, Checkstr: %s",checksum,checksum,command);
         for(uint8_t i = 4; i < strlen(command)-2;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
         if(checksum != strlen(command)-2){
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
-            /*if(!logFile.isOpen()){
+            if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
                 logFile.close();
             }
-            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);*/
+            else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
             Serial.println("Warning, checksum does not match");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
@@ -977,30 +978,33 @@ void DataOffloader(uint8_t bot_id){
         Serial.println("Error, could not open root directory on SD Card. Is it inserted?");
         return;
     }
-    //while(OffloadingBot <= WaterBots.size()){
-        char OffloadCommand[10];
-        uint8_t OffloadBuf[10];
-        snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
-        //Particle.publish("CCHub", OffloadCommand, PRIVATE);
-        memcpy(OffloadBuf,OffloadCommand,10);
-        sendData(OffloadCommand,0,true,false,false);
-        Serial.printlnf("Requested SD Card Data from Bot %d Over BLE\n",BLEBot->botNum);
-        delay(1000);
-        if(BLEBot->botNum != OffloadingBot){
-            Serial.printlnf("Currently connected to Bot %f, need to connect to Bot %d",BLEBot->botNum,OffloadingBot);
-            BLE.disconnect();
-            while(!BLE.connected()){
-                BLEScan(OffloadingBot);
-                delay(50);
-            }
-            Serial.printlnf("Successfully connected to Bot %d", BLEBot->botNum);
+    uint32_t startScanTime = millis();
+    Serial.printlnf("Requested SD Card Data from Bot %d Over BLE\n",BLEBot->botNum);
+    if(BLEBot->botNum != OffloadingBot){
+        Serial.printlnf("Currently connected to Bot %s, need to connect to Bot %d",BLEBot->botNum,OffloadingBot);
+        BLE.disconnect();
+        while(!BLE.connected() && startScanTime - millis() < 15000){
+            BLEScan(OffloadingBot);
+            delay(50);
         }
-        Serial.printlnf("Starting file transfer from Bot %d",BLEBot->botNum);
-        offloadingDone = false;
-        while(!offloadingDone) delay(100);
-        Serial.printlnf("Finished transferring file from Bot %d",BLEBot->botNum);
-        OffloadingBot++;
-    //}
+        char OffloadCommand[10];
+        snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
+        sendData(OffloadCommand,0,true,false,false);
+        if(BLE.connected()) Serial.printlnf("Successfully connected to Bot %d", BLEBot->botNum);
+    }
+    else{
+        char OffloadCommand[10];
+        snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
+        sendData(OffloadCommand,0,true,false,false);
+    }
+    Serial.printlnf("Starting file transfer from Bot %d",BLEBot->botNum);
+    if(startScanTime - millis() > 15000){
+        if(logDir.isOpen()) logDir.close();
+        return;
+    }
+    offloadingDone = false;
+    while(!offloadingDone) delay(100);
+    Serial.printlnf("Finished transferring file from Bot %d",BLEBot->botNum);
     if(logDir.isOpen()) logDir.close();
     offloadingMode = false;
 }
@@ -1017,6 +1021,8 @@ void RPiStatusUpdate(){
             statusFlags |= wb.driveMode << 4;
             statusFlags |= wb.lowBatt << 6;
             statusFlags |= wb.dataRecording << 7;
+            statusFlags |= wb.GPSAvail << 8;
+            statusFlags |= wb.CompassAvail << 9;
             Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags);
         }
     }
@@ -1026,9 +1032,11 @@ void RPiHandler(){
     while(Serial.available()){
             String data = Serial.readStringUntil('\n');
             Serial.println(data);
-            char buffer[data.length()];
-            for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
-            if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+            char buffer[data.length() + 2];
+            data.toCharArray(buffer,data.length()+1);
+            buffer[data.length() + 1] = 0;
+            //if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+            //if(data.length() > 1 && data.charAt(data.length()-1) == '\n') buffer[data.length()-1] = 0;
             processRPiCommand(buffer,3);
             if(logMessages){
                 if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
@@ -1110,7 +1118,6 @@ void manualMotorControl(uint8_t commandedBot){
     else{
         if(HSet > 0){
             if(HSet > (0-VSet)){        // H = 90, V = 0 -> LS = 135, RS = 45, H = 90, V = -90 -> LS = 0; RS = 45
-                Serial.println("Hello World!!!!!!!");
                 LSpeed = (90 + HSet/2 + VSet*1.5 );
                 RSpeed = (90 - HSet/2);      
             }
@@ -1132,11 +1139,13 @@ void manualMotorControl(uint8_t commandedBot){
     }
     
     
-    
-    sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
-    Serial.println(mtrStr);
-    sendData(mtrStr,0,true,false, false);
-    delay(100);
+    for(WaterBot wb: WaterBots){
+        if(wb.driveMode == 0){
+            sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
+            Serial.println(mtrStr);
+            sendData(mtrStr,0,true,false, false);
+        }
+    }
 }
 
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
@@ -1196,7 +1205,9 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
     char outStr[strlen(dataOut)+2];
     sprintf(outStr,"%s%02x",dataOut,strlen(dataOut));
-    if(VERBOSE) Serial.println(outStr);
+    #ifdef VERBOSE
+    Serial.println(outStr);
+    #endif
     if(sendLTE || sendMode == 4){
         Particle.publish("Bot1dat", outStr, PRIVATE);
         sendLTE = false;
@@ -1414,4 +1425,16 @@ void jHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     Serial.println("Joystick trigger");
+}
+
+int LTEInputCommand(String cmd){
+    char cmdBuf[100];
+    cmd.toCharArray(cmdBuf, 100);
+    processCommand(cmdBuf, 4,false);
+    if(logMessages){
+        if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[INFO] Received LTE Message: %s",cmdBuf);
+        logFile.close();
+    }
+    return 1;
 }

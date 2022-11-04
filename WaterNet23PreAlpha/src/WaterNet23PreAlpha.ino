@@ -57,7 +57,6 @@
 
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
-#define MAX_ERR_BUF_SIZE    15              //Buffer size for error-return string
 
 #define PHADDR              99               //default I2C ID number for EZO pH Circuit.
 #define MCOND               100               //default I2C ID number for EZO Mini-Conductivity (0.1)
@@ -104,8 +103,6 @@
 #define MTR_CUTOFF_RAD      1.5         //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0           //Radius to keep motors off in sentry mode after reaching the cutoff radius
 
-#define REPL_NAK            false
-
 SYSTEM_MODE(MANUAL);
 
 //GPS Buffers and Objects
@@ -116,7 +113,7 @@ SFE_UBLOX_GNSS myGPS;
 Adafruit_LIS3MDL lis3mdl;
 
 //SD File system object
-SdFat sd((SPIClass*)&SPI);
+SdFat sd((SPIClass*)&SPI1);
 
 File myFile;
 File logFile;
@@ -152,10 +149,9 @@ uint8_t BLECustomData[CUSTOM_DATA_LEN];
 
 //Function prototypes
 void setupSPI();
-void setupLTE();
 void setupXBee();
 void setupGPS();
-bool getPositionData();
+void getPositionData();
 void sendResponseData();
 void timeInterval();
 void updateMotors();
@@ -197,8 +193,8 @@ bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
 uint16_t LTEStatusCount;
-uint8_t statusFlags;
-bool LTEAvail, XBeeAvail, BLEAvail;     //Flags for communicaton keep-alives/available
+uint16_t statusFlags;
+bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 bool signalLED;
@@ -208,7 +204,6 @@ uint32_t lastMtrTime, lastTelemTime;
 uint32_t lastStatusTime;
 float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
 //char txBuf[UART_TX_BUF_SIZE];
-char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t errModeReply;
 size_t txLen = 0;
 char filename[MAX_FILENAME_LEN];
@@ -241,33 +236,15 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             else logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
             Serial.println("Warning, checksum does not match");
-            if(REPL_NAK){
-                if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
-                    char rxBotNum[2];
-                    rxBotNum[0] = command[0];
-                    rxBotNum[1] = command[1];
-                    sprintf(errBuf,"B%d%2snak%3s",BOTNUM,rxBotNum,cmdStr);
-                }
-                else{
-                    sprintf(errBuf,"B%dABnak%3s",BOTNUM,cmdStr);
-                }
-                errModeReply = mode;
-            }
-            return;
-        }
-        if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
-            if(mode == 2){  //Acknowledge from XBee
-
-            }
-            else if(mode == 1){ //Acknowledge from BLE
-                
-            }
             return;
         }
         if(!strcmp(cmdStr,"ctl")){
-            char tLat[8];
-            char tLon[8];
-            sscanf(dataStr,"%s %s %d %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal 
+            char tLat[10];
+            char tLon[10];
+            sscanf(dataStr,"%s %s %d %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal
+            targetLat = atof(tLat);
+            targetLon = atof(tLon);
+            Serial.printlnf("New target GPS, Lat: %f Lon: %f", targetLat, targetLon);
         }
         if(!strcmp(cmdStr,"mtr")){  //Motor Speed Control
             char lSpd[3] = {dataStr[0],dataStr[1],dataStr[2]};
@@ -303,14 +280,18 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         else if(!strcmp(cmdStr,"hwa")){
             waitForConnection = false;
         }
-        else if(!strcmp(cmdStr,"aut")){  //Enter autonomous mode
-            
-        }
         else if(!strcmp(cmdStr,"dmp")){  //Enter SD Card "Dump Mode"
             offloadMode = true;
             status.setPattern(LED_PATTERN_BLINK);
             status.setColor(RGB_COLOR_BLUE);
             status.setSpeed(LED_SPEED_FAST);
+        }
+        else if(!strcmp(cmdStr,"egp")){ //Emulated GPS point
+            char tLat[10];
+            char tLon[10];
+            sscanf(dataStr,"%s %s",tLat,tLon);
+            latitude = atof(tLat);
+            longitude = atof(tLon);
         }
     }
 }
@@ -327,7 +308,6 @@ void cmdLTEHandler(const char *event, const char *data){
 void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
     status.setActive(true);
-
     
     pinMode(SENSE_EN, OUTPUT);
     pinMode(PWR_EN, OUTPUT);
@@ -348,12 +328,17 @@ void setup(){
     BLE.setTxPower(8);          //Max transmitting power
     
     //Log.info("Hello from WaterNet23!");
-    Serial.begin();
+    Serial.begin(115200);
     Serial1.begin(9600);                        //Start serial for XBee module
     setupSPI();                                 //Setup SPI for BeagleBone
     setupXBee();                                //Setup XBee module
     setupGPS();                                 //Setup GPS module
-    setupLTE();                                 //Initialize LTE Flags
+    
+    Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
+    Particle.function("Input Command", LTEInputCommand);
+    LTEAvail = false;
+    GPSAvail = false;
+    CompassAvail = false;
 
     lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();
     XBeeRxTime = 0;
@@ -449,13 +434,7 @@ void setup(){
 }
 
 void loop(){
-    //Serial.println();
-    if(getPositionData()){
-        char latLonBuf[UART_TX_BUF_SIZE];
-        //sprintf(latLonBuf, "GPS Data: Lat:%0.6f Lon:%0.6f\n", latitude, longitude);
-        //Serial.println(latLonBuf);
-        //sendData(latLonBuf, 0, true, true, false);
-    }
+    getPositionData();
     readPowerSys();
     //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
@@ -463,10 +442,6 @@ void loop(){
     statusUpdate();
     updateMotors();
     if(offloadMode) dataOffloader();
-    if(errModeReply && REPL_NAK){
-        sendData(errBuf,errModeReply,false,false,false);
-        errModeReply = 0;
-    }
     //sendData("B1CCptsbigbot",0,false,true,false);
     sendResponseData();
     delay(500);
@@ -482,11 +457,7 @@ void loop(){
   //for sentence cracking
 //  nmea.process(incoming);
 //}
-//Initialization for LTE events and flags
-void setupLTE(){
-    Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
-    LTEAvail = false;
-}
+
 
 void setupSPI(){
     SPI.begin(SPI_MODE_MASTER);
@@ -615,37 +586,30 @@ float calcDelta(float compassHead, float targetHead){
     }
 }
 
-bool getPositionData(){
+void getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
-
-  //if(nmea.isValid() == true){
-    //if(myGPS.isConnected()){
-        targetLat = 35.769889;
-        targetLon = -78.673824;
-        latitude = 35.771801;
-        longitude = -78.674378;
-        //latitude = ((float)myGPS.getLatitude())/1000000.0;
-        //longitude = ((float)myGPS.getLongitude())/1000000.0;
+        
+        if(myGPS.isConnected()){
+            latitude = ((float)myGPS.getLatitude())/1000000.0;
+            longitude = ((float)myGPS.getLongitude())/1000000.0;
+            GPSAvail = true;
+        }
+        else GPSAvail = false;
         lis3mdl.read();      // get X Y and Z data at once
         sensors_event_t event;
-        bool compassAvail = lis3mdl.getEvent(&event);
-        if(compassAvail) compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
+        bool CompassAvail = lis3mdl.getEvent(&event);
+        if(CompassAvail) compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);
             travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);
             targetDelta = calcDelta(compassHeading, travelHeading);
             lastTelemTime = millis();
-            if(compassAvail) telemetryAvail = true;
-            char tempbuf[100];
-            sprintf(tempbuf,"Raw : %f, Compass : %f, Travel hd: %f, T Delta: %f", atan2(event.magnetic.y, event.magnetic.x) * 180.0 / M_PI, compassHeading, travelHeading, targetDelta);
-            printBLE(tempbuf);
-            //Serial.println(tempbuf);
+            if(CompassAvail) telemetryAvail = true;
+            char tempbuf[200];
+            sprintf(tempbuf,"Lat: %f Lon %f TLat: %f TLon: %f, Compass: %f, Travel hd: %f, T Delta: %f, Dist: %f", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance);
+            //printBLE(tempbuf);
+            Serial.println(tempbuf);
         }        
-        return true;
-    //}
-    return false;
-  //}
-    
 }
 
 //Function to check if response data to a request needs to be sent out
@@ -737,7 +701,7 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD;
             else rightMotorSpeed = setRSpeed;
         }
-        Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
+        //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         ESCL.write(leftMotorSpeed);
         ESCR.write(180-rightMotorSpeed);
         updateMotorControl = false;        
@@ -778,6 +742,8 @@ void StatusHandler(){
     statusFlags |= driveMode << 4;
     statusFlags |= lowBattery << 6;
     statusFlags |= logSensors << 7;
+    statusFlags |= GPSAvail << 8;
+    statusFlags |= CompassAvail << 9;
     statusReady = true;
     Serial.println("Sending a status update!");
 }
@@ -957,6 +923,7 @@ void wdogHandler(){
 
 void dataOffloader(){
     Serial.println("Entering Data Offloader Mode");
+    myFile.close();
     if (!logDir.open("/")) {
         offloadMode = false;
         Serial.println("Error, could not open root SD card directory");
@@ -1018,17 +985,17 @@ void LEDHandler(){
     LEDPattern SetPattern;
     LEDSpeed SetSpeed;
     uint8_t statusMode;
-    if(signalLED){
-        status.setPattern(LED_PATTERN_BLINK);
-        status.setColor(RGB_COLOR_ORANGE);
-        status.setSpeed(LED_SPEED_FAST);
-        return;
-    }
     if(offloadMode){
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_BLUE);
         status.setSpeed(LED_SPEED_FAST);
         return;                
+    }
+    if(signalLED){
+        status.setPattern(LED_PATTERN_BLINK);
+        status.setColor(RGB_COLOR_ORANGE);
+        status.setSpeed(LED_SPEED_FAST);
+        return;
     }
     if(lowBattery){
         SetPattern = LED_PATTERN_BLINK;
@@ -1083,4 +1050,16 @@ void LEDHandler(){
     status.setPattern(SetPattern);
     status.setColor(SetColor);
     status.setSpeed(SetSpeed);    
+}
+
+int LTEInputCommand(String cmd){
+    char cmdBuf[100];
+    cmd.toCharArray(cmdBuf, 100);
+    processCommand(cmdBuf, 4,false);
+    if(logMessages){
+        if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[INFO] Received LTE Message: %s",cmdBuf);
+        logFile.close();
+    }
+    return 1;
 }
