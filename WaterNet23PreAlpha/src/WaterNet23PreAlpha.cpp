@@ -56,9 +56,15 @@ int LTEInputCommand(String cmd);
 #define chipSelect          D8          //Chip select pin for Micro SD Card
 #define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
 #define SOL_ISENSE          A2          //Shunt monitor ADC input for solar array input current
+#ifdef A6
 #define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
+#endif
+#ifdef D22
 #define PWR_EN              D22         
+#endif
+#ifdef D23
 #define LEAK_DET            D23
+#endif
 
 /////////////////////////
 // Compass Calibration //
@@ -124,6 +130,7 @@ int LTEInputCommand(String cmd);
 #define MTR_TRAVEL_SPD      0.5         //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5         //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0           //Radius to keep motors off in sentry mode after reaching the cutoff radius
+#define POS_POLL_TIME       500         //Rate to poll the GPS and Compass and calculate the position heading
 
 SYSTEM_MODE(MANUAL);
 
@@ -220,7 +227,7 @@ bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail;     //Flags for comm
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 bool signalLED;
-uint32_t senseTimer, dataTimer;
+uint32_t senseTimer, dataTimer, positionTimer;
 uint32_t XBeeRxTime, BLERxTime;
 uint32_t lastMtrTime, lastTelemTime;
 uint32_t lastStatusTime;
@@ -332,10 +339,14 @@ void setup(){
     status.setActive(true);
     
     pinMode(SENSE_EN, OUTPUT);
-    pinMode(PWR_EN, OUTPUT);
-    pinMode(LEAK_DET, INPUT);
+    #ifdef PWR_EN
+        pinMode(PWR_EN, OUTPUT);
+        digitalWrite(PWR_EN,LOW);
+    #endif
+    #ifdef LEAK_DET
+        pinMode(LEAK_DET, INPUT);
+    #endif
     digitalWrite(SENSE_EN,LOW);
-    digitalWrite(PWR_EN,LOW);
 
     uint32_t mtrArmTime = millis();
     leftMotorSpeed = setLSpeed = 90;
@@ -362,7 +373,7 @@ void setup(){
     GPSAvail = false;
     CompassAvail = false;
 
-    lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();
+    positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();
     XBeeRxTime = 0;
     BLERxTime = 0;
     dataWait = false;
@@ -458,15 +469,12 @@ void setup(){
 void loop(){
     getPositionData();
     readPowerSys();
-    //Serial.printlnf("Battery %: %d Voltage: %0.3fV, Battery Current: %0.4fA, Solar Current: %0.4fA",battPercent, battVoltage, battCurrent, solarCurrent);
     sensorHandler();
     XBeeHandler();
     statusUpdate();
     updateMotors();
     if(offloadMode) dataOffloader();
-    //sendData("B1CCptsbigbot",0,false,true,false);
     sendResponseData();
-    delay(500);
 }
 
 
@@ -506,7 +514,9 @@ void setupGPS(){
 }
 
 uint8_t readPowerSys(){
-    battVoltage = (float) analogRead(BATT_VSENSE) * VDIV_MULT;
+    #ifdef BATT_VSENSE
+        battVoltage = (float) analogRead(BATT_VSENSE) * VDIV_MULT;
+    #endif
     int rawPCT = (int)(100 * (battVoltage - BAT_MIN)/(BAT_MAX - BAT_MIN));
     if(rawPCT < 0) rawPCT = 0;
     if(rawPCT > 100) rawPCT = 100;
@@ -610,7 +620,9 @@ float calcDelta(float compassHead, float targetHead){
 
 void getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
-        
+    if(millis() - positionTimer > POS_POLL_TIME){
+        positionTimer = millis();
+        updateMotorControl = true;
         if(myGPS.isConnected()){
             latitude = ((float)myGPS.getLatitude())/1000000.0;
             longitude = ((float)myGPS.getLongitude())/1000000.0;
@@ -632,6 +644,7 @@ void getPositionData(){
             //printBLE(tempbuf);
             Serial.println(tempbuf);
         }        
+    }
 }
 
 //Function to check if response data to a request needs to be sent out
@@ -660,13 +673,12 @@ void statusUpdate(){
         }
         if(LTEStatusCount) LTEStatusCount--;
         statusReady = false;
-        delay(100);
-        sendData("B1CCptsbigbot",0,true,false,false);
+        //sendData("B1CCptsbigbot",0,true,false,false);
     }
 }
 
 void updateMotors(){
-    //if(updateMotorControl){
+    if(updateMotorControl){
         if(driveMode == 1 || driveMode == 2){       //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
             if(travelDistance < MTR_CUTOFF_RAD){
                 pointArrived = true;
@@ -727,7 +739,7 @@ void updateMotors(){
         ESCL.write(leftMotorSpeed);
         ESCR.write(180-rightMotorSpeed);
         updateMotorControl = false;        
-    //}
+    }
 }
 
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){

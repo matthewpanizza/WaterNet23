@@ -76,7 +76,7 @@ int LTEInputCommand(String cmd);
 #define XBEE_BLE_MAX_TIMEOUT    36
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
-#define MTR_UPDATE_TIME         200             //Frequency to send manual motor control packet in milliseconds
+#define MTR_UPDATE_TIME         500             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
 
@@ -94,7 +94,7 @@ int LTEInputCommand(String cmd);
 #define JOY_MIN             1
 
 //Development Parameters
-//#define VERBOSE
+#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -1140,9 +1140,8 @@ void manualMotorControl(uint8_t commandedBot){
     
     
     for(WaterBot wb: WaterBots){
-        if(wb.driveMode == 0){
+        if(wb.driveMode == 0 && wb.botNum == botSelect){
             sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
-            Serial.println(mtrStr);
             sendData(mtrStr,0,true,false, false);
         }
     }
