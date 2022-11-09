@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -29,7 +29,7 @@ void motionHandler();
 void wdogHandler();
 void LEDHandler();
 int LTEInputCommand(String cmd);
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -642,7 +642,7 @@ void getPositionData(){
             char tempbuf[200];
             sprintf(tempbuf,"Lat: %f Lon %f TLat: %f TLon: %f, Compass: %f, Travel hd: %f, T Delta: %f, Dist: %f", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance);
             //printBLE(tempbuf);
-            Serial.println(tempbuf);
+            //Serial.println(tempbuf);
         }        
     }
 }

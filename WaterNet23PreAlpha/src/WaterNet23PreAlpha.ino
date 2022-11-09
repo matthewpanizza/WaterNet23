@@ -620,7 +620,7 @@ void getPositionData(){
             char tempbuf[200];
             sprintf(tempbuf,"Lat: %f Lon %f TLat: %f TLon: %f, Compass: %f, Travel hd: %f, T Delta: %f, Dist: %f", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance);
             //printBLE(tempbuf);
-            Serial.println(tempbuf);
+            //Serial.println(tempbuf);
         }        
     }
 }
