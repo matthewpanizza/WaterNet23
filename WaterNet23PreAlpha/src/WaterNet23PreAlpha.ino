@@ -195,13 +195,13 @@ bool pointArrived;
 uint8_t battPercent;
 float battVoltage, battCurrent, solarCurrent;
 bool updateMotorControl;
-uint8_t driveMode = 1;
+uint8_t driveMode = 0;
 bool lowBattery;
 bool statusReady;
 uint8_t requestActive;
 uint16_t LTEStatusCount;
 uint16_t statusFlags;
-bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail;     //Flags for communicaton keep-alives/available
+bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail, SDAvail;     //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 bool signalLED;
@@ -209,7 +209,7 @@ uint32_t senseTimer, dataTimer, positionTimer;
 uint32_t XBeeRxTime, BLERxTime;
 uint32_t lastMtrTime, lastTelemTime;
 uint32_t lastStatusTime;
-float sensePH, senseTemp, senseCond, senseMiniCond, senseDO;
+float sensePH, senseTemp, senseCond, senseMCond, senseDO;
 //char txBuf[UART_TX_BUF_SIZE];
 uint8_t errModeReply;
 size_t txLen = 0;
@@ -348,8 +348,7 @@ void setup(){
     Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
     Particle.function("Input Command", LTEInputCommand);
     LTEAvail = false;
-    GPSAvail = false;
-    CompassAvail = false;
+    SDAvail = true;
 
     positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();
     XBeeRxTime = 0;
@@ -381,7 +380,9 @@ void setup(){
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
+    CompassAvail = true;
     if (! lis3mdl.begin_I2C()) {          // hardware I2C mode, can pass in address & alt Wire
+        CompassAvail = false;
         Serial.println("Failed to find LIS3MDL chip");
     }
     else Serial.println("LIS3MDL Found!");
@@ -415,9 +416,10 @@ void setup(){
         Serial.println("Error: could not connect to SD card!");
         logSensors = false;
         logMessages = false;
+        SDAvail = false;
     }
     if(logSensors){
-        if(!myFile.isOpen()) myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+        myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
         myFile.println(FILE_LABELS);
         myFile.close();
     }
@@ -453,6 +455,8 @@ void loop(){
     updateMotors();
     if(offloadMode) dataOffloader();
     sendResponseData();
+    delay(10);
+    //Serial.printlnf("Hello World, %d", millis());
 }
 
 
@@ -482,8 +486,9 @@ void setupXBee(){
 
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
+    GPSAvail = true;
     if(myGPS.begin() == false){
-        delay(1000);
+        GPSAvail = false;
         Serial.println("Error, Could not initialize GPS");
     }
     myGPS.setI2COutput(COM_TYPE_UBX);
@@ -630,7 +635,7 @@ void sendResponseData(){
     if(requestActive){
         char responseStr[65];
         memset(responseStr,0,65);
-        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMiniCond*1000),(int)(senseTemp*1000));
+        sprintf(responseStr,"B%dCCsns%0.6f %0.6f %d %d %d %d %d ",BOTNUM,latitude,longitude,(int)(senseDO*1000),(int)(sensePH*1000),(int)(senseCond*1000),(int)(senseMCond*1000),(int)(senseTemp*1000));
         sendData(responseStr,requestActive,false,false,false);
         requestActive = 0;
     }
@@ -638,10 +643,9 @@ void sendResponseData(){
 
 void statusUpdate(){
     if(statusReady){
-        char updateStr[28];
-        sprintf(updateStr,"B%dABsup%d %d %.6f %.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);
-        Serial.println(updateStr);
-        Serial.println(LTEStatusCount);
+        Serial.println("Sending a status update!");
+        char updateStr[40];
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
             sendData(updateStr,0,false,false,true);
         }
@@ -756,60 +760,69 @@ void StatusHandler(){
     statusFlags |= logSensors << 7;
     statusFlags |= GPSAvail << 8;
     statusFlags |= CompassAvail << 9;
+    statusFlags |= SDAvail << 10;
     statusReady = true;
-    Serial.println("Sending a status update!");
+    //Serial.println("Sending a status update!");
 }
 
 void sensorHandler(){
-    
     if(dataTimer < millis() && dataWait){
-        Wire.requestFrom(PHADDR, 20, 1);
-        byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
-        char tempSense[20];
-        int c = 0;
-        while(Wire.available()){   // slave may send less than requested
-            tempSense[c++] = Wire.read();
+        if(Wire.requestFrom(PHADDR, 20, 1)){
+            byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
+            char tempSense[20];
+            int c = 0;
+            while(Wire.available()){   // slave may send less than requested
+                tempSense[c++] = Wire.read();
 
+            }
+            sensePH = atof(tempSense);
         }
-        sensePH = atof(tempSense);
         //Serial.printlnf("pH: %f", sensePH);
-        Wire.requestFrom(MCOND, 20, 1);
-        code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
-        char mcondSense[20];
-        c = 0;
-        while(Wire.available()){   // slave may send less than requested
-            mcondSense[c++] = Wire.read();
+        if(Wire.requestFrom(MCOND, 20, 1)){
+            byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
+            char mcondSense[20];
+            int c = 0;
+            while(Wire.available()){   // slave may send less than requested
+                mcondSense[c++] = Wire.read();
 
+            }
+            senseMCond = atof(mcondSense);
         }
-        float senseMCond = atof(mcondSense);
         //Serial.printlnf("MiniCond: %f",senseMCond);
-        Wire.requestFrom(COND, 20, 1);
-        code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
-        char condSense[20];
-        c = 0;
-        while(Wire.available()){   // slave may send less than requested
-            condSense[c++] = Wire.read();
+        if(Wire.requestFrom(COND, 20, 1)){
+            byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
+            char condSense[20];
+            int c = 0;
+            while(Wire.available()){   // slave may send less than requested
+                condSense[c++] = Wire.read();
 
+            }
+            senseCond = atof(condSense);
         }
-        float senseCond = atof(condSense);
         //Serial.printlnf("Conductivity: %f",senseCond);
-        Wire.requestFrom(TEMPADDR, 20, 1);
-        code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
-        char addrSense[20];
-        c = 0;
-        while(Wire.available()){   // slave may send less than requested
-            addrSense[c++] = Wire.read();
+        if(Wire.requestFrom(TEMPADDR, 20, 1)){
+            byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
+            char addrSense[20];
+            int c = 0;
+            while(Wire.available()){   // slave may send less than requested
+                addrSense[c++] = Wire.read();
 
+            }
+            senseTemp = atof(addrSense);
         }
-        float senseTemp = atof(addrSense);
         //Serial.printlnf("Temperature: %f",senseTemp);
         dataWait = false;
         if(logSensors){
-            char timestamp[16];
+            char timestamp[18];
             snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
-            if(!myFile.isOpen()) myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-            myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMiniCond,senseCond);
-            myFile.close();
+            if(!myFile.isOpen()){
+                myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+                myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
+                myFile.close();
+            } 
+            else{
+                myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
+            }
         }
     }
     if(senseTimer < millis()){
@@ -837,9 +850,9 @@ void XBeeHandler(){
         char buffer[data.length()];
         for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
         if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
-        processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
+        processCommand(buffer,2,true);
         if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis();
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);

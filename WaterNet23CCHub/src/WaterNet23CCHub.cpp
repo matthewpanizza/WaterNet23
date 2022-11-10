@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -42,7 +42,7 @@ void uHandler();
 void dHandler();
 void jHandler();
 int LTEInputCommand(String cmd);
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -173,10 +173,13 @@ class WaterBot{
     bool XBeeAvail;
     bool GPSAvail;
     bool CompassAvail;
+    bool SDAvail;
     uint8_t driveMode = 0;
     bool signal = false;
     bool lowBatt = false;
     bool warnedLowBatt = false;
+    bool warnedSDCard = false;
+    bool warnedTelem = false;
     bool dataRecording = true;
     bool offloading = false;
     float TargetLat = -999.0;
@@ -723,7 +726,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             for(WaterBot &w: WaterBots){
                 if(rxBotID == w.botNum){
                     uint8_t battpct;
-                    uint8_t statflags;
+                    uint16_t statflags;
                     float latRX;
                     float lonRX;
                     char testLat[12];
@@ -738,6 +741,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.lowBatt = (statflags >> 6) & 1;
                     w.GPSAvail = (statflags >> 8) & 1;
                     w.CompassAvail = (statflags >> 9) & 1;
+                    w.SDAvail = (statflags >> 10) & 1;
                     w.GPSLat = latRX;
                     w.GPSLon = lonRX;
                     if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){
@@ -757,6 +761,31 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                         PopUps.push_back(m);
                         redrawMenu = true;
                         
+                    }
+                    if(!w.SDAvail && !w.warnedSDCard){
+                        w.warnedSDCard = true;
+                        MenuPopUp m;
+                        sprintf(m.primaryLine,"Warning\0");
+                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
+                        sprintf(m.tertiaryLine, "SD Card Failed\0");
+                        m.primaryStart = 20;
+                        m.secondaryStart = 40;
+                        m.tertiaryStart = 20;
+                        PopUps.push_back(m);
+                        redrawMenu = true;
+                        
+                    }
+                    if((!w.CompassAvail || !w.GPSAvail) && !w.warnedTelem){
+                        MenuPopUp m;
+                        w.warnedTelem = true;
+                        sprintf(m.primaryLine,"Warning\0");
+                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
+                        sprintf(m.tertiaryLine, "GPS/Compass Error\0");
+                        m.primaryStart = 20;
+                        m.secondaryStart = 40;
+                        m.tertiaryStart = 10;
+                        PopUps.push_back(m);
+                        redrawMenu = true;
                     }
                     if(botSelect = w.botNum) redrawMenu = true;
                     logMessage("Status Update!");
@@ -1023,6 +1052,7 @@ void RPiStatusUpdate(){
             statusFlags |= wb.dataRecording << 7;
             statusFlags |= wb.GPSAvail << 8;
             statusFlags |= wb.CompassAvail << 9;
+            statusFlags |= wb.SDAvail << 10;
             Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags);
         }
     }
@@ -1052,9 +1082,9 @@ void XBeeHandler(){
         char buffer[data.length()];
         for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
         if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
-        processCommand(buffer,2,true);
         Serial.println("New XBee Command:");
         Serial.println(data); 
+        processCommand(buffer,2,true);
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[INFO] Received XBee Message: %s",data);
@@ -1258,6 +1288,7 @@ void WaterBotSim(uint8_t count){
         simBot.BLEAvail = false;
         simBot.XBeeAvail = true;
         simBot.LTEAvail = false;
+        simBot.SDAvail = true;
         simBot.battPercent = random(100);
         WaterBots.push_back(simBot);
     }
