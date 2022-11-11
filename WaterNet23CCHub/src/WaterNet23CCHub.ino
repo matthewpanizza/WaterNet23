@@ -26,6 +26,7 @@
 #define D_DPAD                  D7              //Down DPAD button
 #define E_DPAD                  D22              //"Enter" DPAD button
 #define chipSelect              D8              //SD Card chip select pin
+#define STOP_BTN                A7              //Stop button to disable all bot motors
 
 //Program Parameters
 
@@ -43,6 +44,7 @@
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 #define MTR_UPDATE_TIME         500             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000
+#define STOP_PUB_TIME           5000            //Time between sending stop messages when active
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
 
 //Menu Parameters
@@ -108,6 +110,8 @@ bool meshPair;
 bool botPairRx;
 bool statusTimeout;
 int controlUpdateID;
+bool LTEStopSent;
+uint32_t stopTime;
 uint32_t controlUpdateTime;
 uint32_t rcTime;
 uint8_t errCmdMode;
@@ -116,6 +120,7 @@ char errCmdStr[3];
 char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t LTEStatuses;
+bool stopActive;
 
 //Menu variables
 uint8_t botSelect = 0;
@@ -311,6 +316,7 @@ void setup() {
     pinMode(L_DPAD,INPUT_PULLDOWN);
     pinMode(R_DPAD,INPUT_PULLDOWN);
     pinMode(JOY_BTN,INPUT_PULLDOWN);
+    pinMode(STOP_BTN, INPUT_PULLDOWN);
     
     attachInterrupt(E_DPAD,entHandler,RISING);
     attachInterrupt(U_DPAD,uHandler,RISING);
@@ -318,6 +324,7 @@ void setup() {
     attachInterrupt(L_DPAD,lHandler,RISING);
     attachInterrupt(R_DPAD,rHandler,RISING);
     attachInterrupt(JOY_BTN,jHandler,RISING);
+    attachInterrupt(STOP_BTN,sHandler,RISING);
 
     debounceTime = millis();
     controlUpdateTime = millis();
@@ -344,6 +351,10 @@ void setup() {
     logMessages = true;
     postStatus = false;
     statusTimeout = false;
+    stopActive = false;
+    LTEStopSent = false;
+    
+    stopTime = 0;
 
     char timestamp[16];
     snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
@@ -355,20 +366,10 @@ void setup() {
 
     delay(250);
 
-    //oled.setup(); 
     oled.begin(i2c_Address, true); // Address 0x3C default
     oled.clearDisplay();
     oled.display();
     oled.setRotation(1);
-
-    /*BleAdvertisingData advData;                 //Advertising data
-    BLE.addCharacteristic(txCharacteristic);    //Add BLE Characteristics for BLE serial
-    BLE.addCharacteristic(rxCharacteristic);
-    advData.appendServiceUUID(RemoteService); // Add the app service
-    advData.appendLocalName("RemoteTest");           //Local advertising name
-    BLE.advertise(&advData);                    //Start advertising the characteristics*/
-
-    
     
     oled.setTextSize(2);
     oled.setTextColor(SH110X_WHITE);
@@ -392,7 +393,6 @@ void setup() {
     m.primaryStart = 32;
     m.secondaryStart = 12;
     m.tertiaryStart = 10;
-    //delay(10000);
     PopUps.push_back(m);
     
     //startupPair();
@@ -408,10 +408,7 @@ void setup() {
 
 void loop() {
     if(postStatus){
-        char statusStr[30];
-        if(ControlledBot != NULL) sprintf(statusStr,"CCABspcB%1d",ControlledBot->botNum);
-        else sprintf(statusStr,"CCABspcNB");
-        sendData(statusStr,0,true,true,statusTimeout);                                  
+        sendData("CCABspc",0,true,true,statusTimeout);                                  
         postStatus = false;
         statusTimeout = false;
     }
@@ -440,6 +437,13 @@ void loop() {
     XBeeHandler();
     RPiHandler();
     XBeeLTEPairSet();
+    if(stopActive){
+        if(millis() - stopTime > STOP_PUB_TIME){
+            stopTime = millis();
+            sendData("CCABstp",0,true,true,!LTEStopSent);
+            LTEStopSent = true;
+        }
+    }
 }
 
 void logMessage(const char *message){
@@ -626,7 +630,6 @@ void updateBotControl(){
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
-        
         char rxIDBuf[1];
         rxIDBuf[0] = command[1];
         uint8_t rxBotID = atoi(rxIDBuf);
@@ -665,25 +668,17 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             else dataStr[i-7] = command[i];
         }
         if(checksum != strlen(command)-2){
+            #ifdef VERBOSE
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
-            logMessage("[WARN] Warning, checksum does not match!");
             Serial.println("Warning, checksum does not match");
+            #endif
+            logMessage("[WARN] Warning, checksum does not match!");
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
                 rxBotNum[0] = command[0];
                 rxBotNum[1] = command[1];
                 sprintf(errBuf,"CC%2snak%3s",rxBotNum,cmdStr);
                 errModeReply = mode;
-            }
-            
-            return;
-        }
-        if(!strcmp(cmdStr,"ack")){  //Acknowledgement for XBee and BLE
-            if(mode == 1){  //Acknowledge from XBee
-
-            }
-            else if(mode == 2){ //Acknowledge from BLE
-                
             }
             return;
         }
@@ -809,19 +804,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             }
             else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
         }
-        else{   //Didn't recognize command (may be corrupted?) send back error signal
-            if(mode == 1){
-
-            }
-            if(mode == 2){
-
-            }
-        }
-
-        if(sendAck){    //Transmit out acknowledgement if needed
-
-        }
-
     }
 }
 
@@ -1133,11 +1115,12 @@ void manualMotorControl(uint8_t commandedBot){
         }
     }
     
-    
-    for(WaterBot wb: WaterBots){
-        if(wb.driveMode == 0 && wb.botNum == botSelect){
-            sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
-            sendData(mtrStr,0,true,false, false);
+    if(!stopActive){
+        for(WaterBot wb: WaterBots){
+            if(wb.driveMode == 0 && wb.botNum == botSelect){
+                sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
+                sendData(mtrStr,0,true,false, false);
+            }
         }
     }
 }
@@ -1420,6 +1403,36 @@ void jHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
     Serial.println("Joystick trigger");
+}
+
+void sHandler(){
+    if(millis()-debounceTime < DEBOUNCE_MS) return;
+    debounceTime = millis();
+    if(stopActive){
+        MenuPopUp m;
+        sprintf(m.primaryLine,"CLEARED\0");
+        sprintf(m.secondaryLine,"Motors Resuming");
+        sprintf(m.tertiaryLine, "Press again to stop");
+        m.primaryStart = 20;
+        m.secondaryStart = 20;
+        m.tertiaryStart = 7;
+        PopUps.push_back(m);
+        redrawMenu = true;
+        stopActive = false;
+        LTEStopSent = false;
+    }
+    else{
+        MenuPopUp m;
+        sprintf(m.primaryLine,"STOPPED\0");
+        sprintf(m.secondaryLine,"Motors Stopped!");
+        sprintf(m.tertiaryLine, "Press again to start");
+        m.primaryStart = 20;
+        m.secondaryStart = 20;
+        m.tertiaryStart = 5;
+        PopUps.push_back(m);
+        redrawMenu = true;
+        stopActive = true;
+    }
 }
 
 int LTEInputCommand(String cmd){

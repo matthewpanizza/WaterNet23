@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -27,9 +27,11 @@ void testConnection(bool checkBLE, bool checkXBee, bool checkLTE);
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void motionHandler();
 void wdogHandler();
+void buttonTimer();
+void buttonHandler();
 void LEDHandler();
 int LTEInputCommand(String cmd);
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -56,6 +58,7 @@ int LTEInputCommand(String cmd);
 #define chipSelect          D8          //Chip select pin for Micro SD Card
 #define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
 #define SOL_ISENSE          A2          //Shunt monitor ADC input for solar array input current
+#define PWR_BUT             A1
 #ifdef A6
 #define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
 #endif
@@ -86,13 +89,15 @@ int LTEInputCommand(String cmd);
 #define UART_TX_BUF_SIZE    30
 #define SCAN_RESULT_COUNT   20
 
-#define PHADDR              99               //default I2C ID number for EZO pH Circuit.
-#define MCOND               100               //default I2C ID number for EZO Mini-Conductivity (0.1)
-#define COND                101               //default I2C ID number for EZO pH Circuit. (1.0)
-#define TEMPADDR            102
+#define PHADDR              99              //default I2C ID number for EZO pH Circuit.
+#define MCOND               100             //default I2C ID number for EZO Mini-Conductivity (0.1)
+#define COND                101             //default I2C ID number for EZO Conductivity Circuit. (1.0)
+#define TEMPADDR            102             //Default I2C address for temperature sensor
+#define DOADDR              97              //Default I2C address for Dissolved Oxygen sensor
 #define SENS_POLL_RT        2500
 #define SENS_DATA_DLY       825
 
+#define SHUTDOWN_HOLD       3000
 #define WATCHDOG_PD         15000           //Watchdog timer period in milliseconds
 #define STATUS_PD           15000            //Time between status updates published to CC Hub
 #define XBEE_WDOG_AVAIL     30000           //Watchdog interval between XBee messages for availablility check
@@ -111,7 +116,7 @@ int LTEInputCommand(String cmd);
 // Power System Macros //
 /////////////////////////
 
-#define BAT_MIN             13.2            //Voltage to read 0% battery
+#define BAT_MIN             10.2            //Voltage to read 0% battery
 #define BAT_MAX             16.4            //Voltage to read 100% battery
 #define LOW_BATT_PCT        20            //Voltage to set low battery flag
 #define VDIV_MULT           0.004835        //Calculate the ratio for ADC to voltage conversion 3.3V in on ADC = 4095 3.3V on 100kOhm + 20kOhm divider yields (3.3/20000)*120000 = 19.8V in MAX
@@ -196,6 +201,7 @@ Timer watchdog(WATCHDOG_PD, wdogHandler);   //Create timer object for watchdog
 Timer ledTimer(1000,LEDHandler);
 Timer motionTimer(2500, motionHandler);
 Timer statusPD(STATUS_PD,StatusHandler);
+Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);
 
 //LED Control
 LEDStatus status;
@@ -227,6 +233,8 @@ bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail, SDAvail;     //Flags
 bool logSensors, logMessages, dataWait; //Flags for sensor timing/enables
 bool offloadMode;
 bool signalLED;
+bool shutdownActive;
+bool stopActive;
 uint32_t senseTimer, dataTimer, positionTimer;
 uint32_t XBeeRxTime, BLERxTime;
 uint32_t lastMtrTime, lastTelemTime;
@@ -285,8 +293,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
             if(setLSpeed < 90 && setLSpeed >=123) setLSpeed = 67;
             if(setRSpeed < 90 && setRSpeed >=123) setRSpeed = 67;
-            ESCL.write(setLSpeed);
-            ESCR.write(setRSpeed);
+            if(!stopActive){
+                ESCL.write(setLSpeed);
+                ESCR.write(setRSpeed);
+            }
             updateMotorControl = true;
             lastMtrTime = millis();
             driveMode = 0;
@@ -322,6 +332,12 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             latitude = atof(tLat);
             longitude = atof(tLon);
         }
+        else if(!strcmp(cmdStr,"stp")){ //Stop Command (Emergency stop for motors)
+            driveMode = 0;
+            ESCL.write(90);
+            ESCR.write(90);
+            stopActive = true;
+        }
     }
 }
 
@@ -339,14 +355,17 @@ void setup(){
     status.setActive(true);
     
     pinMode(SENSE_EN, OUTPUT);
+    digitalWrite(SENSE_EN,LOW);
+    pinMode(PWR_BUT, INPUT_PULLDOWN);
+    attachInterrupt(PWR_BUT, buttonHandler, CHANGE);
     #ifdef PWR_EN
         pinMode(PWR_EN, OUTPUT);
-        digitalWrite(PWR_EN,LOW);
+        digitalWrite(PWR_EN,HIGH);
     #endif
     #ifdef LEAK_DET
         pinMode(LEAK_DET, INPUT);
     #endif
-    digitalWrite(SENSE_EN,LOW);
+    
 
     uint32_t mtrArmTime = millis();
     leftMotorSpeed = setLSpeed = 90;
@@ -382,6 +401,8 @@ void setup(){
     requestActive = false;
     LTEStatusCount = LTE_MAX_STATUS;
     telemetryAvail = false;
+    shutdownActive = false;
+    stopActive = false;
 
     battPercent = 50;
 
@@ -740,8 +761,10 @@ void updateMotors(){
             else rightMotorSpeed = setRSpeed;
         }
         //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
-        ESCL.write(leftMotorSpeed);
-        ESCR.write(180-rightMotorSpeed);
+        if(!stopActive){
+            ESCL.write(leftMotorSpeed);
+            ESCR.write(180-rightMotorSpeed);
+        }
         updateMotorControl = false;        
     }
 }
@@ -832,6 +855,16 @@ void sensorHandler(){
             }
             senseTemp = atof(addrSense);
         }
+        if(Wire.requestFrom(DOADDR, 20, 1)){
+            byte code = Wire.read();               		                                      //the first byte is the response code, we read this separately.
+            char addrSense[20];
+            int c = 0;
+            while(Wire.available()){   // slave may send less than requested
+                addrSense[c++] = Wire.read();
+
+            }
+            senseDO = atof(addrSense);
+        }
         //Serial.printlnf("Temperature: %f",senseTemp);
         dataWait = false;
         if(logSensors){
@@ -862,6 +895,9 @@ void sensorHandler(){
         Wire.beginTransmission(TEMPADDR);                                              //call the circuit by its ID number.
         Wire.write('r');                                                     //transmit the command that was sent through the serial port.
         Wire.endTransmission();                                                       //end the I2C data transmission.
+        Wire.beginTransmission(DOADDR);                                              //call the circuit by its ID number.
+        Wire.write('r');                                                     //transmit the command that was sent through the serial port.
+        Wire.endTransmission();      
         dataWait = true;
     }
 }
@@ -966,6 +1002,7 @@ void wdogHandler(){
         BLEAvail = false;
     }
     else BLEAvail = true;
+    if(stopActive) stopActive = false;
 }
 
 void dataOffloader(){
@@ -1027,11 +1064,39 @@ void dataOffloader(){
     offloadMode = false;
 }
 
+void buttonTimer(){
+    if(digitalRead(PWR_BUT)) digitalWrite(PWR_EN, LOW); //Turn off system
+    shutdownTimer.stopFromISR();
+}
+
+void buttonHandler(){
+    if(digitalRead(PWR_BUT)){
+        shutdownTimer.startFromISR();
+        shutdownActive = true;
+    }
+    else{
+        shutdownTimer.stopFromISR();
+        shutdownActive = false;
+    }
+}
+
 void LEDHandler(){
     uint32_t SetColor;
     LEDPattern SetPattern;
     LEDSpeed SetSpeed;
     uint8_t statusMode;
+    if(shutdownActive){
+        status.setPattern(LED_PATTERN_BLINK);
+        status.setColor(RGB_COLOR_GREEN);
+        status.setSpeed(LED_SPEED_FAST);
+        return;   
+    }
+    if(stopActive){
+        status.setPattern(LED_PATTERN_BLINK);
+        status.setColor(RGB_COLOR_YELLOW);
+        status.setSpeed(LED_SPEED_FAST);
+        return;
+    }
     if(offloadMode){
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_BLUE);
