@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
@@ -43,7 +43,7 @@ void dHandler();
 void jHandler();
 void sHandler();
 int LTEInputCommand(String cmd);
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23CCHub/src/WaterNet23CCHub.ino"
 #undef min
 #undef max
 #include <vector>
@@ -413,7 +413,7 @@ void setup() {
     oled.print(" Starting ");
     oled.display();
 
-    delay(100);
+    delay(1000);
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
         #ifdef VERBOSE

@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -31,7 +31,7 @@ void buttonTimer();
 void buttonHandler();
 void LEDHandler();
 int LTEInputCommand(String cmd);
-#line 11 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -47,6 +47,8 @@ int LTEInputCommand(String cmd);
 #define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 #define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
+#define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
+#define BATT_TRIG_LEAK      0           //Set to 1 to enable the battery leak cutting off system
 
 ///////////////////////
 // Pin Configuration //
@@ -58,6 +60,7 @@ int LTEInputCommand(String cmd);
 #define chipSelect          D8          //Chip select pin for Micro SD Card
 #define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
 #define SOL_ISENSE          A2          //Shunt monitor ADC input for solar array input current
+#define BAT_LEAK_DET        A4
 #define PWR_BUT             A1
 #ifdef A6
 #define BATT_VSENSE         A6          //Voltage divider ADC input for reading power rail (battery) voltage
@@ -147,7 +150,7 @@ SFE_UBLOX_GNSS myGPS;
 Adafruit_LIS3MDL lis3mdl;
 
 //SD File system object
-SdFat sd((SPIClass*)&SPI1);
+SdFat sd((SPIClass*)&SPI);
 
 File myFile;
 File logFile;
@@ -198,7 +201,7 @@ void statusUpdate();
 
 //Tmers
 Timer watchdog(WATCHDOG_PD, wdogHandler);   //Create timer object for watchdog
-Timer ledTimer(1000,LEDHandler);
+Timer ledTimer(300,LEDHandler);
 Timer motionTimer(2500, motionHandler);
 Timer statusPD(STATUS_PD,StatusHandler);
 Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);
@@ -334,6 +337,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         else if(!strcmp(cmdStr,"stp")){ //Stop Command (Emergency stop for motors)
             driveMode = 0;
+            setLSpeed = 90;
+            setRSpeed = 90;
             ESCL.write(90);
             ESCR.write(90);
             stopActive = true;
@@ -352,12 +357,16 @@ void cmdLTEHandler(const char *event, const char *data){
 
 void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);
+    status.setColor(RGB_COLOR_GREEN);
+    status.setPattern(LED_PATTERN_SOLID);
     status.setActive(true);
     
     pinMode(SENSE_EN, OUTPUT);
     digitalWrite(SENSE_EN,LOW);
-    pinMode(PWR_BUT, INPUT_PULLDOWN);
+    pinMode(PWR_BUT, INPUT);
     attachInterrupt(PWR_BUT, buttonHandler, CHANGE);
+    pinMode(LEAK_DET,INPUT);
+    pinMode(BAT_LEAK_DET,INPUT);
     #ifdef PWR_EN
         pinMode(PWR_EN, OUTPUT);
         digitalWrite(PWR_EN,HIGH);
@@ -382,7 +391,6 @@ void setup(){
     //Log.info("Hello from WaterNet23!");
     Serial.begin(115200);
     Serial1.begin(9600);                        //Start serial for XBee module
-    setupSPI();                                 //Setup SPI for BeagleBone
     setupXBee();                                //Setup XBee module
     setupGPS();                                 //Setup GPS module
     
@@ -498,6 +506,7 @@ void loop(){
     updateMotors();
     if(offloadMode) dataOffloader();
     sendResponseData();
+
     delay(10);
     //Serial.printlnf("Hello World, %d", millis());
 }
@@ -551,6 +560,23 @@ uint8_t readPowerSys(){
     else lowBattery = false;
     battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095;
     solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
+
+    if(!digitalRead(LEAK_DET)){
+        char warnChar[12];
+        if(!LEAK_DET_BYPASS) sprintf(warnChar,"CCB%dldt",BOTNUM);
+        else sprintf(warnChar,"CCB%dwld",BOTNUM);
+        sendData(warnChar,0,true,true,true);
+        delay(50);                  //wait 50ms for data to go out
+        if(!LEAK_DET_BYPASS) digitalWrite(PWR_EN,LOW);   //kill system
+    }
+    if(!digitalRead(BAT_LEAK_DET)){
+        char warnChar[12];
+        if(!LEAK_DET_BYPASS && BATT_TRIG_LEAK) sprintf(warnChar,"CCB%dldb",BOTNUM);
+        else sprintf(warnChar,"CCB%dwlb",BOTNUM);   //Message to warn leak in battery
+        sendData(warnChar,0,true,true,true);
+        delay(50);                  //wait 50ms for data to go out
+        if(!LEAK_DET_BYPASS && BATT_TRIG_LEAK) digitalWrite(PWR_EN,LOW);   //kill system
+    }
     return battPercent;
 }
 

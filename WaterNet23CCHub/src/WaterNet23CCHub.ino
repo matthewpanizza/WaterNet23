@@ -377,7 +377,7 @@ void setup() {
     oled.print(" Starting ");
     oled.display();
 
-    delay(100);
+    delay(1000);
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
         #ifdef VERBOSE
