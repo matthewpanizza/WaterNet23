@@ -3,6 +3,17 @@
  * Description: Initial code for B404 with GPS and serial communications
  * Date: 3/18/2022
  */
+//////////////////////////////////////////////////////////////
+//                Main Software Architecture                //
+//                                                          //
+//    Read these functions to understand code flow          //
+//    -- setup(): Initializes hardware, timers, counters    //
+//    -- loop(): Main body, contiunously executes           //
+//    -- processCommand(): command dictionary from comms    //
+//                                                          //
+//  Timers: read these to understand asynchronous activity  //
+//                                                          //
+//////////////////////////////////////////////////////////////
 
 #include "application.h"                    //Needed for I2C to GPS
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
