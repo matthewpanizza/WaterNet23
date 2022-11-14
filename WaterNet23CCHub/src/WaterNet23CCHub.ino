@@ -634,7 +634,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         rxIDBuf[0] = command[1];
         uint8_t rxBotID = atoi(rxIDBuf);
         bool newBot = true;
-        WaterBot *TargetWB;
+        WaterBot *TargetWB = nullptr;
         int index = 0;
         for(WaterBot w: WaterBots){
             if(rxBotID == w.botNum){
@@ -803,6 +803,28 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 logFile.close();
             }
             else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+        }
+        else if(!strcmp(cmdStr,"ldt") || !strcmp(cmdStr,"ldb")){
+            MenuPopUp m;
+            sprintf(m.primaryLine,"Warning\0");
+            sprintf(m.secondaryLine,"Bot %d\0", rxBotID);
+            sprintf(m.tertiaryLine, "Leak shutoff\0");
+            m.primaryStart = 20;
+            m.secondaryStart = 40;
+            m.tertiaryStart = 30;
+            PopUps.push_back(m);
+            redrawMenu = true;
+        }
+        else if(!strcmp(cmdStr,"wld") || !strcmp(cmdStr,"wlb")){
+            MenuPopUp m;
+            sprintf(m.primaryLine,"Warning\0");
+            sprintf(m.secondaryLine,"Bot %d\0", rxBotID);
+            sprintf(m.tertiaryLine, "Leak detected\0");
+            m.primaryStart = 20;
+            m.secondaryStart = 40;
+            m.tertiaryStart = 25;
+            PopUps.push_back(m);
+            redrawMenu = true;
         }
     }
 }
