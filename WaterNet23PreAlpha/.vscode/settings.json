@@ -10,7 +10,6 @@
         "istream": "cpp",
         "cmath": "cpp"
     },
-    "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": "gerbil_pirate"
+    "particle.targetPlatform": "boron",
+    "particle.firmwareVersion": "4.0.0"
 }

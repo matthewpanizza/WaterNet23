@@ -1,11 +1,11 @@
 {
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": "burrito_sniper",
     "files.associations": {
         "array": "cpp",
         "string": "cpp",
         "string_view": "cpp",
         "vector": "cpp"
-    }
+    },
+    "particle.targetDevice": "burrito_sniper"
 }

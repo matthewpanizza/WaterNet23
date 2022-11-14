@@ -13,7 +13,7 @@
 
 #include "application.h"
 #include "SdFat.h"
-void init(uint8_t inStep, uint8_t minV, uint8_t maxV, bool switchOnOff, const char * itemString);
+void init(uint16_t inStep, uint16_t minV, uint16_t maxV, bool switchOnOff, const char * itemString);
 void startupPair();
 void XBeeLTEPairSet();
 void setup();
@@ -84,8 +84,8 @@ int LTEInputCommand(String cmd);
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
 
 //Menu Parameters
-#define i2c_Address 0x3c //initialize with the I2C addr 0x3C Typically eBay OLED's
-#define MAX_MENU_ITEMS          5
+#define i2c_Address             0x3c //initialize with the I2C addr 0x3C Typically eBay OLED's
+#define MAX_MENU_ITEMS          7
 #define DEBOUNCE_MS             150
 #define OLED_MAX_X              128
 #define OLED_MAX_Y              64
@@ -97,7 +97,7 @@ int LTEInputCommand(String cmd);
 #define JOY_MIN             1
 
 //Development Parameters
-#define VERBOSE
+//#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
@@ -157,6 +157,7 @@ char txBuf[UART_TX_BUF_SIZE];
 char errBuf[MAX_ERR_BUF_SIZE];
 uint8_t LTEStatuses;
 bool stopActive;
+uint8_t BLEBotNum;
 
 //Menu variables
 uint8_t botSelect = 0;
@@ -173,14 +174,14 @@ class WaterBot{
     bool updatedStatus = true;
     bool updatedControl = true;
     uint8_t botNum;
-    uint8_t battPercent = 0;
-    bool BLEAvail;
-    bool LTEAvail;
-    bool XBeeAvail;
-    bool GPSAvail;
-    bool CompassAvail;
-    bool SDAvail;
-    uint8_t driveMode = 0;
+    uint16_t battPercent = 0;
+    bool BLEAvail = false;
+    bool LTEAvail = false;
+    bool XBeeAvail = false;
+    bool GPSAvail = true;
+    bool CompassAvail = true;
+    bool SDAvail = true;
+    uint16_t driveMode = 0;
     bool signal = false;
     bool lowBatt = false;
     bool warnedLowBatt = false;
@@ -197,6 +198,8 @@ class WaterBot{
     float DO = 0.0;
     float Cond = 0.0;
     float MCond = 0.0;
+    uint16_t panelPower = 0;
+    uint16_t battPower = 0;
     uint32_t publishTime = 0;
     uint32_t timeoutCount;
 };
@@ -210,21 +213,21 @@ class PairBot{
 class MenuItem{
     public:
         std::vector<String> labels;
-        void init(uint8_t inStep, uint8_t minV, uint8_t maxV, bool switchOnOff, const char * itemString){
+        void init(uint16_t inStep, uint16_t minV, uint16_t maxV, bool switchOnOff, const char * itemString){
             minVal = minV;
             maxVal = maxV;
             stepSize = inStep;
             onOffSetting = switchOnOff;
             strcpy(itemName,itemString);
         }
-        uint8_t (WaterBot::*MethodPointer);
+        uint16_t (WaterBot::*MethodPointer);
         bool (WaterBot::*MethodPointerBool);
-        uint8_t stepSize;
+        uint16_t stepSize;
         bool onOffSetting = false;
         bool customLabel = false;
         bool statOnly = false;
-        uint8_t minVal;
-        uint8_t maxVal;
+        uint16_t minVal;
+        uint16_t maxVal;
         char itemName[10];
 };
 
@@ -238,7 +241,6 @@ class MenuPopUp{
         uint8_t tertiaryStart = 0;
 };
 
-WaterBot *BLEBot;   //Waterbot that is currently connected to over BLE
 WaterBot *ControlledBot;
 std::vector<WaterBot> WaterBots;
 std::vector<WaterBot> PairBots;
@@ -723,13 +725,11 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 if(rxBotID == w.botNum){
                     uint8_t battpct;
                     uint16_t statflags;
-                    float latRX;
-                    float lonRX;
                     char testLat[12];
                     char testLon[12];
-                    sscanf(dataStr,"%u %u %s %s",&battpct,&statflags,testLat,testLon);
-                    latRX = atof(testLat);
-                    lonRX = atof(testLon);
+                    uint16_t panelPwr;
+                    uint16_t battPwr;
+                    sscanf(dataStr,"%u %u %s %s %d %d",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr);
                     w.battPercent = battpct;
                     w.LTEAvail = statflags & 1;
                     w.XBeeAvail = (statflags >> 1) & 1;
@@ -738,8 +738,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.GPSAvail = (statflags >> 8) & 1;
                     w.CompassAvail = (statflags >> 9) & 1;
                     w.SDAvail = (statflags >> 10) & 1;
-                    w.GPSLat = latRX;
-                    w.GPSLon = lonRX;
+                    w.GPSLat = atof(testLat);
+                    w.GPSLon = atof(testLon);
+                    w.panelPower = panelPwr;
+                    w.battPower = battPwr;
                     if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){
                         w.offloading = (statflags >> 3) & 1;
                         w.driveMode = (statflags >> 4) & 3;
@@ -783,7 +785,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                         PopUps.push_back(m);
                         redrawMenu = true;
                     }
-                    if(botSelect = w.botNum) redrawMenu = true;
+                    if(botSelect == w.botNum) redrawMenu = true;
                     logMessage("Status Update!");
                     /*Serial.println("##########################");
                     Serial.println("##     STATUS UPDATE    ##");
@@ -808,7 +810,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             TargetWB->Cond = ((float)cond_in)/1000.0;
             TargetWB->MCond = ((float)mcond_in)/1000.0;
             TargetWB->temp = ((float)temp_in)/1000.0;
+            #ifdef VERBOSE
             Serial.printlnf("Bot #: %d Temp: %f", TargetWB->botNum,TargetWB->temp);
+            #endif
         }
         else if(!strcmp(cmdStr,"nak")){  //Acknowledgement for XBee and BLE
             strncpy(errCmdStr,dataStr,3);
@@ -820,7 +824,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 if(rxBotID == w.botNum) newBot = false;
             }
             if(newBot){
+                #ifdef VERBOSE
                 Serial.println("Found a new water bot ID");
+                #endif
                 WaterBot newWaterbot;
                 if(mode == 1) newWaterbot.BLEAvail = true;
                 else if(mode == 2) newWaterbot.XBeeAvail = true;
@@ -867,7 +873,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
 
 void processRPiCommand(const char *command, uint8_t mode){
     if(command[0] == 'R' && command[1] == 'P'){  
+        #ifdef VERBOSE
         Serial.println("Received Pi command");
+        #endif
         uint8_t checksum;
         char dataStr[strlen(command)-8];
         dataStr[strlen(command)-9] = '\0';
@@ -878,20 +886,26 @@ void processRPiCommand(const char *command, uint8_t mode){
         checkStr[1] = command[strlen(command)-1];
         checkStr[2] = '\0';
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+        #ifdef VERBOSE
         Serial.printlnf("Checksum: %02x, %03d, Checkstr: %s",checksum,checksum,command);
+        #endif
         for(uint8_t i = 4; i < strlen(command)-2;i++){
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
         if(checksum != strlen(command)-2){
+            #ifdef VERBOSE
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
+            #endif
             if(!logFile.isOpen()){
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
                 logFile.close();
             }
             else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
+            #ifdef VERBOSE
             Serial.println("Warning, checksum does not match");
+            #endif
             if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
                 char rxBotNum[2];
                 rxBotNum[0] = command[0];
@@ -909,7 +923,9 @@ void processRPiCommand(const char *command, uint8_t mode){
             sscanf(dataStr,"%s %s %s %d %d %d %d",idStr,GPSLatstr,GPSLonstr,&drivemode,&offloading,&recording,&signal);
             char botChar[2] = {command[8], '\0'};
             uint8_t targetBot = atoi(botChar);
+            #ifdef VERBOSE
             Serial.printlnf("Got a command packet from Pi for Bot %d",targetBot);
+            #endif
             for(WaterBot &wb: WaterBots){
                 if(wb.botNum == targetBot){
                     wb.TargetLat = atof(GPSLatstr);
@@ -946,7 +962,9 @@ void BLEScan(int BotNumber){
                 uint8_t BLECustomData[CUSTOM_DATA_LEN];
                 scanResults[ii].advertisingData().customData(BLECustomData,CUSTOM_DATA_LEN);
                 if(BotNumber == -2){
+                    #ifdef VERBOSE
                     Serial.printlnf("Found Bot #: %d %d %d %d %d %d %d %d, services: %d",BLECustomData[0],BLECustomData[1],BLECustomData[2],BLECustomData[3],BLECustomData[4],BLECustomData[5],BLECustomData[6],BLECustomData[7], svcCount);
+                    #endif
                     bool newBot = true;
                     PairBot *existingBot;
                     for(PairBot p: BLEPair){
@@ -962,7 +980,9 @@ void BLEScan(int BotNumber){
                         NewBot.rssi = scanResults[ii].rssi();
                         NewBot.botNum = BLECustomData[0];
                         BLEPair.push_back(NewBot);
+                        #ifdef VERBOSE
                         Serial.printlnf("Found new bot: %d", BLECustomData[0],BLEPair.size());
+                        #endif
                     }
                     else{
                         existingBot->rssi = (scanResults[ii].rssi() + existingBot->rssi) >> 1;
@@ -978,7 +998,9 @@ void BLEScan(int BotNumber){
 					    peer.getCharacteristicByUUID(peerTxCharacteristic, txUuid);
 					    peer.getCharacteristicByUUID(peerRxCharacteristic, rxUuid);
                         peer.getCharacteristicByUUID(peerOffloadCharacteristic, offldUuid);
+                        #ifdef VERBOSE
 						Serial.printlnf("Connected to Bot %d",bufName[0]);
+                        #endif
                         bool newBot = true;
                         WaterBot newWaterbot;
                         newWaterbot.BLEAvail = true;
@@ -988,13 +1010,15 @@ void BLEScan(int BotNumber){
                             if(bufName[0] == w.botNum){
                                 newBot = false;
                                 w.BLEAvail = true;
-                                BLEBot = &w;
+                                BLEBotNum = w.botNum;
                             }
                         }
                         if(newBot){
+                            #ifdef VERBOSE
                             Serial.println("Found a new water bot ID");
+                            #endif
                             WaterBots.push_back(newWaterbot);
-                            BLEBot = &WaterBots.back();
+                            BLEBotNum = newWaterbot.botNum;
                             redrawMenu = true;
                         }
                     }
@@ -1009,36 +1033,69 @@ void DataOffloader(uint8_t bot_id){
     uint8_t OffloadingBot = bot_id;
     if (!logDir.open("/")) {
         offloadingDone = true;
+        MenuPopUp m;
+        sprintf(m.primaryLine,"Warning\0");
+        sprintf(m.secondaryLine,"CCHub");
+        sprintf(m.tertiaryLine, "SD Card Failed\0");
+        m.primaryStart = 20;
+        m.secondaryStart = 60;
+        m.tertiaryStart = 20;
+        PopUps.push_back(m);
+        redrawMenu = true;
+        #ifdef VERBOSE
         Serial.println("Error, could not open root directory on SD Card. Is it inserted?");
+        #endif
         return;
     }
     uint32_t startScanTime = millis();
-    Serial.printlnf("Requested SD Card Data from Bot %d Over BLE\n",BLEBot->botNum);
-    if(BLEBot->botNum != OffloadingBot){
-        Serial.printlnf("Currently connected to Bot %s, need to connect to Bot %d",BLEBot->botNum,OffloadingBot);
-        BLE.disconnect();
-        while(!BLE.connected() && startScanTime - millis() < 15000){
-            BLEScan(OffloadingBot);
+    #ifdef VERBOSE
+    Serial.printlnf("Requested SD Card Data from Bot %d Over BLE\n",BLEBotNum);
+    #endif
+    if(BLEBotNum != bot_id){
+        #ifdef VERBOSE
+        Serial.printlnf("Currently connected to Bot %s, need to connect to Bot %d",BLEBotNum,OffloadingBot);
+        #endif
+        offloadingDone = true;
+        MenuPopUp m;
+        sprintf(m.primaryLine,"Info\0");
+        sprintf(m.secondaryLine,"Not connected to BLE\0");
+        sprintf(m.tertiaryLine, "Switching BLE conn\0");
+        m.primaryStart = 30;
+        m.secondaryStart = 5;
+        m.tertiaryStart = 10;
+        PopUps.push_back(m);
+        redrawMenu = true;
+        BLE.disconnect(peer);
+        while(!BLE.connected() && millis() - startScanTime < 15000){
+            BLEScan(bot_id);
             delay(50);
         }
+        
         char OffloadCommand[10];
         snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
         sendData(OffloadCommand,0,true,false,false);
-        if(BLE.connected()) Serial.printlnf("Successfully connected to Bot %d", BLEBot->botNum);
+        #ifdef VERBOSE
+        if(BLE.connected()) Serial.printlnf("Successfully connected to Bot %d", BLEBotNum);
+        #endif
     }
     else{
         char OffloadCommand[10];
         snprintf(OffloadCommand,10,"CCB%ddmp",OffloadingBot);
         sendData(OffloadCommand,0,true,false,false);
     }
-    Serial.printlnf("Starting file transfer from Bot %d",BLEBot->botNum);
-    if(startScanTime - millis() > 15000){
+    #ifdef VERBOSE
+    Serial.printlnf("Starting file transfer from Bot %d",BLEBotNum);
+    #endif
+    if(millis() - startScanTime > 15000){
         if(logDir.isOpen()) logDir.close();
         return;
     }
-    offloadingDone = false;
+    if(BLE.connected()) offloadingDone = false;
+    //offloadingDone = false;
     while(!offloadingDone) delay(100);
-    Serial.printlnf("Finished transferring file from Bot %d",BLEBot->botNum);
+    #ifdef VERBOSE
+    Serial.printlnf("Finished transferring file from Bot %d",BLEBotNum);
+    #endif
     if(logDir.isOpen()) logDir.close();
     offloadingMode = false;
 }
@@ -1058,7 +1115,7 @@ void RPiStatusUpdate(){
             statusFlags |= wb.GPSAvail << 8;
             statusFlags |= wb.CompassAvail << 9;
             statusFlags |= wb.SDAvail << 10;
-            Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags);
+            Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d %d %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags,wb.battPower, wb.panelPower);
         }
     }
 }
@@ -1066,7 +1123,9 @@ void RPiStatusUpdate(){
 void RPiHandler(){
     while(Serial.available()){
             String data = Serial.readStringUntil('\n');
+            #ifdef VERBOSE
             Serial.println(data);
+            #endif
             char buffer[data.length() + 2];
             data.toCharArray(buffer,data.length()+1);
             buffer[data.length() + 1] = 0;
@@ -1087,8 +1146,10 @@ void XBeeHandler(){
         char buffer[data.length()];
         for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);
         if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;
+        #ifdef VERBOSE
         Serial.println("New XBee Command:");
         Serial.println(data); 
+        #endif
         processCommand(buffer,2,true);
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
@@ -1188,8 +1249,10 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];
     if(btBuf[len-1] != '\0') btBuf[len] = '\0';
     else btBuf[len-1] = '\0';
+    #ifdef VERBOSE
     Serial.print("New BT Command: ");
     Serial.println(btBuf);
+    #endif
     processCommand(btBuf,1,true);
     if(logMessages){
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
@@ -1211,20 +1274,28 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
             memset(offloadFilename,0,MAX_FILENAME_LEN);
             strncpy(offloadFilename,fileCommand+8,MAX_FILENAME_LEN);
             if(sd.exists(offloadFilename)){
+                #ifdef VERBOSE
                 Serial.printlnf("File '%s' already exists, deleting and overwriting",offloadFilename);
+                #endif
                 sd.remove(offloadFilename);
             }
+            #ifdef VERBOSE
             Serial.printlnf("Starting offload of file: %s",offloadFilename);
+            #endif
             myFile.open(offloadFilename, O_RDWR | O_CREAT | O_AT_END);
             return;
         }
         else if(!strcmp(fileCommand,"filecomp")){
+            #ifdef VERBOSE
             Serial.printlnf("Reached end of file: %s",offloadFilename);
+            #endif
             if(myFile.isOpen()) myFile.close();
             return;
         }
         else if(!strcmp(fileCommand,"filedone")){
+            #ifdef VERBOSE
             Serial.println("Received done command");
+            #endif
             offloadingDone = true;
             if(myFile.isOpen()) myFile.close();
             return;
@@ -1234,7 +1305,9 @@ void offloadDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& p
     char dataStr[len];
     memcpy(dataStr,data,len);
     myFile.print(dataStr);
+    #ifdef VERBOSE
     Serial.println(dataStr);
+    #endif
 }
 
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
@@ -1329,11 +1402,23 @@ void createMenu(){
     signalToggle.statOnly = false;
     signalToggle.MethodPointerBool = &WaterBot::signal;
 
+    MenuItem solStat;
+    solStat.init(1,0,999,false,"SolPwr");
+    solStat.statOnly = true;
+    solStat.MethodPointer = &WaterBot::panelPower;
+
+    MenuItem battPwr;
+    battPwr.init(1,0,999,false,"BatPwr");
+    battPwr.statOnly = true;
+    battPwr.MethodPointer = &WaterBot::battPower;
+
     MenuItems.push_back(dataRecord);
     MenuItems.push_back(battStat);
     MenuItems.push_back(sentryToggle);
     MenuItems.push_back(offloadItem);
     MenuItems.push_back(signalToggle);
+    MenuItems.push_back(solStat);
+    MenuItems.push_back(battPwr);
 
     SelectedItem = &MenuItems.at(menuItem);
 }
@@ -1341,7 +1426,9 @@ void createMenu(){
 void entHandler(){
     redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
+    #ifdef VERBOSE
     Serial.println("Enter trigger");
+    #endif
     debounceTime = millis();
     if(PopUps.size() != 0){
         PopUps.pop_back();
@@ -1358,7 +1445,9 @@ void rHandler(){
     redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
+    #ifdef VERBOSE
     Serial.println("Right trigger");
+    #endif
     if(selectingBots){
         if(botSelect != WaterBots.back().botNum){
             bool findCurrent = false;
@@ -1377,13 +1466,19 @@ void rHandler(){
         for(WaterBot &ws: WaterBots){
             if(ws.botNum == botSelect){
                 MenuItem *curItem = SelectedItem;
+                #ifdef VERBOSE
                 Serial.println(curItem->itemName);
+                #endif
                 if(curItem == nullptr) return;
                 if(curItem->statOnly) return;
                 if(curItem->onOffSetting){
+                    #ifdef VERBOSE
                     Serial.println("Modified an On/Off Control");
+                    #endif
                     ws.*(curItem->MethodPointerBool) = true;
+                    #ifdef VERBOSE
                     Serial.printlnf("Bot: %d, Modified ",ws.botNum);
+                    #endif
                 }
                 else{
                     
@@ -1400,7 +1495,9 @@ void rHandler(){
 void lHandler(){
     redrawMenu = true;  
     if(millis()-debounceTime < DEBOUNCE_MS) return;
+    #ifdef VERBOSE
     Serial.println("Right trigger");
+    #endif
     debounceTime = millis();
     redrawMenu = true;
     if(selectingBots){
@@ -1420,13 +1517,19 @@ void lHandler(){
         for(WaterBot &ws: WaterBots){
             if(ws.botNum == botSelect){
                 MenuItem *curItem = SelectedItem;
+                #ifdef VERBOSE
                 Serial.println(curItem->itemName);
+                #endif
                 if(curItem == nullptr) return;
                 if(curItem->statOnly) return;
                 if(curItem->onOffSetting){
+                    #ifdef VERBOSE
                     Serial.println("Modified an On/Off Control");
+                    #endif
                     ws.*(curItem->MethodPointerBool) = false;
+                    #ifdef VERBOSE
                     Serial.printlnf("Bot: %d, Modified ",ws.botNum);
+                    #endif
                 }
                 else{
                     
@@ -1445,7 +1548,9 @@ void uHandler(){
     debounceTime = millis();
     if(menuItem) menuItem--;
     SelectedItem = &MenuItems.at(menuItem);
+    #ifdef VERBOSE
     Serial.println("Up trigger");
+    #endif
 }
 
 void dHandler(){
@@ -1454,13 +1559,17 @@ void dHandler(){
     debounceTime = millis();
     if(menuItem < MAX_MENU_ITEMS-1) menuItem++;
     SelectedItem = &MenuItems.at(menuItem);
+    #ifdef VERBOSE
     Serial.println("Down trigger");
+    #endif
 }
 
 void jHandler(){
     if(millis()-debounceTime < DEBOUNCE_MS) return;
     debounceTime = millis();
+    #ifdef VERBOSE
     Serial.println("Joystick trigger");
+    #endif
 }
 
 void sHandler(){

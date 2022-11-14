@@ -8,6 +8,17 @@
  * Description: Initial code for B404 with GPS and serial communications
  * Date: 3/18/2022
  */
+//////////////////////////////////////////////////////////////
+//                Main Software Architecture                //
+//                                                          //
+//    Read these functions to understand code flow          //
+//    -- setup(): Initializes hardware, timers, counters    //
+//    -- loop(): Main body, contiunously executes           //
+//    -- processCommand(): command dictionary from comms    //
+//                                                          //
+//  Timers: read these to understand asynchronous activity  //
+//                                                          //
+//////////////////////////////////////////////////////////////
 
 #include "application.h"                    //Needed for I2C to GPS
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
@@ -16,7 +27,7 @@
 void setup();
 void loop();
 int LTEInputCommand(String cmd);
-#line 11 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 22 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -29,7 +40,7 @@ int LTEInputCommand(String cmd);
 // BOT CONFIGURATION MACROS //
 //////////////////////////////
 
-#define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
+#define BOTNUM              2           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 #define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 #define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
@@ -369,7 +380,9 @@ void setup(){
     digitalWrite(SENSE_EN,LOW);                     
     pinMode(PWR_BUT, INPUT);                            //Configure power button input as an input, no pull as the resistor divider will handle pin floating
     attachInterrupt(PWR_BUT, buttonHandler, CHANGE);    //Attach the buttonHandler function to trigger whenever the button is pressed or released
+    #ifdef LEAK_DET
     pinMode(LEAK_DET,INPUT);                            //Configure the leak detect output of the PCB to be an input with no pull. External pull on PCB
+    #endif
     pinMode(BAT_LEAK_DET,INPUT);                        //Configure the battery leak detect output of the PCB to be an input with no pull. External pull on PCB
     #ifdef PWR_EN                                       //Macro to disable power disable if we are using the Boron as a test platform, as D22 is not present there
         pinMode(PWR_EN, OUTPUT);
@@ -551,7 +564,8 @@ uint8_t readPowerSys(){
     battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095; //Read the amplified input from the shunt from the batter and solar array and calculate the multiplier based on the resistor value and datasheet
     solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
 
-    if(!digitalRead(LEAK_DET) && warnedLeak){                               //LEAK_DET pin is pulled low when a leak is detected
+    #ifdef LEAK_DET
+    if(!digitalRead(LEAK_DET) && !warnedLeak){                              //LEAK_DET pin is pulled low when a leak is detected
         char warnChar[12];                                                  //String to hold transmitted string
         if(!LEAK_DET_BYPASS) sprintf(warnChar,"B%dCCldt",BOTNUM);           //Create error string based on if it's a cutoff trigger or a just a warning
         else sprintf(warnChar,"B%dCCwld",BOTNUM);                           //Warn only
@@ -569,6 +583,7 @@ uint8_t readPowerSys(){
         if(!LEAK_DET_BYPASS && BATT_TRIG_LEAK) digitalWrite(PWR_EN,LOW);    //kill system
         warnedBattLeak = true;
     }
+    #endif
     return battPercent;
 }
 
@@ -713,8 +728,8 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){        //Check if status flag has been set by timer that calculates system status flags
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
-        char updateStr[40];                             //Create local string to hold status being sent out
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);  //Print status flags, battery, latitude and logitude
+        char updateStr[55];                             //Create local string to hold status being sent out
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d ",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent));  //Print status flags, battery, latitude and logitude
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){     //If BLE and XBee are not available, send status over LTE, but only 1 in LTE_STAT_PD updates (to not suck up data)
             sendData(updateStr,0,false,false,true);     //Only send out over LTE
         }
@@ -1091,7 +1106,9 @@ void dataOffloader(){
 
 //Timer that activates whenever the power button is pressed
 void buttonTimer(){
+    #ifdef PWR_EN
     if(digitalRead(PWR_BUT)) digitalWrite(PWR_EN, LOW); //Turn off system
+    #endif
     shutdownTimer.stopFromISR();
 }
 

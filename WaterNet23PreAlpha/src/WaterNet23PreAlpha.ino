@@ -100,7 +100,7 @@
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
-#define MAX_FILENAME_LEN    30
+#define MAX_FILENAME_LEN    32
 
 /////////////////////////
 // Power System Macros //
@@ -371,7 +371,9 @@ void setup(){
     digitalWrite(SENSE_EN,LOW);                     
     pinMode(PWR_BUT, INPUT);                            //Configure power button input as an input, no pull as the resistor divider will handle pin floating
     attachInterrupt(PWR_BUT, buttonHandler, CHANGE);    //Attach the buttonHandler function to trigger whenever the button is pressed or released
+    #ifdef LEAK_DET
     pinMode(LEAK_DET,INPUT);                            //Configure the leak detect output of the PCB to be an input with no pull. External pull on PCB
+    #endif
     pinMode(BAT_LEAK_DET,INPUT);                        //Configure the battery leak detect output of the PCB to be an input with no pull. External pull on PCB
     #ifdef PWR_EN                                       //Macro to disable power disable if we are using the Boron as a test platform, as D22 is not present there
         pinMode(PWR_EN, OUTPUT);
@@ -454,7 +456,7 @@ void setup(){
                           true); // enabled!
 
     char timestamp[16];                         //String that holds a timestamp for naming the files generated on the SD card
-    snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
+    snprintf(timestamp,16,"B%d%02d%02d%04d%02d%02d%02d", BOTNUM, Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
     strcpy(filename,DEF_FILENAME);              //Copy in all of the necessary elements of the file name
     strcat(filename,timestamp);
     strcpy(filenameMessages,filename);
@@ -553,7 +555,8 @@ uint8_t readPowerSys(){
     battCurrent = (float) analogRead(BATT_ISENSE) * BAT_ISENSE_MULT / 4095; //Read the amplified input from the shunt from the batter and solar array and calculate the multiplier based on the resistor value and datasheet
     solarCurrent = (float) analogRead(SOL_ISENSE) * SLR_ISENSE_MULT / 4095;
 
-    if(!digitalRead(LEAK_DET) && warnedLeak){                               //LEAK_DET pin is pulled low when a leak is detected
+    #ifdef LEAK_DET
+    if(!digitalRead(LEAK_DET) && !warnedLeak){                              //LEAK_DET pin is pulled low when a leak is detected
         char warnChar[12];                                                  //String to hold transmitted string
         if(!LEAK_DET_BYPASS) sprintf(warnChar,"B%dCCldt",BOTNUM);           //Create error string based on if it's a cutoff trigger or a just a warning
         else sprintf(warnChar,"B%dCCwld",BOTNUM);                           //Warn only
@@ -571,6 +574,7 @@ uint8_t readPowerSys(){
         if(!LEAK_DET_BYPASS && BATT_TRIG_LEAK) digitalWrite(PWR_EN,LOW);    //kill system
         warnedBattLeak = true;
     }
+    #endif
     return battPercent;
 }
 
@@ -715,8 +719,8 @@ void sendResponseData(){
 void statusUpdate(){
     if(statusReady){        //Check if status flag has been set by timer that calculates system status flags
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
-        char updateStr[40];                             //Create local string to hold status being sent out
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f ",BOTNUM,battPercent,statusFlags,latitude,longitude);  //Print status flags, battery, latitude and logitude
+        char updateStr[55];                             //Create local string to hold status being sent out
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d ",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent));  //Print status flags, battery, latitude and logitude
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){     //If BLE and XBee are not available, send status over LTE, but only 1 in LTE_STAT_PD updates (to not suck up data)
             sendData(updateStr,0,false,false,true);     //Only send out over LTE
         }
@@ -1093,7 +1097,9 @@ void dataOffloader(){
 
 //Timer that activates whenever the power button is pressed
 void buttonTimer(){
+    #ifdef PWR_EN
     if(digitalRead(PWR_BUT)) digitalWrite(PWR_EN, LOW); //Turn off system
+    #endif
     shutdownTimer.stopFromISR();
 }
 
