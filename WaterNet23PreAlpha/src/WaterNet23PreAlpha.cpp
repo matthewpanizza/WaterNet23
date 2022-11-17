@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 1 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -27,7 +27,7 @@
 void setup();
 void loop();
 int LTEInputCommand(String cmd);
-#line 22 "c:/Users/mligh/OneDrive/Particle/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
+#line 22 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
@@ -40,7 +40,7 @@ int LTEInputCommand(String cmd);
 // BOT CONFIGURATION MACROS //
 //////////////////////////////
 
-#define BOTNUM              2           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
+#define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
 #define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 #define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
@@ -51,7 +51,7 @@ int LTEInputCommand(String cmd);
 ///////////////////////
 
 #define ESC_PWM_L           D6          //Left motor ESC output pin
-#define ESC_PWM_R           D5          //Right motor ESC output pin
+#define ESC_PWM_R           D7          //Right motor ESC output pin
 #define SENSE_EN            D2          //Output pin to enable/disable voltage regulator for sensors
 #define chipSelect          D8          //Chip select pin for Micro SD Card
 #define BATT_ISENSE         A3          //Shunt monitor ADC input for battery supply current
@@ -96,10 +96,11 @@ int LTEInputCommand(String cmd);
 #define SENS_DATA_DLY       825             //Number of milliseconds between a request to a sensor and actually retrieving the reading
 
 #define SHUTDOWN_HOLD       3000            //Number of milliseconds that the power button must be held to actually shut off bot
-#define WATCHDOG_PD         15000           //Watchdog timer period in milliseconds
+#define WATCHDOG_PD         1000           //Watchdog timer period in milliseconds
 #define STATUS_PD           10000            //Time between status updates published to CC Hub
-#define XBEE_WDOG_AVAIL     30000           //Watchdog interval between XBee messages for availablility check
-#define BLE_WDOG_AVAIL      30000           //Watchdog interval between BLE messages for availability check
+#define STOP_RST_TIME       10000           //Time after receiving the last stop command to exit stop mode
+#define XBEE_WDOG_AVAIL     5000           //Watchdog interval between XBee messages for availablility check
+#define BLE_WDOG_AVAIL      5000           //Watchdog interval between BLE messages for availability check
 #define LTE_MAX_STATUS      480             // (Divided by LTE STAT PD) Maximum number of status messages to send over LTE if other methods are unavailable
 #define LTE_STAT_PD         4               //Divider for sending status via LTE to reduce data usage
 #define XBEE_START_PUB      5000            //Time period between sending "Hello World" messages over XBee during setup
@@ -109,7 +110,7 @@ int LTEInputCommand(String cmd);
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
-#define MAX_FILENAME_LEN    30
+#define MAX_FILENAME_LEN    32
 
 /////////////////////////
 // Power System Macros //
@@ -127,8 +128,8 @@ int LTEInputCommand(String cmd);
 ////////////////////////
 
 #define MTR_IDLE_ARM        2000            //Number of milliseconds to hold motors stopped for arming
-#define MTR_ST_FWD          123             //Minimum commanded speed for motors going forward
-#define MTR_ST_REV          67              //Minimum commanded speed for motors in reverse
+#define MTR_ST_FWD          110             //Minimum commanded speed for motors going forward
+#define MTR_ST_REV          75              //Minimum commanded speed for motors in reverse
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
 #define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
@@ -136,7 +137,7 @@ int LTEInputCommand(String cmd);
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define POS_POLL_TIME       500             //Rate to poll the GPS and Compass and calculate the position heading
 
-SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 /////////////////////////
 // Function Prototypes //
@@ -257,6 +258,7 @@ uint32_t senseTimer, dataTimer, positionTimer;                          //Timers
 uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
 uint32_t lastMtrTime, lastTelemTime;                                    //Timers for when the last motor and telemetry commands were received
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
+uint32_t stopTime;
 float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
 char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
 char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
@@ -353,6 +355,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             rightMotorSpeed = 90;
             ESCL.write(90);                     //Immediately write to the ESC a stopped state
             ESCR.write(90);
+            stopTime = millis();
             stopActive = true;                  //Set flag to indicate that stop was hit
         }
     }
@@ -391,6 +394,8 @@ void setup(){
     #ifdef LEAK_DET                                     //Macro to disable battery leak if we are using the Boron as a test platform, as D23 is not present there
         pinMode(LEAK_DET, INPUT);
     #endif
+
+    Particle.connect();
     
     uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
     leftMotorSpeed = setLSpeed = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
@@ -414,7 +419,7 @@ void setup(){
     LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
     SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
 
-    positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
+    stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
     XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
     BLERxTime = 0;                              //Initialize timer for checking that BLE is available
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
@@ -465,7 +470,7 @@ void setup(){
                           true); // enabled!
 
     char timestamp[16];                         //String that holds a timestamp for naming the files generated on the SD card
-    snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
+    snprintf(timestamp,16,"B%d%02d%02d%04d%02d%02d%02d", BOTNUM, Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
     strcpy(filename,DEF_FILENAME);              //Copy in all of the necessary elements of the file name
     strcat(filename,timestamp);
     strcpy(filenameMessages,filename);
@@ -737,7 +742,7 @@ void statusUpdate(){
             if(XBeeAvail || BLEAvail) LTEStatusCount = LTE_MAX_STATUS;  //Otherwise, we're sending updates over BLE or XBee, reset counter for cellular
             sendData(updateStr,0,true,true,false);
         }
-        if(LTEStatusCount) LTEStatusCount--;            //Decrement a large coounter for the LTE status. This stops sending the status over LTE after a while to not burn up monthly quota. Should be recovering bots if on cell only
+        if(!BLEAvail && !XBeeAvail && LTEStatusCount) LTEStatusCount--;            //Decrement a large coounter for the LTE status. This stops sending the status over LTE after a while to not burn up monthly quota. Should be recovering bots if on cell only
         statusReady = false;                            //Clear ready flag
         //sendData("B1CCptsbigbot",0,true,false,false);
     }
@@ -781,10 +786,10 @@ void updateMotors(){
             }
         }
 
-        if(setLSpeed > 90 && setLSpeed <=123) setLSpeed = 123; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
-        if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
-        if(setLSpeed < 90 && setLSpeed >=67) setLSpeed = 67;
-        if(setRSpeed < 90 && setRSpeed >=67) setRSpeed = 67;
+        if(setLSpeed > 90 && setLSpeed <= MTR_ST_FWD) setLSpeed = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
+        if(setRSpeed > 90 && setRSpeed <= MTR_ST_FWD) setRSpeed = MTR_ST_FWD;
+        if(setLSpeed < 90 && setLSpeed >= MTR_ST_REV) setLSpeed = MTR_ST_REV;
+        if(setRSpeed < 90 && setRSpeed >= MTR_ST_REV) setRSpeed = MTR_ST_REV;
 
         if(leftMotorSpeed < setLSpeed){                                                     //If the acutal motor (leftMotorSpeed) speed is less than the target motor speed (setLSpeed), then ramp the acutal motor speed to reach target
             if(setLSpeed - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;   //If we're off by more than one step size, then increment by one step
@@ -1041,7 +1046,7 @@ void wdogHandler(){
         BLEAvail = false;
     }
     else BLEAvail = true;
-    if(stopActive) stopActive = false;                          //Set stop to false in case the CChub somehow crashed (though we have already entered a "float" mode where drivemode = 0)
+    if(stopActive && millis() - stopActive > STOP_RST_TIME) stopActive = false;                          //Set stop to false in case the CChub somehow crashed (though we have already entered a "float" mode where drivemode = 0)
 }
 
 //Function to pause operation and copy data off of SD card over bluetooth to the CChub

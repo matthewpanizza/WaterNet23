@@ -36,7 +36,7 @@
 #define CUSTOM_DATA_LEN         8               //Number of bytes to include in the advertising packet for BLE
 #define MAX_FILENAME_LEN        30              //Maximum number of characters in the filename for log files
 #define MAX_ERR_BUF_SIZE        15              //Buffer size for error-return string
-#define MAX_LTE_STATUSES        25
+#define MAX_LTE_STATUSES        300             //Maximum number of statuses to send over LTE when XBee and BLE are unavailable
 
 //Timing Control
 
@@ -44,6 +44,8 @@
 #define BLE_MAX_CONN_TIME       200             //20 second max time to successfully pair to bot
 #define BLE_SCAN_PERIOD         1000            //Time betweeen BLE scans
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
+#define LTE_CTL_PERIOD          29000           //Minimum time between sending LTE control packets periodically per bot
+#define MTR_LTE_PERIOD          3000            //Minimum time between sending mtr command over LTE
 #define MTR_UPDATE_TIME         500             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000            //Number of milliseconds between sending control packets to bots
 #define STOP_PUB_TIME           5000            //Time between sending stop messages when active
@@ -61,13 +63,14 @@
 #define JOY_MID             2048                //ADC reading when the joystick is centered
 #define JOY_MAX             4094                //ADC reading when the joystick is fully forward
 #define JOY_MIN             1                   //ADC reading when the joystick is fully backward
+#define LTE_MIN_DIFF        3                   //Minimum difference in motor speed to send an update over LTE
 
 //Development Parameters
 //#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
-SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(AUTOMATIC);
 
 // These UUIDs were defined by Nordic Semiconductor and are now the defacto standard for
 // UART-like services over BLE. Many apps support the UUIDs now, like the Adafruit Bluefruit app.
@@ -108,9 +111,11 @@ bool LTEStopSent;                               //Only send stop command over LT
 uint32_t stopTime;                              //Timer for periodically publishing stop command when a stop is active over XBee and BLE
 uint32_t controlUpdateTime;                     //Timer for periodically sending control packet to bots     
 uint32_t rcTime;                                //Time between sending mtr commands to the currently controlled bot
-uint8_t LTEStatuses;                            //Counter for number of statuses that have been sent over LTE. Stops sending status over LTE after running out
+uint16_t LTEStatuses = MAX_LTE_STATUSES;                            //Counter for number of statuses that have been sent over LTE. Stops sending status over LTE after running out
 bool stopActive;                                //Flag set active when the stop button has been pressed, and is cleared after pressing again
 uint8_t BLEBotNum;                              //Bot id of the bot currently connected to over BLE
+bool mtrLTEDiff = false;                        //Flag set true when the motor has a significant enough speed change to warrant sending a new LTE speed
+uint8_t LSpeed, RSpeed;
 
 //Menu variables
 uint8_t botSelect = 0;                          //Which bot in the menu is currently selected
@@ -124,10 +129,11 @@ uint32_t debounceTime;                          //Timer shared between all butto
 //Class used widely throughout the program to handle data sent and received by the waterbots. Represents the controllable/status attributes of the actual bots, each given a dedicated object
 class WaterBot{
     public:
-    bool updatedStatus = true;      //Flag to indicate that a new status was received and should have an update sent to the raspberry pi
+    bool updatedStatus = false;      //Flag to indicate that a new status was received and should have an update sent to the raspberry pi
     bool updatedControl = true;     //Flag to indicate that the menu buttons have modified an attribute of this bot that requires a control packet to be sent
     uint8_t botNum;                 //Bot number unique to each bot and can range from 0 to 9. Identified in each message
     uint16_t battPercent = 0;       //Battery percentage read by each bot, reported over status update packet and displayed on menu
+    bool LTEInitialStatus = false;
     bool BLEAvail = false;          //Flag if BLE communication is functional between CC and bot, will affect method of communication choice
     bool LTEAvail = false;          //Flag if LTE communication is functional between CC and bot, will affect method of communication choice
     bool XBeeAvail = false;         //Flag if XBee communication is functional between CC and bot, will affect method of communication choice
@@ -146,6 +152,7 @@ class WaterBot{
     float TargetLon = -999.0;       //Target longitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
     float GPSLat = 0.0;             //Current GPS latitude sampled from onboard Ublox module
     float GPSLon= 0.0;              //Current GPS longitude sampled from onboard Ublox module
+    uint8_t reqActive = 0;         //Flag set true when a request should be made to get sensor data
     float pH = 0.0;                 //pH sensor reading, populated when a sensor request ("sns" command) is made
     float temp = 0.0;               //Water temperature sensor reading, populated when a sensor request ("sns" command) is made
     float DO = 0.0;                 //Dissolved Oxygen sensor reading, populated when a sensor request ("sns" command) is made
@@ -154,7 +161,8 @@ class WaterBot{
     uint16_t panelPower = 0;        //Solar panel power (in Watts) sampled from the onboard shunt and voltage divider
     uint16_t battPower = 0;         //Battery power draw (in Watts) sampled from the onboard shunt and voltage divider
     uint32_t publishTime = 0;       //A timer used to handle a data "hazard", which prevents the bot from updating this class with variables controllable in both locations for a short period of time, to not have a "loop"
-    uint32_t timeoutCount;
+    uint32_t LTELastStatTime = 0;   //A timer used to hold the last time a periodic "ctl" command was sent to the bot to limit the rate of LTE publishes
+    uint32_t LastMtrTime = 0;       //A timer used to hold the last time a "mtr" command was sent to limit the rate of mtr published
 };
 
 class PairBot{
@@ -201,7 +209,6 @@ std::vector<PairBot> BLEPair;
 std::vector<MenuPopUp> PopUps;
 
 Timer at1(5000,actionTimer5);
-Timer at2(60000,actionTimer60);
 
 MenuItem * SelectedItem;
 std::vector<MenuItem> MenuItems;
@@ -273,7 +280,7 @@ void startupPair(){
             while(meshPair){
                 BLEScan(selectedBot);
                 BLETimeout++;
-                if(WaterBots.size() == 0 && BLETimeout == LTE_BKP_Time) Particle.publish("Bot1dat", "CCABhwd", PRIVATE);
+                if(WaterBots.size() == 0 && BLETimeout == LTE_BKP_Time) Particle.publish("CCHub", "CCABhwd", PRIVATE);
                 if(BLETimeout > BLE_MAX_CONN_TIME){
                     meshPair = false;
                     botSelect = WaterBots.front().botNum;
@@ -390,7 +397,6 @@ void setup() {
     //delay(3000);
 
     at1.start();
-    at2.start();
 
     WaterBotSim(1);
 
@@ -399,7 +405,7 @@ void setup() {
 
 void loop() {
     if(postStatus){
-        sendData("CCABspc",0,true,true,statusTimeout);                                  
+        sendData("CCABspc",0,false,true,false);                                  
         postStatus = false;
         statusTimeout = false;
     }
@@ -424,10 +430,17 @@ void loop() {
             DataOffloader(wb.botNum);
             wb.offloading = false;
         }
+        if(wb.reqActive > 3){
+            char tempBuf[10];
+            sprintf(tempBuf,"CCB%dsns",wb.reqActive);
+            sendData(tempBuf,0,!(wb.XBeeAvail), true, false);
+            wb.reqActive = 0;
+        }
     }
     XBeeHandler();
     RPiHandler();
     XBeeLTEPairSet();
+    RPiStatusUpdate();
     if(stopActive){
         if(millis() - stopTime > STOP_PUB_TIME){
             stopTime = millis();
@@ -435,6 +448,7 @@ void loop() {
             LTEStopSent = true;
         }
     }
+    delay(10);
 }
 
 void logMessage(const char *message){
@@ -595,7 +609,13 @@ void updateBotControl(){
                 #ifdef VERBOSE
                 Serial.printlnf("Control Packet: %s",statusStr);
                 #endif
-                sendData(statusStr,0,true,true,statusTimeout);
+                bool rpiLTEStatus = false;
+                if(!wb.XBeeAvail && !wb.BLEAvail && LTEStatuses && wb.LTEInitialStatus){
+                    rpiLTEStatus = true;
+                    LTEStatuses--;
+                }
+                sendData(statusStr,0,!(wb.XBeeAvail),true,rpiLTEStatus);
+                wb.LTEInitialStatus = false;
             }
         }
         //if(ControlledBot == NULL) return;
@@ -612,7 +632,12 @@ void updateBotControl(){
         WaterBot wb = WaterBots.at(controlUpdateID);
         char statusStr[42];
         sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum,wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);
-        sendData(statusStr,0,true,true,statusTimeout);
+        bool sendLTEStat = false;
+        if(!wb.XBeeAvail && !wb.BLEAvail && (millis() - wb.LTELastStatTime > LTE_CTL_PERIOD)){
+            sendLTEStat = true;
+            WaterBots.at(controlUpdateID).LTELastStatTime = millis();
+        }
+        sendData(statusStr,0,false,true,sendLTEStat);
         if(controlUpdateID < WaterBots.size()-1) controlUpdateID++;
         else controlUpdateID = 0;
     }
@@ -693,6 +718,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.GPSLon = atof(testLon);
                     w.panelPower = panelPwr;
                     w.battPower = battPwr;
+                    w.updatedStatus = true;
                     if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){
                         w.offloading = (statflags >> 3) & 1;
                         w.driveMode = (statflags >> 4) & 3;
@@ -878,6 +904,7 @@ void processRPiCommand(const char *command, uint8_t mode){
                     wb.offloading = offloading;
                     wb.dataRecording = recording;
                     wb.signal = signal;
+                    wb.LTEInitialStatus = true;
                     if(botSelect == wb.botNum) redrawMenu = true;
                     wb.updatedControl = true;
                     updateControl = true;
@@ -1059,7 +1086,8 @@ void RPiStatusUpdate(){
             statusFlags |= wb.GPSAvail << 8;
             statusFlags |= wb.CompassAvail << 9;
             statusFlags |= wb.SDAvail << 10;
-            Serial.printlnf("CCRPsupB%d %d %0.6f %0,6f %d %d %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags,wb.battPower, wb.panelPower);
+            Serial.printlnf("CCRPsupB%d %d %0.6f %0.6f %d %d %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags,wb.battPower, wb.panelPower);
+            wb.updatedStatus = false;
         }
     }
 }
@@ -1104,6 +1132,8 @@ void XBeeHandler(){
 }
 
 void manualMotorControl(uint8_t commandedBot){
+    static uint8_t lastLSpeed;
+    static uint8_t lastRSpeed;
 
     char mtrStr[15];
     int VRead, HRead, VSet, HSet;
@@ -1131,7 +1161,7 @@ void manualMotorControl(uint8_t commandedBot){
     else{
         HSet = 0;
     }
-    uint8_t LSpeed, RSpeed;
+    
     LSpeed = 90 + VSet/2;
     if(VSet > 0){
         if(HSet > 0){
@@ -1177,12 +1207,35 @@ void manualMotorControl(uint8_t commandedBot){
             }
         }
     }
+
+    if(lastLSpeed - LSpeed > LTE_MIN_DIFF || LSpeed - lastLSpeed > LTE_MIN_DIFF){
+        lastLSpeed = LSpeed;
+        mtrLTEDiff = true;
+    }
+    if(lastRSpeed - RSpeed > LTE_MIN_DIFF || RSpeed - lastRSpeed > LTE_MIN_DIFF){
+        lastRSpeed = RSpeed;
+        mtrLTEDiff = true;
+    }
+    if(lastLSpeed != LSpeed && LSpeed == 90){
+        lastLSpeed = LSpeed;
+        mtrLTEDiff = true;
+    }
+    if(lastRSpeed != RSpeed && RSpeed == 90){
+        lastRSpeed = RSpeed;
+        mtrLTEDiff = true;
+    }
     
     if(!stopActive){
         for(WaterBot wb: WaterBots){
             if(wb.driveMode == 0 && wb.botNum == botSelect){
                 sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
-                sendData(mtrStr,0,true,false, false);
+                bool sendMTRLTE = false;
+                if(!wb.XBeeAvail && !wb.BLEAvail && mtrLTEDiff && (millis() - wb.LastMtrTime > MTR_LTE_PERIOD)){
+                    mtrLTEDiff = false;
+                    wb.LastMtrTime = millis();
+                    sendMTRLTE = true;
+                }
+                sendData(mtrStr,0,!(wb.XBeeAvail), true, sendMTRLTE);
             }
         }
     }
@@ -1261,7 +1314,7 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
     Serial.println(outStr);
     #endif
     if(sendLTE || sendMode == 4){
-        Particle.publish("Bot1dat", outStr, PRIVATE);
+        Particle.publish("CCHub", outStr, PRIVATE);
         sendLTE = false;
     }
     if((sendBLE || sendMode == 1) && BLE.connected()){
@@ -1277,23 +1330,9 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
 void actionTimer5(){
     postStatus = true;
     for(WaterBot &w: WaterBots){
-        w.timeoutCount++;
+        w.reqActive++;
     }
     //if(!BLE.connected)
-}
-
-void actionTimer60(){
-    bool reqLTEStatus = false;
-    for(WaterBot &w: WaterBots){
-        if(w.timeoutCount > XBEE_BLE_MAX_TIMEOUT){
-            reqLTEStatus = true;
-            w.timeoutCount = 0;            
-        }
-    }
-    if(reqLTEStatus && LTEStatuses < MAX_LTE_STATUSES){
-        LTEStatuses++;
-        statusTimeout = true;
-    }
 }
 
 void WaterBotSim(uint8_t count){
