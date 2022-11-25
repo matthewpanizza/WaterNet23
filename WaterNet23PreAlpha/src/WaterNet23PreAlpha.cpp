@@ -45,6 +45,7 @@ int LTEInputCommand(String cmd);
 #define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 #define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
 #define BATT_TRIG_LEAK      0           //Set to 1 to enable the battery leak cutting off system
+//#define VERBOSE
 
 ///////////////////////
 // Pin Configuration //
@@ -131,7 +132,8 @@ int LTEInputCommand(String cmd);
 #define MTR_ST_FWD          100             //Minimum commanded speed for motors going forward
 #define MTR_ST_REV          80              //Minimum commanded speed for motors in reverse
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
-#define MTR_RAMP_SPD        8               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
+#define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
+#define MTR_RAMP_TIME       50              //Time between ramp iterations
 #define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
@@ -199,7 +201,7 @@ uint8_t BLECustomData[CUSTOM_DATA_LEN];             //Byte array for custom data
 
 Timer watchdog(WATCHDOG_PD, wdogHandler);           //Create timer for watchdog, which checks if certain methods of communication are available
 Timer ledTimer(300,LEDHandler);                     //Create timer for LED, which updates the color of the LED based on what communication/hardware modes are available
-Timer motionTimer(2500, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
+Timer motionTimer(250, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
 Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);    //Create timer for shutdown, which runs when the button is pressed to calculate if the button has been held for SHUTDOWN_HOLD seconds 
 
@@ -255,9 +257,9 @@ bool offloadMode;                                                       //Flag t
 bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
 bool shutdownActive;                                                    //Flag to indicate that the button has been pressed down and a shutdown is initiated
 bool stopActive;                                                        //Flag to indicate that the CChub has had a stop hit
-uint32_t senseTimer, dataTimer, positionTimer, rampTimer;                          //Timers for reading from the GPS and compass
+uint32_t senseTimer, dataTimer, positionTimer;                          //Timers for reading from the GPS and compass
 uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
-uint32_t lastMtrTime, lastTelemTime;                                    //Timers for when the last motor and telemetry commands were received
+uint32_t motionTime, lastMtrTime, lastTelemTime;                                    //Timers for when the last motor and telemetry commands were received
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
 uint32_t stopTime;
 float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
@@ -277,14 +279,18 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         cmdStr[3] = '\0';                   //Set null at end of command string
         char checkStr[3] = {command[strlen(command)-2], command[strlen(command)-1], '\0'};  //Get checksum string from last two characters
         checksum = (uint8_t)strtol(checkStr, NULL, 16);       //Convert string to number, with base 16 (hex) from string
+        #ifdef VERBOSE
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
+        #endif
         for(uint8_t i = 4; i < strlen(command)-2;i++){      //Copy in data characters from overall string
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
         if(checksum != strlen(command)-2){      //Check if the received checksum matches the length of the string received
+            #ifdef VERBOSE
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum); //Print to console
             Serial.println("Warning, checksum does not match");
+            #endif
             if(!logFile.isOpen()){  //Print to SD Card
                 logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[WARN] Message Checksum Does Not Match!: %s",command);
@@ -315,7 +321,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 ESCL.write(setLSpeed);
                 ESCR.write(setRSpeed);
             }*/
-            updateMotorControl = true;      //Set flag to indicate to updateMotors that a new speed has been received
+            //updateMotorControl = true;      //Set flag to indicate to updateMotors that a new speed has been received
             lastMtrTime = millis();         //Update timer for the watchdog that a motor speed was received from CC hub
             driveMode = 0;                  //In case we missed the switch from an autonomous to manual mode, switch to manual mode
         }
@@ -398,7 +404,7 @@ void setup(){
         pinMode(LEAK_DET, INPUT);
     #endif
 
-    Particle.connect();
+    //Particle.connect();
     
     uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
     leftMotorSpeed = setLSpeed = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
@@ -427,8 +433,7 @@ void setup(){
     Particle.function("Input Command", LTEInputCommand);        //Debug function to feed in commands over LTE
     LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
     SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
-
-    rampTimer = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
+    motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
     XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
     BLERxTime = 0;                              //Initialize timer for checking that BLE is available
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
@@ -530,7 +535,8 @@ void setup(){
 
 //Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
 void loop(){
-    getPositionData();      //Grab position data from GPS and Compass
+    //Serial.printlnf("Time: %d", millis());
+    //getPositionData();      //Grab position data from GPS and Compass
     readPowerSys();         //Read power from battery and solar panel
     sensorHandler();        //Read and request data from Atlas sensor
     XBeeHandler();          //Check if a string has come in from XBee
@@ -539,7 +545,7 @@ void loop(){
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();     //Send sensor data if requested from the CC
     varCompassHead = (double)compassHeading;
-    delay(10);              //Slow down the program a little bit, 10ms per loop
+    delay(3);              //Slow down the program a little bit, 10ms per loop
     //Serial.printlnf("Hello World, %d", millis());
 }
 
@@ -610,7 +616,9 @@ float deg2rad(float deg) {
 float readCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
     rawHead = (double) rawHeading;
+    #ifdef VERBOSE
     Serial.printlnf("Raw Heading: %f", rawHeading);
+    #endif
     //Map the bearing based on which 1/8th section of the compass it it
     if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
         //Serial.println("Between N and NE");
@@ -703,7 +711,7 @@ void getPositionData(){
     //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
     if(millis() - positionTimer > POS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
-        updateMotorControl = true;                      //Indicate to motor control function that new position data is available
+        if(driveMode != 0) updateMotorControl = true;                      //Indicate to motor control function that new position data is available
         if(myGPS.isConnected()){                        //Only read from GPS if it is connected
             latitude = ((float)myGPS.getLatitude())/1000000.0;      //Get latitude and divide by 1000000 to get in degrees
             longitude = ((float)myGPS.getLongitude())/1000000.0;    //Get longitude and divide by 1000000 to get in degrees
@@ -742,7 +750,9 @@ void sendResponseData(){
 //Function to check if the status is updated based on a flag and then transmit it out to the CChub
 void statusUpdate(){
     if(statusReady){        //Check if status flag has been set by timer that calculates system status flags
+        #ifdef VERBOSE
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
+        #endif
         char updateStr[55];                             //Create local string to hold status being sent out
         sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d ",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent));  //Print status flags, battery, latitude and logitude
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){     //If BLE and XBee are not available, send status over LTE, but only 1 in LTE_STAT_PD updates (to not suck up data)
@@ -760,6 +770,10 @@ void statusUpdate(){
 
 //Function to calculate what speed the motors should move at based on the current drive mode (manual, sentry, autonomous)
 void updateMotors(){
+    if(millis() - motionTime > MTR_RAMP_TIME){
+        updateMotorControl = true;
+        motionTime = millis();
+    }
     if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
         if(driveMode == 1 || driveMode == 2){               //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
             if(travelDistance < MTR_CUTOFF_RAD){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
@@ -817,14 +831,11 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
             else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
         }
-        if(driveMode == 0){
-            rightMotorSpeed = setRSpeed;
-            leftMotorSpeed = setLSpeed;
-        }
         //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
             ESCL.write(180-leftMotorSpeed);
             ESCR.write(rightMotorSpeed);
+            Serial.printlnf("Update motor speed (%dms): %d %d",millis(), setRSpeed, setLSpeed);
         }
         updateMotorControl = false;        //Set the flag to false
     }
@@ -974,8 +985,10 @@ void XBeeHandler(){
         char buffer[data.length()];                     //Create a buffer to take the received string object and make a character array to pass to processCommand
         for(uint16_t i = 0 ; i < data.length(); i++) buffer[i] = data.charAt(i);    //Loop over characters and copy them into char array
         if(data.length() > 1 && data.charAt(data.length()-1) == '\r') buffer[data.length()-1] = 0;      //If there was a carriage return, then get rid of it and set to terminate character
+        #ifdef VERBOSE
         Serial.println("New XBee Command:");
         Serial.println(data);                           //Print out command for debugging
+        #endif
         processCommand(buffer,2,true);                  //Process the command received over Xbee using the dictionary
         if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis(); //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
         if(logMessages){
@@ -992,8 +1005,10 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];       //Convert byte array into character array
     if(btBuf[len-1] != '\0') btBuf[len] = '\0';                     //Make sure there is a null character at the end (another bug that cost many hours and seeing random data from surrounding memory)
     else btBuf[len-1] = '\0';
+    #ifdef VERBOSE
     Serial.println("New BT Command:");
     Serial.println(btBuf);                                          //Print out command for debugging purposes
+    #endif
     processCommand(btBuf,1,true);                                   //Process the command received over BLE using the dictionary
     if(btBuf[0] == 'A' || btBuf[0] == 'C') BLERxTime = millis();    //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
     if(logMessages){

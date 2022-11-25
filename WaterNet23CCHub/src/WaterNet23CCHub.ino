@@ -46,7 +46,7 @@
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 #define LTE_CTL_PERIOD          29000           //Minimum time between sending LTE control packets periodically per bot
 #define MTR_LTE_PERIOD          3000            //Minimum time between sending mtr command over LTE
-#define MTR_UPDATE_TIME         500             //Frequency to send manual motor control packet in milliseconds
+#define MTR_UPDATE_TIME         750             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000            //Number of milliseconds between sending control packets to bots
 #define STOP_PUB_TIME           5000            //Time between sending stop messages when active
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
@@ -114,7 +114,7 @@ uint32_t rcTime;                                //Time between sending mtr comma
 uint16_t LTEStatuses = MAX_LTE_STATUSES;                            //Counter for number of statuses that have been sent over LTE. Stops sending status over LTE after running out
 bool stopActive;                                //Flag set active when the stop button has been pressed, and is cleared after pressing again
 uint8_t BLEBotNum;                              //Bot id of the bot currently connected to over BLE
-bool mtrLTEDiff = false;                        //Flag set true when the motor has a significant enough speed change to warrant sending a new LTE speed
+bool ctlSpeedDiff = false;                      //Flag set true when the motor has a significant enough speed change to warrant sending a new speed immediately
 uint8_t LSpeed, RSpeed;
 
 //Menu variables
@@ -411,10 +411,7 @@ void loop() {
     }
     updateMenu();
     updateBotControl();
-    if((millis() - rcTime) > MTR_UPDATE_TIME){
-        manualMotorControl(botSelect);
-        rcTime = millis();
-    }
+    manualMotorControl(botSelect);
     if (BLE.connected()) {
         
     }
@@ -649,23 +646,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         char rxIDBuf[1];
         rxIDBuf[0] = command[1];
         uint8_t rxBotID = atoi(rxIDBuf);
-        bool newBot = true;
-        WaterBot *TargetWB = nullptr;
-        int index = 0;
-        for(WaterBot w: WaterBots){
-            if(rxBotID == w.botNum){
-                newBot = false;
-                TargetWB = &WaterBots.at(index);
-            }
-            index++;
-        }
-        if(newBot){
-            WaterBot newWaterbot;
-            newWaterbot.botNum = rxBotID;
-            WaterBots.push_back(newWaterbot);
-            TargetWB = &WaterBots.back();
-            redrawMenu = true;
-        }
+        if(rxBotID > 9) return;
         uint8_t checksum;
         char dataStr[strlen(command)-8];
         dataStr[strlen(command)-9] = '\0';
@@ -695,6 +676,23 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                 rxBotNum[1] = command[1];
             }
             return;
+        }
+        bool newBot = true;
+        WaterBot *TargetWB = nullptr;
+        int index = 0;
+        for(WaterBot w: WaterBots){
+            if(rxBotID == w.botNum){
+                newBot = false;
+                TargetWB = &WaterBots.at(index);
+            }
+            index++;
+        }
+        if(newBot){
+            WaterBot newWaterbot;
+            newWaterbot.botNum = rxBotID;
+            WaterBots.push_back(newWaterbot);
+            TargetWB = &WaterBots.back();
+            redrawMenu = true;
         }
         else if(!strcmp(cmdStr,"sup")){
             for(WaterBot &w: WaterBots){
@@ -1210,32 +1208,34 @@ void manualMotorControl(uint8_t commandedBot){
 
     if(lastLSpeed - LSpeed > LTE_MIN_DIFF || LSpeed - lastLSpeed > LTE_MIN_DIFF){
         lastLSpeed = LSpeed;
-        mtrLTEDiff = true;
+        ctlSpeedDiff = true;
     }
     if(lastRSpeed - RSpeed > LTE_MIN_DIFF || RSpeed - lastRSpeed > LTE_MIN_DIFF){
         lastRSpeed = RSpeed;
-        mtrLTEDiff = true;
+        ctlSpeedDiff = true;
     }
     if(lastLSpeed != LSpeed && LSpeed == 90){
         lastLSpeed = LSpeed;
-        mtrLTEDiff = true;
+        ctlSpeedDiff = true;
     }
     if(lastRSpeed != RSpeed && RSpeed == 90){
         lastRSpeed = RSpeed;
-        mtrLTEDiff = true;
+        ctlSpeedDiff = true;
     }
-    
-    if(!stopActive){
+
+    if(!stopActive && ((millis() - rcTime > MTR_UPDATE_TIME) || (ctlSpeedDiff && millis() - rcTime > 75))){
+        ctlSpeedDiff = false;
+        rcTime = millis();
         for(WaterBot wb: WaterBots){
             if(wb.driveMode == 0 && wb.botNum == botSelect){
                 sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);
                 bool sendMTRLTE = false;
-                if(!wb.XBeeAvail && !wb.BLEAvail && mtrLTEDiff && (millis() - wb.LastMtrTime > MTR_LTE_PERIOD)){
-                    mtrLTEDiff = false;
+                if(!wb.XBeeAvail && !wb.BLEAvail && ctlSpeedDiff && (millis() - wb.LastMtrTime > MTR_LTE_PERIOD)){
                     wb.LastMtrTime = millis();
                     sendMTRLTE = true;
                 }
                 sendData(mtrStr,0,!(wb.XBeeAvail), true, sendMTRLTE);
+                Serial.printlnf("Time :%d, Speed: %d %d", millis(), LSpeed, RSpeed);
             }
         }
     }
