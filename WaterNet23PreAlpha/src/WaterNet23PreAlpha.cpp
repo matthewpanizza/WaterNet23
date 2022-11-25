@@ -104,7 +104,7 @@ int LTEInputCommand(String cmd);
 #define LTE_MAX_STATUS      480             // (Divided by LTE STAT PD) Maximum number of status messages to send over LTE if other methods are unavailable
 #define LTE_STAT_PD         4               //Divider for sending status via LTE to reduce data usage
 #define XBEE_START_PUB      5000            //Time period between sending "Hello World" messages over XBee during setup
-#define MANUAL_RAMP_PD      100             //Time period between motor ramp updates when in manual motor drive mode
+#define MANUAL_RAMP_PD      30             //Time period between motor ramp updates when in manual motor drive mode
 
 #define DEF_FILENAME        "WaterBot"
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
@@ -128,10 +128,10 @@ int LTEInputCommand(String cmd);
 ////////////////////////
 
 #define MTR_IDLE_ARM        2000            //Number of milliseconds to hold motors stopped for arming
-#define MTR_ST_FWD          110             //Minimum commanded speed for motors going forward
-#define MTR_ST_REV          75              //Minimum commanded speed for motors in reverse
+#define MTR_ST_FWD          100             //Minimum commanded speed for motors going forward
+#define MTR_ST_REV          80              //Minimum commanded speed for motors in reverse
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
-#define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
+#define MTR_RAMP_SPD        8               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
@@ -230,7 +230,8 @@ Servo ESCR;                                     //Object for servo esc of right 
 
 bool waitForConnection;                                                 //Flag used on startup until the CC acknowledges this bot
 float latitude, longitude;                                              //Globals to hold the latitude and longitude read in from the GPS
-float compassHeading, travelHeading, targetDelta;                       //Compassheading is the calibrated compass reading relative to north, travel heading is the heading between current point and target point
+float compassHeading; 
+float travelHeading, targetDelta;                       //Compassheading is the calibrated compass reading relative to north, travel heading is the heading between current point and target point
 float targetLat, targetLon;                                             //Globals to hold the latitude and longitude sent from the CC for where the bot should target
 float travelDistance;                                                   //Global to hold the distance between the current latitude and longitude and the target latitude and longitude
 bool telemetryAvail;                                                    //Boolean global to check if the compass and GPS are available
@@ -254,7 +255,7 @@ bool offloadMode;                                                       //Flag t
 bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
 bool shutdownActive;                                                    //Flag to indicate that the button has been pressed down and a shutdown is initiated
 bool stopActive;                                                        //Flag to indicate that the CChub has had a stop hit
-uint32_t senseTimer, dataTimer, positionTimer;                          //Timers for reading from the GPS and compass
+uint32_t senseTimer, dataTimer, positionTimer, rampTimer;                          //Timers for reading from the GPS and compass
 uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
 uint32_t lastMtrTime, lastTelemTime;                                    //Timers for when the last motor and telemetry commands were received
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
@@ -262,6 +263,8 @@ uint32_t stopTime;
 float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
 char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
 char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
+double varCompassHead;
+double rawHead;
 
 //Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -414,12 +417,18 @@ void setup(){
     setupXBee();                                //Setup XBee module
     setupGPS();                                 //Setup GPS module
     
+    Particle.variable("Heading", varCompassHead);
+    Particle.variable("RawHead", rawHead);
+    //Particle.variable("Distance", travelDistance);
+    //Particle.variable("Lat", latitude);
+    //Particle.variable("Lon", longitude);
+
     Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
     Particle.function("Input Command", LTEInputCommand);        //Debug function to feed in commands over LTE
     LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
     SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
 
-    stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
+    rampTimer = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
     XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
     BLERxTime = 0;                              //Initialize timer for checking that BLE is available
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
@@ -529,7 +538,7 @@ void loop(){
     updateMotors();         //Update the motor speeds dependent on the mode
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();     //Send sensor data if requested from the CC
-
+    varCompassHead = (double)compassHeading;
     delay(10);              //Slow down the program a little bit, 10ms per loop
     //Serial.printlnf("Hello World, %d", millis());
 }
@@ -600,7 +609,8 @@ float deg2rad(float deg) {
 //Function to take an x and y acceleration from the compass and calibrate the raw heading calulation for use by autonomous algorithm
 float readCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
-    //Serial.printlnf("Raw Heading: %f", rawHeading);
+    rawHead = (double) rawHeading;
+    Serial.printlnf("Raw Heading: %f", rawHeading);
     //Map the bearing based on which 1/8th section of the compass it it
     if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
         //Serial.println("Between N and NE");
@@ -807,16 +817,16 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
             else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
         }
+        if(driveMode == 0){
+            rightMotorSpeed = setRSpeed;
+            leftMotorSpeed = setLSpeed;
+        }
         //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
-            ESCL.write(leftMotorSpeed);
-            ESCR.write(180-rightMotorSpeed);
+            ESCL.write(180-leftMotorSpeed);
+            ESCR.write(rightMotorSpeed);
         }
         updateMotorControl = false;        //Set the flag to false
-    }
-    else if(driveMode == 0 && millis() - positionTimer > MANUAL_RAMP_PD){   //If in manual movement mode, there isn't a trigger for updating the motor speed, so trigger with time periodically
-        updateMotorControl = true;
-        positionTimer = millis();
     }
 }
 
@@ -1043,7 +1053,8 @@ void wdogHandler(){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
             logFile.printlnf("[WARN] BLE Messages have not been received in %ds, assuming BLE is unavailable",(BLE_WDOG_AVAIL/1000));
         }
-        BLEAvail = false;
+        if(BLE.connected() && XBeeAvail) BLEAvail = true;
+        else BLEAvail = false;
     }
     else BLEAvail = true;
     if(stopActive && millis() - stopActive > STOP_RST_TIME) stopActive = false;                          //Set stop to false in case the CChub somehow crashed (though we have already entered a "float" mode where drivemode = 0)
