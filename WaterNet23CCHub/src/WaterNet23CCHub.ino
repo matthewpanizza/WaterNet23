@@ -66,11 +66,11 @@
 #define LTE_MIN_DIFF        3                   //Minimum difference in motor speed to send an update over LTE
 
 //Development Parameters
-//#define VERBOSE
+#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
-SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 // These UUIDs were defined by Nordic Semiconductor and are now the defacto standard for
 // UART-like services over BLE. Many apps support the UUIDs now, like the Adafruit Bluefruit app.
@@ -1235,7 +1235,7 @@ void manualMotorControl(uint8_t commandedBot){
                     sendMTRLTE = true;
                 }
                 sendData(mtrStr,0,!(wb.XBeeAvail), true, sendMTRLTE);
-                Serial.printlnf("Time :%d, Speed: %d %d", millis(), LSpeed, RSpeed);
+                //Serial.printlnf("Time :%d, Speed: %d %d", millis(), LSpeed, RSpeed);
             }
         }
     }

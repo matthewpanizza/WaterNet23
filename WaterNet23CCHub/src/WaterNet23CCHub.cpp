@@ -81,7 +81,7 @@ int LTEInputCommand(String cmd);
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 #define LTE_CTL_PERIOD          29000           //Minimum time between sending LTE control packets periodically per bot
 #define MTR_LTE_PERIOD          3000            //Minimum time between sending mtr command over LTE
-#define MTR_UPDATE_TIME         500             //Frequency to send manual motor control packet in milliseconds
+#define MTR_UPDATE_TIME         750             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000            //Number of milliseconds between sending control packets to bots
 #define STOP_PUB_TIME           5000            //Time between sending stop messages when active
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
@@ -101,11 +101,11 @@ int LTEInputCommand(String cmd);
 #define LTE_MIN_DIFF        3                   //Minimum difference in motor speed to send an update over LTE
 
 //Development Parameters
-//#define VERBOSE
+#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
-SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 // These UUIDs were defined by Nordic Semiconductor and are now the defacto standard for
 // UART-like services over BLE. Many apps support the UUIDs now, like the Adafruit Bluefruit app.
@@ -1270,7 +1270,7 @@ void manualMotorControl(uint8_t commandedBot){
                     sendMTRLTE = true;
                 }
                 sendData(mtrStr,0,!(wb.XBeeAvail), true, sendMTRLTE);
-                Serial.printlnf("Time :%d, Speed: %d %d", millis(), LSpeed, RSpeed);
+                //Serial.printlnf("Time :%d, Speed: %d %d", millis(), LSpeed, RSpeed);
             }
         }
     }

@@ -129,7 +129,7 @@
 #define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
-#define POS_POLL_TIME       500             //Rate to poll the GPS and Compass and calculate the position heading
+#define POS_POLL_TIME       990             //Rate to poll the GPS and Compass and calculate the position heading
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
@@ -194,6 +194,7 @@ uint8_t BLECustomData[CUSTOM_DATA_LEN];             //Byte array for custom data
 Timer watchdog(WATCHDOG_PD, wdogHandler);           //Create timer for watchdog, which checks if certain methods of communication are available
 Timer ledTimer(300,LEDHandler);                     //Create timer for LED, which updates the color of the LED based on what communication/hardware modes are available
 Timer motionTimer(250, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
+Timer motorHandler(MTR_RAMP_TIME,updateMotors);
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
 Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);    //Create timer for shutdown, which runs when the button is pressed to calculate if the button has been held for SHUTDOWN_HOLD seconds 
 
@@ -518,17 +519,18 @@ void setup(){
         Serial.println("Successfully paired with controller");
     }
     while(millis() - mtrArmTime < MTR_IDLE_ARM) delay(5);   //Check that the we've been in this setup function for at least two seconds so the ESC's will arm and allow movement
+    motorHandler.start();
 }
 
 //Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
 void loop(){
-    Serial.printlnf("Time: %d", millis());
+    //Serial.printlnf("Time: %d", millis());
     getPositionData();      //Grab position data from GPS and Compass
     readPowerSys();         //Read power from battery and solar panel
     sensorHandler();        //Read and request data from Atlas sensor
     XBeeHandler();          //Check if a string has come in from XBee
     statusUpdate();         //Check if a status update has to be sent out
-    updateMotors();         //Update the motor speeds dependent on the mode
+    //updateMotors();         //Update the motor speeds dependent on the mode
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();     //Send sensor data if requested from the CC
     varCompassHead = (double)compassHeading;
@@ -569,7 +571,7 @@ void setupGPS(){
     }
     myGPS.setI2COutput(COM_TYPE_UBX);
     myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
-    myGPS.setNavigationFrequency(1);
+    myGPS.setNavigationFrequency(2);
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 }
 
@@ -713,13 +715,13 @@ float calcDelta(float compassHead, float targetHead){
 void getPositionData(){
     if(millis() - positionTimer > POS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
-        if(myGPS.checkUblox()){                        //Only read from GPS if it is connected
+        if(myGPS.isConnected()){                        //Only read from GPS if it is connected
             latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
             longitude = ((float)myGPS.getLongitude())/10000000.0;    //Get longitude and divide by 1000000 to get in degrees
             Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
-        else if(myGPS.isConnected()) GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        else if(!myGPS.isConnected()) GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
@@ -772,11 +774,11 @@ void statusUpdate(){
 
 //Function to calculate what speed the motors should move at based on the current drive mode (manual, sentry, autonomous)
 void updateMotors(){
-    if(millis() - motionTime > MTR_RAMP_TIME){
-        updateMotorControl = true;
-        motionTime = millis();
-    }
-    if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
+    //if(millis() - motionTime > MTR_RAMP_TIME){
+    //    updateMotorControl = true;
+    //    motionTime = millis();
+    //}
+    //if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
         if(driveMode == 1 || driveMode == 2){               //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
             if(travelDistance < MTR_CUTOFF_RAD){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
                 pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
@@ -837,10 +839,10 @@ void updateMotors(){
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
             ESCL.write(180-leftMotorSpeed);
             ESCR.write(rightMotorSpeed);
-            Serial.printlnf("Update motor speed (%dms): %d %d",millis(), setRSpeed, setLSpeed);
+            Serial.printlnf("Update motor speed (%dms): %d %d", millis(), setRSpeed, setLSpeed);
         }
         updateMotorControl = false;        //Set the flag to false
-    }
+    //}
 }
 
 //Majoy function for sending a string of data out over BLE, XBee or LTE. Automatically calculates the checksum from the given string
