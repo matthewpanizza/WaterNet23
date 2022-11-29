@@ -29,6 +29,7 @@ void loop();
 int LTEInputCommand(String cmd);
 #line 22 "/Users/matthewpanizza/Downloads/WaterNet23/WaterNet23PreAlpha/src/WaterNet23PreAlpha.ino"
 #define X_AXIS_ACCELERATION 0
+//#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
 #include "SdFat.h"
 #include "sdios.h"
@@ -212,6 +213,9 @@ Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);    //Create timer for shutdown,
 //////////////////////
 
 SFE_UBLOX_GNSS myGPS;                           //GPS Buffer and Objects
+//char nmeaBuffer[100];
+//MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
+//SFE_UBLOX_GPS myGPS;
 
 Adafruit_LIS3MDL lis3mdl;                       //Compass object
 
@@ -313,14 +317,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             setLSpeed = atoi(lSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
             setRSpeed = atoi(rSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
             Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",setLSpeed,setRSpeed);
-            /*if(setLSpeed > 90 && setLSpeed <=123) setLSpeed = 123;
-            if(setRSpeed > 90 && setRSpeed <=123) setRSpeed = 123;
-            if(setLSpeed < 90 && setLSpeed >=123) setLSpeed = 67;
-            if(setRSpeed < 90 && setRSpeed >=123) setRSpeed = 67;
-            if(!stopActive){
-                ESCL.write(setLSpeed);
-                ESCR.write(setRSpeed);
-            }*/
             //updateMotorControl = true;      //Set flag to indicate to updateMotors that a new speed has been received
             lastMtrTime = millis();         //Update timer for the watchdog that a motor speed was received from CC hub
             driveMode = 0;                  //In case we missed the switch from an autonomous to manual mode, switch to manual mode
@@ -535,8 +531,8 @@ void setup(){
 
 //Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
 void loop(){
-    //Serial.printlnf("Time: %d", millis());
-    //getPositionData();      //Grab position data from GPS and Compass
+    Serial.printlnf("Time: %d", millis());
+    getPositionData();      //Grab position data from GPS and Compass
     readPowerSys();         //Read power from battery and solar panel
     sensorHandler();        //Read and request data from Atlas sensor
     XBeeHandler();          //Check if a string has come in from XBee
@@ -558,15 +554,31 @@ void setupXBee(){
     //Serial1.printf("Hello from Bot %d\n", BOTNUM);   //Send Hello World message!
 }
 
+//This function gets called from the SparkFun Ublox Arduino Library
+//As each NMEA character comes in you can specify what to do with it
+//Useful for passing to other libraries like tinyGPS, MicroNMEA, or even
+//a buffer, radio, etc.
+//void SFE_UBLOX_GPS::processNMEA(char incoming){
+  //Take the incoming char from the Ublox I2C port and pass it on to the MicroNMEA lib
+  //for sentence cracking
+  //nmea.process(incoming);
+//}
+
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
     GPSAvail = true;
+    /*myGPS.begin(Wire);
+    if (myGPS.isConnected() == false){
+        //Log.warn("Ublox GPS not detected at default I2C address, freezing.");
+        GPSAvail = false;
+    }*/
     if(myGPS.begin() == false){
         GPSAvail = false;
         Serial.println("Error, Could not initialize GPS");
     }
     myGPS.setI2COutput(COM_TYPE_UBX);
     myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
+    myGPS.setNavigationFrequency(1);
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 }
 
@@ -708,16 +720,15 @@ float calcDelta(float compassHead, float targetHead){
 
 //Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement
 void getPositionData(){
-    //myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
     if(millis() - positionTimer > POS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
-        if(driveMode != 0) updateMotorControl = true;                      //Indicate to motor control function that new position data is available
-        if(myGPS.isConnected()){                        //Only read from GPS if it is connected
-            latitude = ((float)myGPS.getLatitude())/1000000.0;      //Get latitude and divide by 1000000 to get in degrees
-            longitude = ((float)myGPS.getLongitude())/1000000.0;    //Get longitude and divide by 1000000 to get in degrees
+        if(myGPS.checkUblox()){                        //Only read from GPS if it is connected
+            latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
+            longitude = ((float)myGPS.getLongitude())/10000000.0;    //Get longitude and divide by 1000000 to get in degrees
+            Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
-        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        else if(myGPS.isConnected()) GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
@@ -731,7 +742,7 @@ void getPositionData(){
             //char tempbuf[200];
             //sprintf(tempbuf,"Lat: %f Lon %f TLat: %f TLon: %f, Compass: %f, Travel hd: %f, T Delta: %f, Dist: %f", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance);
             //printBLE(tempbuf);
-            //Serial.println(tempbuf);
+            Serial.printlnf("Heading: %0.2f",compassHeading);
         }        
     }
 }
