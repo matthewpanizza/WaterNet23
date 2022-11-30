@@ -129,7 +129,8 @@
 #define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
-#define POS_POLL_TIME       990             //Rate to poll the GPS and Compass and calculate the position heading
+#define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
+#define COMP_POLL_TIME      250             //Rate to poll the Compass and calculate the target heading
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
@@ -253,7 +254,7 @@ bool offloadMode;                                                       //Flag t
 bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
 bool shutdownActive;                                                    //Flag to indicate that the button has been pressed down and a shutdown is initiated
 bool stopActive;                                                        //Flag to indicate that the CChub has had a stop hit
-uint32_t senseTimer, dataTimer, positionTimer;                          //Timers for reading from the GPS and compass
+uint32_t senseTimer, dataTimer, positionTimer, compassTimer;            //Timers for reading from the GPS and compass
 uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
 uint32_t motionTime, lastMtrTime, lastTelemTime;                                    //Timers for when the last motor and telemetry commands were received
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
@@ -392,7 +393,7 @@ void setup(){
         pinMode(LEAK_DET, INPUT);
     #endif
 
-    //Particle.connect();
+    Particle.connect();
     
     uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
     leftMotorSpeed = setLSpeed = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
@@ -421,7 +422,7 @@ void setup(){
     Particle.function("Input Command", LTEInputCommand);        //Debug function to feed in commands over LTE
     LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
     SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
-    motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
+    compassTimer = motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
     XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
     BLERxTime = 0;                              //Initialize timer for checking that BLE is available
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
@@ -713,7 +714,7 @@ float calcDelta(float compassHead, float targetHead){
 
 //Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement
 void getPositionData(){
-    if(millis() - positionTimer > POS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
+    if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
         if(myGPS.isConnected()){                        //Only read from GPS if it is connected
             latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
@@ -721,7 +722,9 @@ void getPositionData(){
             Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
-        else if(!myGPS.isConnected()) GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+    }
+    if(millis() - compassTimer > COMP_POLL_TIME){
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
