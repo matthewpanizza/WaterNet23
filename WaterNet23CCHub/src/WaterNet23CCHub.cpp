@@ -359,6 +359,10 @@ void setup() {
     attachInterrupt(JOY_BTN,jHandler,RISING);
     attachInterrupt(STOP_BTN,sHandler,RISING);
 
+    delay(5);
+
+    if(digitalRead(U_DPAD) == LOW || digitalRead(D_DPAD) == LOW) Particle.connect();
+
     debounceTime = millis();
     controlUpdateTime = millis();
     rcTime = millis();

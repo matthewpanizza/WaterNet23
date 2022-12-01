@@ -43,7 +43,7 @@ int LTEInputCommand(String cmd);
 
 #define BOTNUM              1           //VERY IMPORTANT - Change for each bot to configure which node in the network this bot is
 #define STARTUP_WAIT_PAIR   0           //Set to 1 to wait for controller to connect and discover bots, turns on "advertising" on startup
-#define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
+//#define BLE_DEBUG_ENABLED               //If enabled, will add a BLE characteristic for convenient printing of log messages to a BLE console
 #define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
 #define BATT_TRIG_LEAK      0           //Set to 1 to enable the battery leak cutting off system
 //#define VERBOSE
@@ -118,7 +118,7 @@ int LTEInputCommand(String cmd);
 // Power System Macros //
 /////////////////////////
 
-#define BAT_MIN             10.2            //Voltage to read 0% battery
+#define BAT_MIN             13.2            //Voltage to read 0% battery
 #define BAT_MAX             16.4            //Voltage to read 100% battery
 #define LOW_BATT_PCT        20              //Voltage to set low battery flag
 #define VDIV_MULT           0.004835        //Calculate the ratio for ADC to voltage conversion 3.3V in on ADC = 4095 3.3V on 100kOhm + 20kOhm divider yields (3.3/20000)*120000 = 19.8V in MAX
@@ -135,7 +135,7 @@ int LTEInputCommand(String cmd);
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
 #define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_RAMP_TIME       50              //Time between ramp iterations
-#define MTR_TRAVEL_SPD      0.5             //Percentage maximum travel speed for autonomous movement default
+#define MTR_TRAVEL_SPD      0.25             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
@@ -273,6 +273,7 @@ char filename[MAX_FILENAME_LEN];                                        //Filena
 char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
 double varCompassHead;
 double rawHead;
+uint32_t BLEdbgTimer;
 
 //Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -431,7 +432,7 @@ void setup(){
     Particle.function("Input Command", LTEInputCommand);        //Debug function to feed in commands over LTE
     LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
     SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
-    compassTimer = motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
+    BLEdbgTimer = compassTimer = motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
     XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
     BLERxTime = 0;                              //Initialize timer for checking that BLE is available
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
@@ -725,13 +726,16 @@ float calcDelta(float compassHead, float targetHead){
 void getPositionData(){
     if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
-        if(myGPS.isConnected()){                        //Only read from GPS if it is connected
+        /*if(myGPS.isConnected()){                        //Only read from GPS if it is connected
             latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
             longitude = ((float)myGPS.getLongitude())/10000000.0;    //Get longitude and divide by 1000000 to get in degrees
             Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
-        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected*/
+        GPSAvail = true;
+        latitude = 35.77185;
+        longitude = -78.67415;
     }
     if(millis() - compassTimer > COMP_POLL_TIME){
         lis3mdl.read();                                 // get X Y and Z data at once
@@ -745,9 +749,9 @@ void getPositionData(){
             lastTelemTime = millis();                                                           //Update telemetry time
             if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
             //char tempbuf[200];
-            //sprintf(tempbuf,"Lat: %f Lon %f TLat: %f TLon: %f, Compass: %f, Travel hd: %f, T Delta: %f, Dist: %f", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance);
+            //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
             //printBLE(tempbuf);
-            Serial.printlnf("Heading: %0.2f",compassHeading);
+            //Serial.printlnf("Heading: %0.2f",targetDelta);
         }        
     }
 }
@@ -803,8 +807,8 @@ void updateMotors(){
                     setRSpeed = 90;
                 }
                 else{                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
-                    int Lset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
-                    int Rset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
+                    int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
+                    int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
                     if(Lset < 0) setLSpeed = 0;             //Cap the speed between 0 and 180
                     else if(Lset > 180) setLSpeed = 180;
                     else Lset = setLSpeed;
@@ -815,8 +819,8 @@ void updateMotors(){
             }
             else{                                           //Otherwise, we are outside the radius of both circles
                 pointArrived = false;                       //Set flag back to false so we have to travel to the inner circle, also happens usually when a new point is specified
-                int Lset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
-                int Rset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate); 
+                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
+                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate); 
                 if(Lset < 0) setLSpeed = 0;                 //Cap speed between 0 and 180
                 else if(Lset > 180) setLSpeed = 180;
                 else setLSpeed = Lset;
@@ -847,7 +851,7 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
             else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
         }
-        //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
+        Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
             ESCL.write(180-leftMotorSpeed);
             ESCR.write(rightMotorSpeed);
@@ -878,6 +882,8 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
 //Function used for BLE debugging that allows printing debug messages to a remote device
 void printBLE(const char *dataOut){
     #ifdef BLE_DEBUG_ENABLED                                        //Only functional if BLE debugging is enabled, disable to reduce overhead in final build
+        if(millis() - BLEdbgTimer < 1000) return;
+        BLEdbgTimer = millis();
         uint8_t txBuf_tmp[strlen(dataOut)];                         //Convert input string to byte array to transmit out of BLE
         memcpy(txBuf_tmp,dataOut,strlen(dataOut));                  //Copy character array elements into byte array
         bledbgCharacteristic.setValue(txBuf_tmp, strlen(dataOut));  //Transmit out byte array
