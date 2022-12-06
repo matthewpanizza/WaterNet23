@@ -101,7 +101,7 @@ int LTEInputCommand(String cmd);
 #define LTE_MIN_DIFF        3                   //Minimum difference in motor speed to send an update over LTE
 
 //Development Parameters
-#define VERBOSE
+//#define VERBOSE
 
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode

@@ -73,6 +73,7 @@
 #define SE_BEARING  86.0                    //Raw degrees to read north (135 degrees) at
 #define E_BEARING   58.0                    //Raw degrees to read north (90 degrees) at
 #define NE_BEARING  31.0                    //Raw degrees to read north (45 degrees) at
+#define COMP_OFFSET 0
 
 ////////////////////
 // PROGRAM MACROS //
@@ -126,11 +127,13 @@
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
 #define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_RAMP_TIME       50              //Time between ramp iterations
-#define MTR_TRAVEL_SPD      0.25             //Percentage maximum travel speed for autonomous movement default
+#define MTR_TRAVEL_SPD      0.45             //Percentage maximum travel speed for autonomous movement default
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
 #define COMP_POLL_TIME      250             //Rate to poll the Compass and calculate the target heading
+
+
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
@@ -265,6 +268,7 @@ char filenameMessages[MAX_FILENAME_LEN];                                //Filena
 double varCompassHead;
 double rawHead;
 uint32_t BLEdbgTimer;
+float last_lat, last_lon;
 
 //Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -414,7 +418,7 @@ void setup(){
     setupGPS();                                 //Setup GPS module
     
     Particle.variable("Heading", varCompassHead);
-    Particle.variable("RawHead", rawHead);
+    Particle.variable("TargetHead", rawHead);
     //Particle.variable("Distance", travelDistance);
     //Particle.variable("Lat", latitude);
     //Particle.variable("Lon", longitude);
@@ -536,6 +540,7 @@ void loop(){
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();     //Send sensor data if requested from the CC
     varCompassHead = (double)compassHeading;
+    //rawHead = (double) targetDelta;
     delay(3);              //Slow down the program a little bit, 10ms per loop
     //Serial.printlnf("Hello World, %d", millis());
 }
@@ -624,7 +629,7 @@ float readCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
     rawHead = (double) rawHeading;
     #ifdef VERBOSE
-    Serial.printlnf("Raw Heading: %f", rawHeading);
+    //Serial.printlnf("Raw Heading: %f", rawHeading);
     #endif
     //Map the bearing based on which 1/8th section of the compass it it
     if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
@@ -717,32 +722,36 @@ float calcDelta(float compassHead, float targetHead){
 void getPositionData(){
     if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
-        /*if(myGPS.isConnected()){                        //Only read from GPS if it is connected
+        if(myGPS.isConnected()){                        //Only read from GPS if it is connected
             latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
             longitude = ((float)myGPS.getLongitude())/10000000.0;    //Get longitude and divide by 1000000 to get in degrees
             Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
-        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected*/
-        GPSAvail = true;
-        latitude = 35.77185;
-        longitude = -78.67415;
+        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        //GPSAvail = true;
+        //latitude = 35.77185;
+        //longitude = -78.67415;
     }
     if(millis() - compassTimer > COMP_POLL_TIME){
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
         if(CompassAvail) compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
+        compassHeading += COMP_OFFSET;
+        if(compassHeading > 180) compassHeading = compassHeading - 360;
+        else if(compassHeading < -180) compassHeading = compassHeading + 360;
         if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
             travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
             travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
             targetDelta = calcDelta(compassHeading, travelHeading);                             //Calculate delta to control angle of the bot
             lastTelemTime = millis();                                                           //Update telemetry time
             if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
+            //rawHead = (double) targetDelta;
             //char tempbuf[200];
             //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
             //printBLE(tempbuf);
-            //Serial.printlnf("Heading: %0.2f",targetDelta);
+            Serial.printlnf("RAW: %0.2f, Head: %0.2f, Delta: %0.2f", compassHeading, travelHeading, targetDelta);
         }        
     }
 }
@@ -798,8 +807,8 @@ void updateMotors(){
                     setRSpeed = 90;
                 }
                 else{                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
-                    int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
-                    int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate) * (travelDistance/SENTRY_IDLE_RAD);
+                    int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
+                    int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);
                     if(Lset < 0) setLSpeed = 0;             //Cap the speed between 0 and 180
                     else if(Lset > 180) setLSpeed = 180;
                     else Lset = setLSpeed;
@@ -810,8 +819,8 @@ void updateMotors(){
             }
             else{                                           //Otherwise, we are outside the radius of both circles
                 pointArrived = false;                       //Set flag back to false so we have to travel to the inner circle, also happens usually when a new point is specified
-                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
-                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate); 
+                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
+                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2); 
                 if(Lset < 0) setLSpeed = 0;                 //Cap speed between 0 and 180
                 else if(Lset > 180) setLSpeed = 180;
                 else setLSpeed = Lset;
@@ -842,11 +851,11 @@ void updateMotors(){
             if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
             else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
         }
-        Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
+        //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
             ESCL.write(180-leftMotorSpeed);
             ESCR.write(rightMotorSpeed);
-            Serial.printlnf("Update motor speed (%dms): %d %d", millis(), setRSpeed, setLSpeed);
+            //Serial.printlnf("Update motor speed (%dms): %d %d", millis(), setRSpeed, setLSpeed);
         }
         updateMotorControl = false;        //Set the flag to false
     //}
@@ -1178,12 +1187,12 @@ void LEDHandler(){
     LEDSpeed SetSpeed;
     uint8_t statusMode;
     //Special LED Modes
-    if(shutdownActive){     //The user is holding down the power off button
+    /*if(shutdownActive){     //The user is holding down the power off button
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_GREEN);
         status.setSpeed(LED_SPEED_FAST);
         return;   
-    }
+    }*/
     if(stopActive){         //The user has pressed the stop button on the CChub
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_YELLOW);
