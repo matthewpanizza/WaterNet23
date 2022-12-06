@@ -1,22 +1,22 @@
 /*
  * Project WaterNet23CCHub
  * Description: Code for the Central Control hub responsible for orchestrating commands to Water Bots
- * Author:
- * Date:
+ * Author: WaterNet23 - Matthew Panizza, Jake Meckley Cynthia Rios, Harrison Strag
+ * Date: 9/2/22
  */
 
 
 #include "application.h"
-#include "SdFat.h"
+#include "SdFat.h"                              //Library for SD Card
 #undef min
 #undef max
-#include <vector>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
+#include <vector>                               //Standard C++ library for vector data type
+#include <Adafruit_GFX.h>                       //Library for displaying text/shapes on standard LCDs
+#include <Adafruit_SH110X.h>                    //Library to use Adafruit GFX library with this specific 128x64 OLED
 
 // Pin Definitions
 
-#define OLED_RESET              A0
+#define OLED_RESET              A0              //Pin used to reset the OLED screen on startup
 #define JOYH_ADC                A2              //Horizontal Joystick
 #define JOYV_ADC                A3              //Vertical Joystick ADC pin
 #define JOY_BTN                 D23             //Joystick button press
@@ -24,7 +24,7 @@
 #define R_DPAD                  A1              //Right DPAD button
 #define U_DPAD                  A5              //Up DPAD button
 #define D_DPAD                  D7              //Down DPAD button
-#define E_DPAD                  D22              //"Enter" DPAD button
+#define E_DPAD                  D22             //"Enter" DPAD button
 #define chipSelect              D8              //SD Card chip select pin
 #define STOP_BTN                A7              //Stop button to disable all bot motors
 
@@ -105,7 +105,6 @@ bool logMessages;                               //Default flag for if debug mess
 bool startConnect;                              //Flag used for finding bluetooth devices when pairing, set true once a device was found
 bool postStatus;                                //Flag set true when status should be posted to the bots
 bool meshPair;                                  //Flag used to start pairing with the closest Bluetooth bot
-bool statusTimeout;                             //Timeout for bluetooth and Xbee flag where LTE should be used as backup
 int controlUpdateID;                            //Id to publish the next status update to. Updates go in a circle between all discovered bots
 bool LTEStopSent;                               //Only send stop command over LTE when first pressed instead of periodically publishing
 uint32_t stopTime;                              //Timer for periodically publishing stop command when a stop is active over XBee and BLE
@@ -171,289 +170,257 @@ class PairBot{
     int rssi;
 };
 
-class MenuItem{
+class MenuItem{                                 //Class for displaying menu on the mini OLED. Can have different label types. Takes a pointer to a variable type in the WaterBot class
     public:
-        std::vector<String> labels;
-        void init(uint16_t inStep, uint16_t minV, uint16_t maxV, bool switchOnOff, const char * itemString){
-            minVal = minV;
-            maxVal = maxV;
-            stepSize = inStep;
-            onOffSetting = switchOnOff;
-            strcpy(itemName,itemString);
+        std::vector<String> labels;             //Vector of strings for custom labels (such as "Rem", "Sen", and "Aut") for the drive mode menu item. Indexed by the current value at the variable (i.e. a value of "2" at the method pointer displays the string at vector location 2)
+        void init(uint16_t inStep, uint16_t minV, uint16_t maxV, bool switchOnOff, const char * itemString){    //Constructor for the menu item, requires setting key properties of the item
+            minVal = minV;                      //Minimum value to decrement to when pressing the left button
+            maxVal = maxV;                      //Maximum value to increment to when pressing the right button
+            stepSize = inStep;                  //Number of values to step up or down by when pressing left or right button
+            onOffSetting = switchOnOff;         //Set true if this setting is an On/Off setting (like "Signal"). Causes the string "On" and "Off" to be displayed instead of a digit
+            strcpy(itemName,itemString);        //Copy in the string displayed as the label of the menu item liike "Signal" or "Battery"
         }
-        uint16_t (WaterBot::*MethodPointer);
-        bool (WaterBot::*MethodPointerBool);
-        uint16_t stepSize;
-        bool onOffSetting = false;
-        bool customLabel = false;
-        bool statOnly = false;
-        uint16_t minVal;
-        uint16_t maxVal;
-        char itemName[10];
+        uint16_t (WaterBot::*MethodPointer);    //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a 16-bit unsigned integer type. See menu creation for example
+        bool (WaterBot::*MethodPointerBool);    //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a boolean type. See menu creation for example
+        uint16_t stepSize;                      //Internal step size variable, amount to step up/down by when pressing left or right button
+        bool onOffSetting = false;              //Set true if this setting is an On/Off setting (like "Signal"). Causes the string "On" and "Off" to be displayed instead of a digit
+        bool customLabel = false;               //If this flag is set true, then the labels in the "labels" vector are used instead of a numeric digits or the On/Off label
+        bool statOnly = false;                  //If this flag is true, then this field cannot be modified by the buttons. Used to display statistics only, like the battery percentage which comes from the bot
+        uint16_t minVal;                        //Minimum value to decrement to when pressing the left button
+        uint16_t maxVal;                        //Maximum value to increment to when pressing the right button
+        char itemName[10];                      //Copy in the string displayed as the label of the menu item liike "Signal" or "Battery"
 };
 
-class MenuPopUp{
+class MenuPopUp{                                //Class for displaying a pop up on the mini OLED. Has various lines for displaying text to the user with warnings
     public:
-        char primaryLine[10];
-        char secondaryLine[30];
-        char tertiaryLine [30];
-        uint8_t primaryStart = 0;
-        uint8_t secondaryStart = 0;
-        uint8_t tertiaryStart = 0;
+        char primaryLine[10];                   //Primary line is the main header displayed on the first line, with a maximum of 9 characters. Typically is the "WARNING" or "HELLO". Used strcpy to set the label
+        char secondaryLine[30];                 //Second line on the screen, holds 29 characters. Used strcpy to set the label
+        char tertiaryLine [30];                 //Third line on the screen, holds 29 characters. Used strcpy to set the label
+        uint8_t primaryStart = 0;               //Horizontal pixel to start displaying this line at. Used to center the text in the box
+        uint8_t secondaryStart = 0;             //Horizontal pixel to start displaying this line at. Used to center the text in the box
+        uint8_t tertiaryStart = 0;              //Horizontal pixel to start displaying this line at. Used to center the text in the box
 };
 
-WaterBot *ControlledBot;
-std::vector<WaterBot> WaterBots;
-std::vector<WaterBot> PairBots;
-std::vector<PairBot> BLEPair;
-std::vector<MenuPopUp> PopUps;
+WaterBot *ControlledBot;                        //Pointer to the bot that is currently selected in the bot selection pane
+std::vector<WaterBot> WaterBots;                //Main vector to hold discovered water bots. Used extensively - sends status updates to the bots based on the parameters set here. 
+std::vector<WaterBot> PairBots;                 //Vector used to scan for bots over all communication modes upon startup.
+std::vector<PairBot> BLEPair;                   //Vector used to scan for bots over BLE upon startup. Helps to find the closest bot to the controller to connect to
+std::vector<MenuPopUp> PopUps;                  //Vector to hold pop-ups so they act as a queue. Pressing enter pops the most recently displayed pop up if there is one active
 
-Timer at1(5000,actionTimer5);
+Timer at1(5000,actionTimer5);                   //Timer used to set flags, currently used to periodically request sensor data
 
-MenuItem * SelectedItem;
-std::vector<MenuItem> MenuItems;
+MenuItem * SelectedItem;                        //Pointer to the currently selected menu item so the left and right button handlers can update the integer/boolean pointed to by this menu item
+std::vector<MenuItem> MenuItems;                //Vector of menu items in the system. Push items into this vector on startup and they will be automatically displayed and be modifiable
 
 
+//Function prototypes
 void BLEScan(int BotNumber = -1);
 void XBeeHandler();
+void XBeeLTEPairSet();
 void dataLTEHandler(const char *event, const char *data);
 void createMenu();
+void startupPair();
+void rHandler(void);
 
-void dataLTEHandler(const char *event, const char *data){
-    processCommand(data, 4,false);
-    if(logMessages){
+void dataLTEHandler(const char *event, const char *data){           //Interrupt handler called anytime a message is received from a bot over LTE.
+    processCommand(data, 4,false);                                  //Send the command to the dictionary function for processing
+    if(logMessages){                                                //Log the incoming message to the SD card if enabled
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-        logFile.printlnf("[INFO] Received LTE Message: %s",data);
+        logFile.printlnf("[INFO] Received LTE Message: %s",data);   //Print the message as an info function
         logFile.close();
     }
 }
 
-void startupPair(){
-    startConnect = false;
-    oled.clearDisplay();
-    oled.setCursor(0,0);
+void startupPair(){                                             //Function to run on startup to display how many bots have been discovered and wait until at least on is discovered
+    startConnect = false;                                       //Flag set true while scanning for bots, cleared upon bluetooth connection or a 
+    oled.clearDisplay();                                        //Empty the display for the new startup item
+    oled.setCursor(0,0);                                        //Scanning text put on first line
     oled.print("Scanning ");
-    oled.fillCircle(115,7,3,SH110X_WHITE);
+    oled.fillCircle(115,7,3,SH110X_WHITE);                      //Fill initial circle for animation
     oled.display();
-    uint8_t loadAnim = 0;
-    while(!startConnect){
-        oled.setCursor(0,16);
+    uint8_t loadAnim = 0;                                       //Animation counter for displaying the radius of the circle
+    while(!startConnect){                                       //Loop until bots are found. Wait for user to press the enter button
+        oled.setCursor(0,16);                                   //Set location for rectangle
         oled.fillRect(72,16,35,15,0);
-        oled.printlnf("Bots: %d",BLEPair.size());
+        oled.printlnf("Bots: %d",WaterBots.size());             //Notify user of how many bots have been discovered
         #ifdef VERBOSE
             Serial.printlnf("Array size: %d",BLEPair.size());
         #endif
-        oled.drawCircle(115,7,loadAnim,SH110X_WHITE);
-        if(loadAnim-1) oled.fillCircle(115,7,loadAnim-1,0);
-        oled.display();
-        loadAnim++;
-        if(loadAnim > 7){
+        oled.drawCircle(115,7,loadAnim,SH110X_WHITE);           //Draw the circle with varying circle radius for animation
+        if(loadAnim-1) oled.fillCircle(115,7,loadAnim-1,0);     //Erase the previous circle
+        oled.display();                                         //Display the animated circle
+        loadAnim++;                                             //Increment the counter so the next loop displays the circle
+        if(loadAnim > 7){                                       //Loop back to center for animation
             loadAnim = 0;
-            oled.drawCircle(115,7,7,0);
+            oled.drawCircle(115,7,7,0);                         //Erase last circle
         }
-        BLEScan(-2);
-        XBeeHandler();
-        XBeeLTEPairSet();
+        //BLEScan(-2);
+        XBeeHandler();                                          //Check XBee radio for hello world message received from bot
+        XBeeLTEPairSet();                                       //Add XBee and LTE discovered bots to the Pair Bot vector
         
-        //delay(50);
-        if(digitalRead(E_DPAD) == LOW){
-            int minRSSI = -999;
-            int selectedBot = -1;
-            for(PairBot pb: BLEPair){
-                if(pb.rssi > minRSSI){
-                    minRSSI = pb.rssi;
-                    selectedBot = pb.botNum;
-                }
-                
-            }
-            if(selectedBot >= 0){
-                meshPair = true;    //Did we find any bots over BLE
-            }
-            uint8_t BLETimeout = 0;
-            oled.clearDisplay();
-            oled.setCursor(0,0);
-            oled.print("Connecting");
-            oled.setCursor(0,16);
-            oled.printlnf("Bot: %d",selectedBot);
-            oled.display();
-            botSelect = selectedBot;
-            while(meshPair){
-                BLEScan(selectedBot);
-                BLETimeout++;
-                if(WaterBots.size() == 0 && BLETimeout == LTE_BKP_Time) Particle.publish("CCHub", "CCABhwd", PRIVATE);
-                if(BLETimeout > BLE_MAX_CONN_TIME){
-                    meshPair = false;
-                    botSelect = WaterBots.front().botNum;
-                }
-                delay(100);
-            }
+        delay(50);
+        if(digitalRead(E_DPAD) == HIGH && WaterBots.size() > 0){    //When the enter button is pressed, check if there are any discovered bots. Continue to main program if there are discovered bots
+            botSelect = WaterBots.at(0).botNum;                     //Update bot select to select the first-found bot on the list
             oled.clearDisplay();
             oled.display();
-            selectingBots = true;
+            selectingBots = true;                                   //By default, we are choosing bots, not modifying a menu item
         }
         
     }
 }
 
-void XBeeLTEPairSet(){
-    for(WaterBot p: PairBots){
+void XBeeLTEPairSet(){                                                          //Function to send hello-world acknowledge string to bots when a hello world message has been received
+    for(int i = 0; i < PairBots.size(); i++){                                  //Loop over discovered bots, send the message, then pop it from the vector, since it will already be in the main WaterBots vector
         char replyStr[10];
-        sprintf(replyStr,"CCB%dhwa",p.botNum);
-        sendData(replyStr,0,true,p.XBeeAvail,p.LTEAvail);
+        sprintf(replyStr,"CCB%dhwa",PairBots.back().botNum);                    //Bot will stop periodically sending "Hello World" after receiving the acknowledge
+        sendData(replyStr,0,true,PairBots.back().XBeeAvail,PairBots.back().LTEAvail);
         PairBots.pop_back();
     }
 }
 
-void rHandler(void);
-
 void setup() {
 
-    pinMode(E_DPAD,INPUT_PULLDOWN);
-    pinMode(U_DPAD,INPUT_PULLDOWN);
-    pinMode(D_DPAD,INPUT_PULLDOWN);
-    pinMode(L_DPAD,INPUT_PULLDOWN);
-    pinMode(R_DPAD,INPUT_PULLDOWN);
-    pinMode(JOY_BTN,INPUT_PULLDOWN);
-    pinMode(STOP_BTN, INPUT_PULLDOWN);
+    pinMode(E_DPAD,INPUT_PULLDOWN);                 //Enter Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(U_DPAD,INPUT_PULLDOWN);                 //Up Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(D_DPAD,INPUT_PULLDOWN);                 //Down Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(L_DPAD,INPUT_PULLDOWN);                 //Left Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(R_DPAD,INPUT_PULLDOWN);                 //Right Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(JOY_BTN,INPUT_PULLDOWN);                //Joystick click Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
+    pinMode(STOP_BTN, INPUT_PULLDOWN);              //Stop Button - Configure each of the buttons used on the controller to be pulldowns, as they are pulled to 3.3V when pressed
     
-    attachInterrupt(E_DPAD,entHandler,RISING);
-    attachInterrupt(U_DPAD,uHandler,RISING);
-    attachInterrupt(D_DPAD,dHandler,RISING);
-    attachInterrupt(L_DPAD,lHandler,RISING);
-    attachInterrupt(R_DPAD,rHandler,RISING);
-    attachInterrupt(JOY_BTN,jHandler,RISING);
-    attachInterrupt(STOP_BTN,sHandler,RISING);
+    attachInterrupt(E_DPAD,entHandler,RISING);      //Create an interrupt triggered whenever the enter button is pressed
+    attachInterrupt(U_DPAD,uHandler,RISING);        //Create an interrupt triggered whenever the up button is pressed
+    attachInterrupt(D_DPAD,dHandler,RISING);        //Create an interrupt triggered whenever the down button is pressed
+    attachInterrupt(L_DPAD,lHandler,RISING);        //Create an interrupt triggered whenever the left button is pressed
+    attachInterrupt(R_DPAD,rHandler,RISING);        //Create an interrupt triggered whenever the right button is pressed
+    attachInterrupt(JOY_BTN,jHandler,RISING);       //Create an interrupt triggered whenever the joystick button is pressed
+    attachInterrupt(STOP_BTN,sHandler,RISING);      //Create an interrupt triggered whenever the stop button is pressed
 
     delay(5);
 
-    if(digitalRead(U_DPAD) == LOW || digitalRead(D_DPAD) == LOW) Particle.connect();
+    if(digitalRead(U_DPAD) == LOW || digitalRead(D_DPAD) == LOW) Particle.connect();    //Debug function, disables LTE if both up and down are held when first plugged in to not wait for cell tower connection
 
-    debounceTime = millis();
+    debounceTime = millis();                        //Initialize timers to current startup time so they are accuracte when the program starts
     controlUpdateTime = millis();
     rcTime = millis();
     controlUpdateID = -1;
 
-    Serial.begin(115200);
-    Serial1.begin(9600);                        //Start serial for XBee module
-    setupXBee();
+    Serial.begin(115200);                           //Set debug output serial port to use 115200 baud
+    Serial1.begin(9600);                            //Start serial for XBee module, using 9600 baud for long range
+    setupXBee();                                    //Setup XBee by sending bypass characters for XBee modules which have the integrated controller
 
-	BLE.on();
-    BLE.setScanTimeout(50);  //100ms scan
-    BLE.setTxPower(8);
+	BLE.on();                                       //Make sure bluetooth is on for the controller
+    BLE.setScanTimeout(50);                         //100ms scan
+    BLE.setTxPower(8);                              //Use highest power to get longest range
 
-    peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);
+    peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);        //Create bluetooth characteristic which triggers the BLEDataReceived function whenever the connected bot publishes a command over BLE
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
 
-    Particle.subscribe("Bot1dat",dataLTEHandler);
+    Particle.subscribe("Bot1dat",dataLTEHandler);   //Subscribe to LTE event that comes from bots. They will publish when sending LTE data and this will trigger the dataLTEHandler function
     Particle.function("Input Command", LTEInputCommand);
 
-    offloadingMode = false;
+    offloadingMode = false;                         //Initialize flags for offloading so we don't initially start offloading data from the SD card
     offloadingDone = false;
 
-    logMessages = true;
-    postStatus = false;
-    statusTimeout = false;
-    stopActive = false;
-    LTEStopSent = false;
+    logMessages = true;                             //Default settings for certain actions - enable SD card logging by default
+    postStatus = false;                             //Don't post status until after the first timer expires so we have time to sample the system
+    stopActive = false;                             //Flag set true whenever the stop button is hit, cleared when hit again. By default we should not stop the bot motors, or the user could be confused
+    LTEStopSent = false;                            //Flag set true when a stop command has been sent already, limits publishing rate
     
-    stopTime = 0;
+    stopTime = 0;                                   //Timer for periodically sending stop signal when stop is active
 
-    char timestamp[16];
+    char timestamp[16];                             //string for holding the filename timestamp
     snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
-    strcpy(filenameMessages,DEF_FILENAME);
+    strcpy(filenameMessages,DEF_FILENAME);          //Create the filename using the current time as well as the label in the macro
     strcat(filenameMessages,timestamp);
     strcat(filenameMessages,"_LOG.txt");
 
-    createMenu();
+    createMenu();                                   //Function to initialize the menu items by creating menu objects and pushing them to the menu item vector
 
     delay(250);
 
-    oled.begin(i2c_Address, true); // Address 0x3C default
-    oled.clearDisplay();
-    oled.display();
-    oled.setRotation(1);
+    oled.begin(i2c_Address, true);                  // Address 0x3C default for display
+    oled.clearDisplay();                            //Clear display in case it had something from a reset
+    oled.display();                                 //Apply changes to display
+    oled.setRotation(1);                            //Standard rotation
     
-    oled.setTextSize(2);
-    oled.setTextColor(SH110X_WHITE);
-    oled.setCursor(0,0);
-    oled.print(" Starting ");
+    oled.setTextSize(2);                            //Set text size of the "Starting" prompt
+    oled.setTextColor(SH110X_WHITE);                //Set white color with black background
+    oled.setCursor(0,0);                            //Cursor position for "Starting" prompt
+    oled.print(" Starting ");                       //Print label to tell user the system is starting
     oled.display();
 
-    delay(1000);
+    delay(250);
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {
+    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Begin communication with the SD card at 8MHz, using chipSelect as the GPIO for selecting this SPI device
         #ifdef VERBOSE
         Serial.println("Error: could not connect to SD card!");
         #endif
         logMessages = false;
     }
 
-    MenuPopUp m;
-    sprintf(m.primaryLine,"Hello!\0");
-    sprintf(m.secondaryLine,"Scanning for Bots\0", 1);
-    sprintf(m.tertiaryLine, "OK when bots ready\0",15);
-    m.primaryStart = 32;
+    MenuPopUp m;                                        //Create initial pop-up to greet user
+    sprintf(m.primaryLine,"Hello!\0");                  //Display hello as the main text
+    sprintf(m.secondaryLine,"Scanning for Bots\0", 1);  //Second line for information
+    sprintf(m.tertiaryLine, "OK when bots ready\0",15); //Third line for information
+    m.primaryStart = 32;                                //Values to center the text found by experimentation
     m.secondaryStart = 12;
     m.tertiaryStart = 10;
     PopUps.push_back(m);
     
-    //startupPair();
+    startupPair();                                      //Not significantly tested - Disable if using an emulated bot id or if the program is crashing on startup
     //delay(3000);
 
-    at1.start();
+    at1.start();                                        //Start the timer used for requesting sensor data
 
-    WaterBotSim(1);
+    //WaterBotSim(1);
 
     
 }
 
 void loop() {
-    if(postStatus){
-        sendData("CCABspc",0,false,true,false);                                  
-        postStatus = false;
-        statusTimeout = false;
-    }
-    updateMenu();
-    updateBotControl();
-    manualMotorControl(botSelect);
-    if (BLE.connected()) {
-        
-    }
-    else {
-    	if (millis() - lastScan >= BLE_SCAN_PERIOD) {
+    if(postStatus){                                     //Check if the timer has indicated that a status update should be sent
+        sendData("CCABspc",0,false,true,false);         //Call send data to send data over XBee, which helps to check if XBee is available
+        postStatus = false;                             //Set flag false until time expires again
+    }       
+    updateMenu();                                       //Function to update all redrawing of the menu, triggered whenever buttons are pressed or an interrupt modifies something displayed on the menu
+    updateBotControl();                                 //Function to send out the control packet to each of the bots periodically. The control packet will set items like the drive mode and also change the LED state
+    manualMotorControl(botSelect);                      //Function to control motors from the joystick if the selected bot is in manual motor control mode
+    if(!BLE.connected()) {                              //If bluetooth is not connected, then periodically scan for bots so at least one may have bluetooth
+    	if (millis() - lastScan >= BLE_SCAN_PERIOD) {   //Check timer between scans to not scan too often
     		lastScan = millis();
-    		BLEScan(-1);
+    		BLEScan(-1);                                //Scan for any bot
     	}
 
     }
-    for(WaterBot &wb: WaterBots){
-        if(wb.offloading){
-            DataOffloader(wb.botNum);
-            wb.offloading = false;
+    for(WaterBot &wb: WaterBots){                       //Loop over all bots and check for offloading or sensor requests
+        if(wb.offloading){                              //Check if the user requested an offload from the menu items
+            DataOffloader(wb.botNum);                   //Offload from this bot
+            wb.offloading = false;                      //Set flag back to false for this bot to not immediately offload again
         }
-        if(wb.reqActive > 3){
+        if(wb.reqActive > 3){                           //Check if we should re-request the live sensor data from this bot
             char tempBuf[10];
-            sprintf(tempBuf,"CCB%dsns",wb.reqActive);
+            sprintf(tempBuf,"CCB%dsns",wb.reqActive);   //Send sense command which makes the request
             sendData(tempBuf,0,!(wb.XBeeAvail), true, false);
-            wb.reqActive = 0;
+            wb.reqActive = 0;                           //Set the request active to false so it only happens at the timer intervals
         }
     }
-    XBeeHandler();
-    RPiHandler();
-    XBeeLTEPairSet();
-    RPiStatusUpdate();
-    if(stopActive){
-        if(millis() - stopTime > STOP_PUB_TIME){
+    XBeeHandler();                                      //Check XBee serial buffer and process serial data to the command dictionary if a command was received
+    RPiHandler();                                       //Check USB serial to see if Raspberry Pi or computer has sent a new control packet which contains the drive mode and target latitude and longitude
+    XBeeLTEPairSet();                                   //Call pair function to see if any bots have come online after the initial pair sequence
+    RPiStatusUpdate();                                  //Periodically send a status update for all of the bots to the Raspberry Pi so the user interface is populated with recent data and status
+    if(stopActive){                                     //If the user has pressed the stop button and has not yet cleared it, periodically publish the stop button in case the bot missed the previous message
+        if(millis() - stopTime > STOP_PUB_TIME){        //Check timer to publish periodically, stops sending periodically after being cleared by hitting stop again
             stopTime = millis();
-            sendData("CCABstp",0,true,true,!LTEStopSent);
-            LTEStopSent = true;
+            sendData("CCABstp",0,true,true,!LTEStopSent); 
+            LTEStopSent = true;                         //Only send stop over LTE one time so we don't burn through cell data
         }
     }
     delay(10);
 }
 
-void logMessage(const char *message){
-    if(!logFile.isOpen()){
+void logMessage(const char *message){           //Function to take a string and log it to the SD card by opening/closing the file
+    if(!logFile.isOpen()){                      //if the file is not open, open it and then close it afterwards to ensure changes take place
         logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.println(message);
         logFile.close();
@@ -461,71 +428,70 @@ void logMessage(const char *message){
     else logFile.println(message);
 }
 
+//Abstraction function to print a single menu item with data from a given waterbot, at the provided x and y coordinates, id is the menu item at the location in the menu vector. 
+//Highlighted means this item is selected in the list (highlights main label). Selected highlights the data value like On/Off when modifying the value
 void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint16_t y, WaterBot wb){
-    if(highlighted){
-        oled.fillRect(x,y,OLED_MAX_X - 40,16,1);
-        oled.setCursor(x+1,y+1);
-        oled.setTextSize(2);
-        oled.setTextColor(0);
-        oled.print(MenuItems.at(id).itemName);
-        if(selected){
-            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,1);
-            oled.setCursor(OLED_MAX_X - 39,y+1);
-            oled.setTextColor(0);
-            if(MenuItems.at(id).onOffSetting){
-                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+    if(highlighted){                                            //Check if this menu item should be highlighted
+        oled.fillRect(x,y,OLED_MAX_X - 40,16,1);                //Draw white rectangle, then write black text to show "highlighted" state
+        oled.setCursor(x+1,y+1);                                //Set cursor for text
+        oled.setTextSize(2);                                    //Set size to 2 for standard menu items
+        oled.setTextColor(0);                                   //Set to black text
+        oled.print(MenuItems.at(id).itemName);                  //Print out the name associated with the menu item at the "id" location in the menu vector
+        if(selected){                                           //If this item is selected, then draw box to indicate to the user
+            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,1); //Fill area with white rectangle 
+            oled.setCursor(OLED_MAX_X - 39,y+1);                //Move cursor to draw text in this box
+            oled.setTextColor(0);                               //Make sure the text is set to black
+            if(MenuItems.at(id).onOffSetting){                  //Determine where to source the label for the value, when true, display "On" or "Off"
+                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");    //Check if the value this menu item modifies for this waterbot is true, print "On" if true, "Off" if false
                 else oled.printf("Off");
             }
-            else if(MenuItems.at(id).customLabel){
+            else if(MenuItems.at(id).customLabel){              //Otherwise, check if we are using custom labels, like those for the drive mode. Source the label text from the Menu item label vector
                 oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
             }
-            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));    //Otherwise, just print the number in the unsigned integer location
         }
         else{
-            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,0);
+            oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,0);             //Draw black rectangle to erase text, then write white text to show "unhighlighted" state
             oled.setCursor(OLED_MAX_X - 39,y+1);
-            oled.setTextColor(1);
-            if(MenuItems.at(id).onOffSetting){
-                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+            oled.setTextColor(1);                                           //Set to white text
+            if(MenuItems.at(id).onOffSetting){                              //Determine where to source the label for the value, when true, display "On" or "Off"
+                if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");    //Check if the value this menu item modifies for this waterbot is true, print "On" if true, "Off" if false
                 else oled.printf("Off");
             }
-            else if(MenuItems.at(id).customLabel){
+            else if(MenuItems.at(id).customLabel){                          //Otherwise, check if we are using custom labels, like those for the drive mode. Source the label text from the Menu item label vector
                 oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
             }
-            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+            else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));    //Otherwise, just print the number in the unsigned integer location
         }
         #ifdef VERBOSE
         Serial.printlnf("Printed Highlighted Menu item with name: %s",MenuItems.at(id).itemName);
         #endif
     }
-    else{
-        oled.fillRect(x,y,OLED_MAX_X - 40,16,0);
-        oled.setCursor(x+1,y+1);
-        oled.setTextSize(2);
-        oled.setTextColor(1);
-        oled.print(MenuItems.at(id).itemName);
+    else{                                                       //This item is not highlighted, cannot have the value highlighted either
+        oled.fillRect(x,y,OLED_MAX_X - 40,16,0);                //Draw black rectangle to erase any previous contents
+        oled.setCursor(x+1,y+1);                                //Move cursor for where to display label text
+        oled.setTextSize(2);                                    //Set standard size for text of menu
+        oled.setTextColor(1);                                   //Use white text for non-highlighted menu items
+        oled.print(MenuItems.at(id).itemName);                  //Print out the name associated with the menu item at the "id" location in the menu vector
         oled.fillRect(OLED_MAX_X - 40,y,OLED_MAX_X-1,16,0);
         oled.setCursor(OLED_MAX_X - 39,y+1);
         oled.setTextColor(1);
-        if(MenuItems.at(id).onOffSetting){
-            if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");
+        if(MenuItems.at(id).onOffSetting){                      //Determine where to source the label for the value, when true, display "On" or "Off"
+            if(wb.*(MenuItems.at(id).MethodPointerBool))  oled.printf("On");    //Check if the value this menu item modifies for this waterbot is true, print "On" if true, "Off" if false
             else oled.printf("Off");
         }
-        else if(MenuItems.at(id).customLabel){
+        else if(MenuItems.at(id).customLabel){                  //Otherwise, check if we are using custom labels, like those for the drive mode. Source the label text from the Menu item label vector
             oled.printf(MenuItems.at(id).labels.at(wb.*MenuItems.at(id).MethodPointer));
         }
-        else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));
+        else oled.printf("%d",wb.*(MenuItems.at(id).MethodPointer));    //Otherwise, just print the number in the unsigned integer location
     }
-    
-    
-    
     MenuItems.at(id);
 }
 
 void updateMenu(){
     if(redrawMenu){
-        oled.fillRect(0,0,OLED_MAX_X,OLED_MAX_Y,0);
-        if(PopUps.size() != 0){  //If there is a queue of pop-ups to be displayed
+        oled.fillRect(0,0,OLED_MAX_X,OLED_MAX_Y,0);         //Erase full screen
+        if(PopUps.size() != 0){                             //Check if there is a queue of pop-ups to be displayed
             oled.drawRect(1,1,126,62,1);
             oled.drawRect(2,2,124,60,1);
             oled.setTextColor(1);
@@ -545,7 +511,7 @@ void updateMenu(){
             oled.printf("OK");
             oled.display();
             redrawMenu = false;
-            return;
+            return;                                         //Don't display the main menu if there is a pop-up active
         }
         uint8_t menuSelect = 0;
         for(uint8_t i = 0; i < WaterBots.size(); i++){
@@ -565,7 +531,7 @@ void updateMenu(){
                 oled.printf("%d",WaterBots.at(i).botNum);
             }
         }
-        if(menuItem == 0){
+        if(menuItem == 0){      //If we are selecting the first menu item in the list, print it first (highlighted), then print the next two unhighlighted
             //Serial.println("Menu item 0");
             if(MenuItems.size() != 0) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));
             uint8_t loopIter = MenuItems.size();
@@ -575,7 +541,7 @@ void updateMenu(){
                 printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
             }
         }
-        else if(menuItem == MAX_MENU_ITEMS-1){
+        else if(menuItem == MAX_MENU_ITEMS-1){  //If we are selecting the last menu item in the list, print it last (highlighted), then print the previous two unhighlighted
             //Serial.printlnf("Menu item %d", menuItem);
             printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));
             //Serial.printlnf("Menu item %d", menuItem-1);
@@ -583,7 +549,7 @@ void updateMenu(){
             //Serial.printlnf("Menu item %d", menuItem-2);
             printMenuItem(menuItem-2,false,!selectingBots,0,16,WaterBots.at(menuSelect));
         }
-        else{
+        else{                                   //Otherwise, print the selected item in the middle of the list (highlighted) with one unhighlighted item before and after
             //Serial.printlnf("Menu item %d", menuItem+1);
             printMenuItem(menuItem+1,false,!selectingBots,0,48,WaterBots.at(menuSelect));
             //Serial.printlnf("Menu item %d", menuItem);
@@ -619,9 +585,6 @@ void updateBotControl(){
                 wb.LTEInitialStatus = false;
             }
         }
-        //if(ControlledBot == NULL) return;
-        //if(ControlledBot->offloading) offloadingMode = true;
-        
     }
     if(millis() - controlUpdateTime > CONTROL_PUB_TIME){
         controlUpdateTime = millis();
@@ -644,41 +607,37 @@ void updateBotControl(){
     }
 }
 
+//Dictionary function to process commands received from bots
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
-    if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){
-        char rxIDBuf[1];
-        rxIDBuf[0] = command[1];
-        uint8_t rxBotID = atoi(rxIDBuf);
-        if(rxBotID > 9) return;
-        uint8_t checksum;
-        char dataStr[strlen(command)-8];
-        dataStr[strlen(command)-9] = '\0';
-        char cmdStr[4];
-        cmdStr[3] = '\0';
-        char checkStr[3];
-        checkStr[0] = command[strlen(command)-2];
-        checkStr[1] = command[strlen(command)-1];
-        checkStr[2] = '\0';
-        checksum = (uint8_t)strtol(checkStr, NULL, 16);       // number base 16
+    if((command[2] == 'A' && command[3] == 'B') || (command[2] == 'C' && command[3] == 'C')){   //Check if the message was addressed to the CChub or all bots (as a broadcast)
+        char rxIDBuf[1];                                            //Get the id of the bot that sent this message to find the bot in the WaterBots vector
+        rxIDBuf[0] = command[1];                                    //Convert the source bot to a single character
+        uint8_t rxBotID = atoi(rxIDBuf);                            //Convert the character to an integer for comparison
+        if(rxBotID > 9) return;                                     //Only accept bot ids between 0 and 9
+        uint8_t checksum;                                           //Value of the checksum received, a hexadecimal (base 16) number at the end of the string
+        char dataStr[strlen(command)-8];                            //Create array to hold the data portion of the received message
+        dataStr[strlen(command)-9] = '\0';                          //Set null character to allow use of string compare functions (causes a nasty bug of flowing to surrounding memory otherwise)
+        char cmdStr[4];                                             //String to hold 3-byte command, compared in dictionary
+        cmdStr[3] = '\0';                                           //Set null character to allow use of string compare functions (causes a nasty bug of flowing to surrounding memory otherwise)
+        char checkStr[3];                                           //2-byte checksum which is compared to the string length
+        checkStr[0] = command[strlen(command)-2];                   //Copy in the last 2 characters from the end of the message
+        checkStr[1] = command[strlen(command)-1];                   //Copy in the last 2 characters from the end of the message
+        checkStr[2] = '\0';                                         //Null terminator for string compare
+        checksum = (uint8_t)strtol(checkStr, NULL, 16);             //Convert to number base 16
         #ifdef VERBOSE
         Serial.printlnf("Checksum: %02x, %03d",checksum,checksum);
         #endif
-        for(uint8_t i = 4; i < strlen(command)-2;i++){
+        for(uint8_t i = 4; i < strlen(command)-2;i++){              //Copy in the data portion to the data string
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
-        if(checksum != strlen(command)-2){
+        if(checksum != strlen(command)-2){                          //Compare the checksum to the string length and return if they don't match (reject this message, wait for the next periodic broadcast)
             #ifdef VERBOSE
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
             Serial.println("Warning, checksum does not match");
             #endif
-            logMessage("[WARN] Warning, checksum does not match!");
-            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
-                char rxBotNum[2];
-                rxBotNum[0] = command[0];
-                rxBotNum[1] = command[1];
-            }
+            logMessage("[WARN] Warning, checksum does not match!"); //Log warning to SD card
             return;
         }
         bool newBot = true;
@@ -880,11 +839,6 @@ void processRPiCommand(const char *command, uint8_t mode){
             #ifdef VERBOSE
             Serial.println("Warning, checksum does not match");
             #endif
-            if((command[1] >= '0' && command[1] <= '9') || command[1] == 'C'){
-                char rxBotNum[2];
-                rxBotNum[0] = command[0];
-                rxBotNum[1] = command[1];
-            }
             return;
         }
         if(!strcmp(cmdStr,"ctl")){
@@ -1361,6 +1315,7 @@ void WaterBotSim(uint8_t count){
 
 }
 
+//Function to create menu items used by the program and push them to the menu item vector for printing
 void createMenu(){
     MenuItem dataRecord;
     dataRecord.init(1,0,1,true,"Record");
@@ -1427,19 +1382,19 @@ void entHandler(){
         modifiedValue = false;
     }
 }
-
+//Right button interrupt handler - used to move between which bot is selected and also modify the value of menu items
 void rHandler(){
-    redrawMenu = true;  
-    if(millis()-debounceTime < DEBOUNCE_MS) return;
-    debounceTime = millis();
+    redrawMenu = true;                                          //Set redraw flag always so the display is updated with new highlighted item
+    if(millis()-debounceTime < DEBOUNCE_MS) return;             //debounce this button, to make sure only one trigger is registered per press
+    debounceTime = millis();    
     #ifdef VERBOSE
     Serial.println("Right trigger");
     #endif
-    if(selectingBots){
-        if(botSelect != WaterBots.back().botNum){
-            bool findCurrent = false;
-            for(WaterBot &ws: WaterBots){
-                if(findCurrent){
+    if(selectingBots){                                          //If enter was hit over a menu item, the item will be open for modification, and this flag indicates true when not modifying items (i.e. selecting which bot to access)
+        if(botSelect != WaterBots.back().botNum){               //Check if we are not at the leftmost bot in the list, otherwise we shouldn't try selecting a bot that doesn't exist
+            bool findCurrent = false;                           //Grab the first item in the waterbot list to make sure we don't accidentally access something null
+            for(WaterBot &ws: WaterBots){                       //Loop over the list of bots discovered
+                if(findCurrent){                                //Funky algorithm to find the bot next to the current bot in the list
                     botSelect = ws.botNum;
                     ControlledBot = &ws;
                     break;
@@ -1448,17 +1403,16 @@ void rHandler(){
             }
         }
     }
-    else{
-        //int index = 0;
-        for(WaterBot &ws: WaterBots){
-            if(ws.botNum == botSelect){
-                MenuItem *curItem = SelectedItem;
+    else{                                                       //If enter was hit over a menu item, the item will be open for modification, and this flag indicates false when modifying items (i.e. editing the value of a menu item)
+        for(WaterBot &ws: WaterBots){                           //Loop over all bots in the list of discovered bots
+            if(ws.botNum == botSelect){                         //If we find the one we're looking for in the list
+                MenuItem *curItem = SelectedItem;               //Take the current selected menu item
                 #ifdef VERBOSE
                 Serial.println(curItem->itemName);
                 #endif
-                if(curItem == nullptr) return;
-                if(curItem->statOnly) return;
-                if(curItem->onOffSetting){
+                if(curItem == nullptr) return;                  //Make sure that there is a menu item currently selected
+                if(curItem->statOnly) return;                   //Some menu items are a status-only display and can't be modified, so do nothing
+                if(curItem->onOffSetting){                      //If this is an on/off setting, then it must be a boolean, so set it true
                     #ifdef VERBOSE
                     Serial.println("Modified an On/Off Control");
                     Serial.printlnf("Bot: %d, Modified ",ws.botNum);
@@ -1467,10 +1421,10 @@ void rHandler(){
                 }
                 else{
                     
-                    if(ws.*(curItem->MethodPointer) < curItem->maxVal) ws.*(curItem->MethodPointer) += curItem->stepSize;
+                    if(ws.*(curItem->MethodPointer) < curItem->maxVal) ws.*(curItem->MethodPointer) += curItem->stepSize; //Increment the counter in the waterbot class that this menu item modifies, using the pointer to a element of the waterbot class (see the menuitem class for details)
                 }
-                modifiedValue = true;
-                ws.updatedControl = true;
+                modifiedValue = true;                           //Indicate to the main loop that some bot has a modified a value, so send out a new control packet
+                ws.updatedControl = true;                       //Indicate that this bot has a modified value
             }
             //index++;
         }
