@@ -8,7 +8,9 @@
         "ratio": "cpp",
         "algorithm": "cpp",
         "istream": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "ios": "cpp",
+        "vector": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0",
