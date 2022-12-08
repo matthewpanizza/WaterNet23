@@ -1,0 +1,4 @@
+Added Pin To Net: NetName=A0/Feather_RST_n Pin=J1-1
+Added Pin To Net: NetName=A0/Feather_RST_n Pin=MD1-5
+Added Pin To Net: NetName=A0/Feather_RST_n Pin=P1-15
+Added Net: Name=A0/Feather_RST_n
