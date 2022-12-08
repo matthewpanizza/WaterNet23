@@ -1,0 +1,6 @@
+Removed Pin From Net: NetName=D23 Pin=Q5-1
+Removed Pin From Net: NetName=Board Water Pin=Q5-2
+Removed Pin From Net: NetName=GND Pin=Q5-3
+Added Pin To Net: NetName=Board Water Pin=Q5-1
+Added Pin To Net: NetName=GND Pin=Q5-2
+Added Pin To Net: NetName=D23 Pin=Q5-3

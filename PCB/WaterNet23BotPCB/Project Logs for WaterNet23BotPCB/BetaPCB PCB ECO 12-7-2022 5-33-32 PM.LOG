@@ -1,0 +1,60 @@
+Removed Pin From Net: NetName=D23 Pin=Q5-1
+Removed Pin From Net: NetName=Board Water Pin=Q5-2
+Removed Pin From Net: NetName=GND Pin=Q5-3
+Removed Pin From Net: NetName=NetQ4_4 Pin=Q7-1
+Removed Pin From Net: NetName=Power_Gate_Switch Pin=Q7-2
+Removed Pin From Net: NetName=GND Pin=Q7-3
+Change component parameters: Designator = "R6" ("R23"); Footprint = "0603 Resistor"; UniqueID = "\HSDONAHE" ("\HSDONAHE")
+Change component parameters (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "1R"; VariantName = "[No Variations]"
+Change component parameters: Designator = "R12" ("R24"); Footprint = "0603 Resistor"; UniqueID = "\FEACOIPM" ("\FEACOIPM")
+Change component parameters (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "1R"; VariantName = "[No Variations]"
+Change component parameters: Designator = "R15" ("R25"); Footprint = "0603 Resistor"; UniqueID = "\FLFWMXJT" ("\FLFWMXJT")
+Change component parameters (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "1R"; VariantName = "[No Variations]"
+Change component parameters: Designator = "R50" ("R9"); Footprint = "0603 Resistor"; UniqueID = "\HKXNBXET" ("\HKXNBXET")
+Change component parameters (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "75k"; VariantName = "[No Variations]"
+Added Component: Designator=R59(0603 Resistor)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10k"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=Board Water Pin=Q5-1
+Added Pin To Net: NetName=GND Pin=Q5-2
+Added Pin To Net: NetName=D23 Pin=Q5-3
+Added Pin To Net: NetName=Power_Gate_Switch Pin=Q7-1
+Added Pin To Net: NetName=GND Pin=Q7-2
+Added Pin To Net: NetName=NetQ4_4 Pin=Q7-3
+Added Pin To Net: NetName=GND Pin=R59-1
+Added Pin To Net: NetName=Power_Gate_Switch Pin=R59-2
+Added Member To Class: ClassName=Power Member=Component R59 Resistor

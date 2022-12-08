@@ -1,0 +1,3 @@
+Added Pin To Net: NetName=GND Pin=R59-1
+Added Pin To Net: NetName=Power_Gate_Switch Pin=R59-2
+Added Member To Class: ClassName=Power Member=Component R59 Resistor
