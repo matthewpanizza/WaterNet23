@@ -1,0 +1,18 @@
+{
+    "extensions.ignoreRecommendations": true,
+    "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
+    "files.associations": {
+        "*.ino": "cpp",
+        "chrono": "cpp",
+        "limits": "cpp",
+        "ratio": "cpp",
+        "algorithm": "cpp",
+        "istream": "cpp",
+        "cmath": "cpp",
+        "ios": "cpp",
+        "vector": "cpp"
+    },
+    "particle.targetPlatform": "bsom",
+    "particle.firmwareVersion": "4.0.0",
+    "particle.targetDevice": "gerbil_pirate"
+}
