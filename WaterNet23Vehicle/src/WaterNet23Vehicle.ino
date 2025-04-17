@@ -19,6 +19,7 @@
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
 #include <Adafruit_LIS3MDL.h>
 #include <Adafruit_Sensor.h>
+#include "LSM303.h"
 #define X_AXIS_ACCELERATION 0
 //#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
@@ -65,6 +66,13 @@
 // Compass Calibration //
 /////////////////////////
 
+#define COMPASS_TYPE            0           //0 = LSM303DLHC, 1 = LIS3MDL
+#define DO_COMPASS_CALIB        false       //Set to true to use below values to remap raw compass readings
+
+#define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
+#define COMPASS_TYPE_LIS3MDL    1           //Value for COMPASS_TYPE to indicate LIS3MDL
+
+//Calibrations for LIS3MDL Compass
 #define N_BEARING   6.0                     //Raw degrees to read north (0 degrees) at
 #define NW_BEARING  -18.0                   //Raw degrees to read north (-45 degrees) at
 #define W_BEARING   -40.0                   //Raw degrees to read north (-90 degrees) at
@@ -136,6 +144,7 @@
 
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_THREAD(ENABLED);
 
 /////////////////////////
 // Function Prototypes //
@@ -144,12 +153,14 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void cmdLTEHandler(const char *event, const char *data);                    //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void setupXBee();
+bool setupCompass();
 void setupGPS();
 uint8_t readPowerSys();
 float deg2rad(float deg);
-float readCompassHeading(float x_accel, float y_accel);
+float lis3mdlCompassHeading(float x_accel, float y_accel);
 float calcDistance(float lat1, float lat2, float lon1, float lon2);
 float calcDelta(float compassHead, float targetHead);
+float getCalibratedCompassHeading();
 void getPositionData();
 void sendResponseData();
 void statusUpdate();
@@ -167,6 +178,7 @@ void buttonTimer();
 void buttonHandler();
 void logMessage(const char *message);
 void LEDHandler();
+int LTEInputCommand(String cmd);
 
 
 ///////////////////////
@@ -213,7 +225,8 @@ SFE_UBLOX_GNSS myGPS;                           //GPS Buffer and Objects
 //MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 //SFE_UBLOX_GPS myGPS;
 
-Adafruit_LIS3MDL lis3mdl;                       //Compass object
+Adafruit_LIS3MDL lis3mdl;                 //Compass object for LIS3MDL
+LSM303 lsm303;                            //Compass object for LSM303DLHC
 
 LEDStatus status;                               //LED Control object
 
@@ -461,21 +474,7 @@ void setup(){
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
 
-    CompassAvail = true;                        //Assume compass is available, unless we can't connect to it over I2C
-    if (! lis3mdl.begin_I2C()) {                // hardware I2C mode, can pass in address & alt Wire
-        CompassAvail = false;                   //Couldn't connect over I2C, so assume the compass is unavailable. Flag disables Autonomous/Sentry mode
-        Serial.println("Failed to find LIS3MDL chip");
-    }
-    else Serial.println("LIS3MDL Found!");
-    lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
-    lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
-    lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
-    lis3mdl.setRange(LIS3MDL_RANGE_8_GAUSS);
-    lis3mdl.setIntThreshold(500);
-    lis3mdl.configInterrupt(false, false, true, // enable z axis
-                          true, // polarity
-                          false, // don't latch
-                          true); // enabled!
+    CompassAvail = setupCompass();
 
     char timestamp[16];                         //String that holds a timestamp for naming the files generated on the SD card
     snprintf(timestamp,16,"B%d%02d%02d%04d%02d%02d%02d", BOTNUM, Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
@@ -564,6 +563,43 @@ void setupXBee(){
   //nmea.process(incoming);
 //}
 
+//Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
+bool setupCompass(){
+
+    if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
+        if (! lis3mdl.begin_I2C()) {                // hardware I2C mode, can pass in address & alt Wire
+            Serial.println("Failed to find LIS3MDL chip");   //Couldn't connect over I2C, so assume the compass is unavailable. Flag disables Autonomous/Sentry mode
+            return false;
+        }
+        else Serial.println("LIS3MDL Found!");
+        lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
+        lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+        lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
+        lis3mdl.setRange(LIS3MDL_RANGE_8_GAUSS);
+        lis3mdl.setIntThreshold(500);
+        lis3mdl.configInterrupt(false, false, true, // enable z axis
+                              true, // polarity
+                              false, // don't latch
+                              true); // enabled!
+    }
+    else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
+        if(!lsm303.init()) return false;
+        lsm303.enableDefault();
+
+        /*
+        Calibration values; the default values of +/-32767 for each axis
+        lead to an assumed magnetometer bias of 0. Use the Calibrate example
+        program to determine appropriate values for your particular unit.
+        */
+        lsm303.m_min = (LSM303::vector<int16_t>){-32767, -32767, -32767};
+        lsm303.m_max = (LSM303::vector<int16_t>){+32767, +32767, +32767};
+    }
+    else{
+        return false;
+    }
+    return true;
+}
+
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
     GPSAvail = true;
@@ -624,8 +660,8 @@ float deg2rad(float deg) {
   return deg * (3.14159/180);   //Multiply by Pi/180
 }
 
-//Function to take an x and y acceleration from the compass and calibrate the raw heading calulation for use by autonomous algorithm
-float readCompassHeading(float x_accel, float y_accel){
+//Function to take an x and y acceleration from the compass and calibrate the raw heading calulation for use by autonomous algorithm. Returns a value between -180 and +180 degrees
+float lis3mdlCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
     rawHead = (double) rawHeading;
     #ifdef VERBOSE
@@ -718,6 +754,39 @@ float calcDelta(float compassHead, float targetHead){
     }
 }
 
+//Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
+float getCalibratedCompassHeading(){
+    if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
+        float lis3mdlHeading = 0.0;                       //Create a variable to hold the heading from the compass
+        lis3mdl.read();                                 // get X Y and Z data at once
+        sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
+        bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
+        if(CompassAvail) lis3mdlHeading = lis3mdlCompassHeading(event.magnetic.x,event.magnetic.y);
+        lis3mdlHeading += COMP_OFFSET;
+        if(lis3mdlHeading > 180) lis3mdlHeading = lis3mdlHeading - 360;
+        else if(lis3mdlHeading < -180) lis3mdlHeading = lis3mdlHeading + 360;
+        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
+            travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
+            travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
+            targetDelta = calcDelta(lis3mdlHeading, travelHeading);                             //Calculate delta to control angle of the bot
+            lastTelemTime = millis();                                                           //Update telemetry time
+            if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
+            //rawHead = (double) targetDelta;
+            //char tempbuf[200];
+            //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
+            //printBLE(tempbuf);
+            Serial.printlnf("RAW: %0.2f, Head: %0.2f, Delta: %0.2f", lis3mdlHeading, travelHeading, targetDelta);
+        }  
+        return lis3mdlHeading;                    //Return the heading from the compass
+    }
+    else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
+        lsm303.read();                              //Read the compass data from the LSM303 over I2C
+        float rawHeading = lsm303.heading();        //Library automatically converts to degrees
+        return rawHeading - 180;                    //Convert 0-360 to -180 to +180
+    }
+    return 0.0;
+}
+
 //Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement
 void getPositionData(){
     if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
@@ -734,25 +803,8 @@ void getPositionData(){
         //longitude = -78.67415;
     }
     if(millis() - compassTimer > COMP_POLL_TIME){
-        lis3mdl.read();                                 // get X Y and Z data at once
-        sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
-        bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
-        if(CompassAvail) compassHeading = readCompassHeading(event.magnetic.x,event.magnetic.y);
-        compassHeading += COMP_OFFSET;
-        if(compassHeading > 180) compassHeading = compassHeading - 360;
-        else if(compassHeading < -180) compassHeading = compassHeading + 360;
-        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
-            travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
-            travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
-            targetDelta = calcDelta(compassHeading, travelHeading);                             //Calculate delta to control angle of the bot
-            lastTelemTime = millis();                                                           //Update telemetry time
-            if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
-            //rawHead = (double) targetDelta;
-            //char tempbuf[200];
-            //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
-            //printBLE(tempbuf);
-            Serial.printlnf("RAW: %0.2f, Head: %0.2f, Delta: %0.2f", compassHeading, travelHeading, targetDelta);
-        }        
+        compassHeading = getCalibratedCompassHeading();   //Get the calibrated compass heading
+        Serial.printlnf("Compass Heading: %0.2f", compassHeading);   //Print the heading to the console for debugging
     }
 }
 
