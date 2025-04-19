@@ -70,11 +70,11 @@ Changing the control mode to Sentry mode will send a target latitude and longitu
 
 #### Autonomous (Aut)
 
-Changing the control mode to Sentry mode will send a target latitude and longitude waypoint to the vehicle and have the vehicle navigate to that point. These GPS waypoints are fed into the CCHub via the USB port which is connected to companion computer. See the next section for information about the companion computer.
+Changing the control mode to autonomous mode will send a target latitude and longitude waypoint to the vehicle and have the vehicle navigate to that point. These GPS waypoints are fed into the CCHub via the USB port which is connected to companion computer. See the next section for information about the companion computer.
 
 ### Companion Computer and Waypoints
 
-See the [Companion Computer to CCHub Command Structure](#companion-computer-to-cchub-command-structure) section for how to send the GPS waypoints to the CCHub.
+The CCHub is set up to be connected over USB to a companion computer such as a Raspberry Pi for automated sending of GPS waypoints. There are a series of commands that can be sent to the CCHub which are then transmitted to the water vehicles. See the [Companion Computer to CCHub Command Structure](#companion-computer-to-cchub-command-structure) section for how to send the GPS waypoints to the CCHub.
 
 ### Light Tower Statuses
 
@@ -196,7 +196,7 @@ On the lab bench, this compass proved to do the trick, but we quickly realized (
 
 ### Motor Drive System
 
-For a movement system, we wanted to upgrade the basic paddle-style rotors to some off-shelf turbine-style motors for their improved efficiency and higher speed capability. We paired the brushless motor turbines with some off-shelf Electronic Speed Controllers (ESCs), which take a simple [duty-cycle baset 50Hz PWM signal](https://howtomechatronics.com/tutorials/arduino/arduino-brushless-motor-control-tutorial-esc-bldc/) for control. These motors got mounted on the inside of both styrofoam blocks and allow for tank-style movement.
+For a movement system, we wanted to upgrade the basic paddle-style rotors to some off-shelf turbine-style motors for their improved efficiency and higher speed capability. We paired the brushless motor turbines with some off-shelf Electronic Speed Controllers (ESCs), which take a simple [duty-cycle based 50Hz PWM signal](https://howtomechatronics.com/tutorials/arduino/arduino-brushless-motor-control-tutorial-esc-bldc/) for control. These motors got mounted on the inside of both styrofoam blocks and allow for tank-style movement.
 
 <img src="Pictures/MotorESC.jpg" width="35%"> <img src="Pictures/Motor.jpg" width="35%">
 
@@ -210,7 +210,7 @@ The vehicle PCB has an LED driver for a common-anode 12V RGB LED. This LED is wi
 
 ### Water Vehicle Power System
 
-One of the intentions of these water vehicles was to have them  monitor one place on an aquaculture pond for many days on end. To achieve this, we both needed a large battery and a solar charging system. The battery was constructed out of [21700 Lithium-ion](https://liionwholesale.com/collections/batteries/products/lishen-21700-lr2170sd-9-6a-flat-top-5000mah-battery-genuine) cells and had a 4-series (14.8V nominal), 6-parallel configuration which gave it a capacity of ~450 watt-hours. The battery was constructed using a spot welder and had an off-shelf 4S BMS.
+One of the intentions of these water vehicles was to have them  monitor one place on an aquaculture pond for many days on end. To achieve this, we both needed a large battery and a solar charging system. The battery was constructed out of [21700 Lithium-ion](https://liionwholesale.com/collections/batteries/products/lishen-21700-lr2170sd-9-6a-flat-top-5000mah-battery-genuine) cells and had a 4-series (14.8V nominal), 6-parallel configuration which gave it a capacity of ~450 watt-hours. The battery was constructed using a spot welder and had an off-shelf 4S Battery Management System (BMS) for regulating charging/discharging.
 
 We also equipped it with a 80W solar panel to have the battery recharge during the day.
 
@@ -220,7 +220,7 @@ For solar charging, we purchased a Maximum-power-point-tracker PCB for handling 
 
 <img src="Pictures/MPPT.png" width="50%">
 
-Integrated in the water vehicle PCB are two XT-30 power ports, one for solar and one for the battery. These ports also have a [Shunt Monitor](https://learn.sparkfun.com/tutorials/ina169-breakout-board-hookup-guide/all) for measuring the amount of power being drawn by each of the two power sources.
+Integrated in the water vehicle PCB are two XT-30 power ports, one for the MPPT output and one for the battery. These ports also have a [Shunt Monitor](https://learn.sparkfun.com/tutorials/ina169-breakout-board-hookup-guide/all) for measuring the amount of power being drawn by each of the two power sources.
 
 <img src="Pictures/PowerLatch.png" width="50%">
 
