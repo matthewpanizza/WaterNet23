@@ -774,7 +774,9 @@ float getRawCompassHeading(){
         lsm303.read();                              //Read the compass data from the LSM303 over I2C
         rawHeading = lsm303.heading();        //Library automatically converts to degrees
     }
-    Serial.printlnf("Raw Heading: %0.2f", compassHeading); 
+    #ifdef VERBOSE
+    Serial.printlnf("Raw Heading: %0.2f", rawHeading); 
+    #endif
     return rawHeading;   //Return the raw heading from the compass module
 }
 
@@ -819,6 +821,7 @@ void getPositionData(){
     if(millis() - compassTimer > COMP_POLL_TIME){
         compassTimer = millis();                       //Reset timer
         compassHeading = getCalibratedCompassHeading();   //Get the calibrated compass heading
+        Serial.printlnf("Compass Heading: %0.2f", compassHeading);   //Print the heading to the console for debugging
         #ifdef VERBOSE
             Serial.printlnf("Compass Heading: %0.2f", compassHeading);   //Print the heading to the console for debugging
         #endif
@@ -843,7 +846,9 @@ void statusUpdate(){
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
         #endif
         char updateStr[55];                             //Create local string to hold status being sent out
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d ",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent));  //Print status flags, battery, latitude and logitude
+        int txCompassHead = compassHeading;    //Get the compass heading to send out over the status update
+        if(txCompassHead < 0) txCompassHead += 360;   //If the heading is negative, add 360 to it to get a positive value
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent), txCompassHead);  //Print status flags, battery, latitude and logitude
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){     //If BLE and XBee are not available, send status over LTE, but only 1 in LTE_STAT_PD updates (to not suck up data)
             sendData(updateStr,0,false,false,true);     //Only send out over LTE
         }

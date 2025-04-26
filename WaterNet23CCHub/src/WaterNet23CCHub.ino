@@ -150,6 +150,9 @@ class WaterBot{
     float TargetLon = -999.0;       //Target longitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
     float GPSLat = 0.0;             //Current GPS latitude sampled from onboard Ublox module
     float GPSLon= 0.0;              //Current GPS longitude sampled from onboard Ublox module
+    uint16_t CompassHeading = 0.0;     //Current filtered compass heading from onboard module
+    bool requestCompCalibration = false; //Flag set true when the bot is requesting a compass calibration, which will pop up a warning on the menu
+    bool calRequestAcknowledged = false; //Flag set true when the user has acknowledged the compass calibration request by clearing pop-up
     uint8_t reqActive = 0;         //Flag set true when a request should be made to get sensor data
     float pH = 0.0;                 //pH sensor reading, populated when a sensor request ("sns" command) is made
     float temp = 0.0;               //Water temperature sensor reading, populated when a sensor request ("sns" command) is made
@@ -665,7 +668,8 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     char testLon[12];
                     uint16_t panelPwr;
                     uint16_t battPwr;
-                    sscanf(dataStr,"%u %u %s %s %d %d",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr);       //Parse out the various pieced of data from the data string an put them in the local variables
+                    uint16_t compassHeading;
+                    sscanf(dataStr,"%u %u %s %s %d %d %d",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr, &compassHeading);       //Parse out the various pieced of data from the data string an put them in the local variables
                     w.battPercent = battpct;                        //Copy in battery percent from the status update
                     w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
                     w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
@@ -679,6 +683,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     w.panelPower = panelPwr;                        //Copy in the solar panel power measurement
                     w.battPower = battPwr;                          //Copy in the battery power measurement
                     w.updatedStatus = true;                         //Indicate that this bot has received new data for printing to menu
+                    w.CompassHeading = compassHeading;              //Copy in the compass heading from the status update
                     if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){      //Check the last time a status change was published to this bot, this prevents a status update from reverting a change the user made due to latency, ignore a status update for modifiable fields for some time
                         w.offloading = (statflags >> 3) & 1;                //Copy in offloading, drive mode and sensor data recording if it hasn't been sent out too recently
                         w.driveMode = (statflags >> 4) & 3;
@@ -1199,6 +1204,34 @@ void manualMotorControl(uint8_t commandedBot){              //Function to read t
     }
 }
 
+void calibrateCompass(){
+    for(WaterBot &wb: WaterBots){            //Loop over water bots in vector and check if this one is selected and being controlled
+        if(wb.requestCompCalibration){
+            wb.requestCompCalibration = false;          //Set the flag to false so we don't keep sending this command over and over again
+            MenuPopUp m;                                //Create a pop-up for the low battery warning
+            sprintf(m.primaryLine,"Compass\0");         //Populate strings of the compass calibration mode with the bot number
+            sprintf(m.secondaryLine,"Turn B%d to face North\0", wb.botNum);
+            sprintf(m.tertiaryLine, "Press OK when faced North\0");
+            m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
+            m.secondaryStart = 5;
+            m.tertiaryStart = 5;
+            PopUps.push_back(m);                        //Push the pop-up item onto the vector so the menu updater prints it
+            redrawMenu = true;                          //Set flag so the menu item updater draws it in
+            wb.calRequestAcknowledged = true;           //Indicate that the pop-up has been shown to the user and they can acknowledge it
+        }
+
+        //If the user has requested calibration, after they clear the pop-up, send the command to the bot to start calibration
+        if(wb.calRequestAcknowledged && PopUps.empty()){                //Check if the user has acknowledged the calibration request, if so then send the command to the bot
+            wb.calRequestAcknowledged = false;          //Reset the flag to false so we don't keep sending this command over and over again
+            char calStr[10];                            //String to hold the calibration command
+            sprintf(calStr,"CCB%dcmp",wb.botNum);       //Create the command string to send out
+            #ifdef VERBOSE
+            Serial.printlnf("Sending compass calibration command to Bot %d",wb.botNum);
+            #endif
+        }
+    }
+}
+
 //Interrupt handler that is called when BLE data is received from the bot
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
     char btBuf[len+1];      //Received as a byte array over BLE, take and convert to a char array for string operations
@@ -1357,6 +1390,16 @@ void createMenu(){
     battPwr.statOnly = true;                                //Only a statistic, not modifiable
     battPwr.MethodPointer = &WaterBot::battPower;           //Source data from the battPower variable for the selected bot
 
+    MenuItem compHead;                                       //Create item for the compass heading
+    compHead.init(1,0,359,false,"Compass");                  //Range 0-359
+    compHead.statOnly = true;                                //Only a statistic, not modifiable
+    compHead.MethodPointer = &WaterBot::CompassHeading;      //Source data from the battPower variable for the selected bot
+
+    MenuItem compassCal;                                                //Create item for the compass calibration mode
+    compassCal.init(1,0,1,true,"CalCmp?");                              //True or false
+    compassCal.statOnly = false;                                        //This is a modifiable field
+    compassCal.MethodPointerBool = &WaterBot::requestCompCalibration;   //Source data from the battPower variable for the selected bot
+
     MenuItems.push_back(dataRecord);                        //Push all the generated menu items into the menu items vector and they will be automatically printed by the menu function
     MenuItems.push_back(battStat);
     MenuItems.push_back(sentryToggle);
@@ -1364,6 +1407,8 @@ void createMenu(){
     MenuItems.push_back(signalToggle);
     MenuItems.push_back(solStat);
     MenuItems.push_back(battPwr);
+    MenuItems.push_back(compHead);
+    MenuItems.push_back(compassCal);
 
     SelectedItem = &MenuItems.at(menuItem);                 //Select the first menu item
 }
