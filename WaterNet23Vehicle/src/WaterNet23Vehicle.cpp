@@ -27,6 +27,8 @@
 #include "LSM303.h"
 void setup();
 void loop();
+void readEEPROM();
+void writeEEPROM();
 #line 23 "c:/Users/mligh/OneDrive/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
 #define X_AXIS_ACCELERATION 0
 //#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
@@ -47,6 +49,17 @@ void loop();
 #define LEAK_DET_BYPASS     0           //Set to 1 to disable shutdown upon leak detection
 #define BATT_TRIG_LEAK      0           //Set to 1 to enable the battery leak cutting off system
 //#define VERBOSE
+
+//////////////////////////
+// EEPROM Configuration //
+//////////////////////////
+
+#define EEPROM_KEY1_LOC         0x00                    //Location of the first key in EEPROM, used to check if the EEPROM is valid
+#define EEPROM_KEY2_LOC         0x01                    //Location of the second key in EEPROM, used to check if the EEPROM is valid
+#define EEPROM_KEY1             0x23                    //Key for the first byte of the EEPROM, used to check if the EEPROM is valid
+#define EEPROM_KEY2             0x129                   //Key for the second byte of the EEPROM, used to check if the EEPROM is valid
+#define EEPROM_COMP_CAL_LOC     0x02                    //Location of the compass calibration in EEPROM, used to store the calibration values for the compass
+
 
 ///////////////////////
 // Pin Configuration //
@@ -75,21 +88,13 @@ void loop();
 /////////////////////////
 
 #define COMPASS_TYPE            0           //0 = LSM303DLHC, 1 = LIS3MDL
-#define DO_COMPASS_CALIB        false       //Set to true to use below values to remap raw compass readings
 
 #define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
 #define COMPASS_TYPE_LIS3MDL    1           //Value for COMPASS_TYPE to indicate LIS3MDL
 
-//Calibrations for LIS3MDL Compass
-#define N_BEARING   6.0                     //Raw degrees to read north (0 degrees) at
-#define NW_BEARING  -18.0                   //Raw degrees to read north (-45 degrees) at
-#define W_BEARING   -40.0                   //Raw degrees to read north (-90 degrees) at
-#define SW_BEARING  -78.0                   //Raw degrees to read north (-135 degrees) at
-#define S_BEARING   125.0                   //Raw degrees to read north (180 degrees) at
-#define SE_BEARING  86.0                    //Raw degrees to read north (135 degrees) at
-#define E_BEARING   58.0                    //Raw degrees to read north (90 degrees) at
-#define NE_BEARING  31.0                    //Raw degrees to read north (45 degrees) at
-#define COMP_OFFSET 0
+#define COMP_OFFSET 0                       //Number of degrees to add to the raw compass reading to calibrate it to true north. This is a constant offset, not a full calibration
+
+#define COMP_CAL_AVG_COUNT      5         //Number of samples to average for the compass calibration
 
 ////////////////////
 // PROGRAM MACROS //
@@ -162,12 +167,14 @@ void processCommand(const char *command, uint8_t mode, bool sendAck);
 void cmdLTEHandler(const char *event, const char *data);                    //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void setupXBee();
 bool setupCompass();
+void compassCalibration();
 void setupGPS();
 uint8_t readPowerSys();
 float deg2rad(float deg);
 float lis3mdlCompassHeading(float x_accel, float y_accel);
 float calcDistance(float lat1, float lat2, float lon1, float lon2);
 float calcDelta(float compassHead, float targetHead);
+float getRawCompassHeading();
 float getCalibratedCompassHeading();
 void getPositionData();
 void sendResponseData();
@@ -290,6 +297,8 @@ double varCompassHead;
 double rawHead;
 uint32_t BLEdbgTimer;
 float last_lat, last_lon;
+int compOffset = COMP_OFFSET;                                           //Offset for the compass calibration. Degrees off north to add to the compass reading to calibrate it to true north
+bool doCompassCal = false;                                              //Flag to indicate that the compass calibration has been requested
 
 //Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -364,7 +373,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             status.setColor(RGB_COLOR_BLUE);
             status.setSpeed(LED_SPEED_FAST);
         }
-        else if(!strcmp(cmdStr,"egp")){         //Emulated GPS point for testing purposes. Set the target latitude and longitude which allows testing of the distance and bearing functions for the GPS and compass
+        else if(!strcmp(cmdStr,"cmp")){         //Command to calibrate the compass, which is used to set the offset for the compass heading
+            doCompassCal = true;               //Set flag to indicate that the compass calibration
+        }
+        else if(!strcmp(cmdStr,"egp")){         //Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
             char tLat[12];                      //Strings for the latitude and longitude, as sscanf cannot handle floats very well, copies string then converts to a float using atof()
             char tLon[12];
             sscanf(dataStr,"%s %s",tLat,tLon);      //Scan in the target latitude and longitude from the data string
@@ -420,6 +432,8 @@ void setup(){
     #endif
 
     Particle.connect();
+
+    readEEPROM();                               //Read the EEPROM to get the compass calibration
     
     uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
     leftMotorSpeed = setLSpeed = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
@@ -538,6 +552,7 @@ void setup(){
 //Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
 void loop(){
     //Serial.printlnf("Time: %d", millis());
+    compassCalibration();    //Check if the compass calibration has been requested, and if so, run the calibration function
     getPositionData();      //Grab position data from GPS and Compass
     readPowerSys();         //Read power from battery and solar panel
     sensorHandler();        //Read and request data from Atlas sensor
@@ -550,6 +565,24 @@ void loop(){
     //rawHead = (double) targetDelta;
     delay(3);              //Slow down the program a little bit, 10ms per loop
     //Serial.printlnf("Hello World, %d", millis());
+}
+
+//Reads from the EEPROM if it is properly formatted. Updates the EEPROM if formatting does not match
+void readEEPROM(){
+    //Check if the EEPROM has been configured for use by the CAN analyzer. Read memory items if the keys match
+    if(EEPROM.read(EEPROM_KEY1_LOC) == EEPROM_KEY1 && EEPROM.read(EEPROM_KEY2_LOC) == EEPROM_KEY2){
+        EEPROM.get(EEPROM_COMP_CAL_LOC, compOffset);    //Read the compass calibration
+    }
+    //Otherwise, write the default values and the keys for the CAN Analyzer so the EEPROM is set up for the next time
+    else{
+        EEPROM.put(EEPROM_COMP_CAL_LOC, compOffset);    //Write the compass calibration value to the EEPROM
+        EEPROM.write(EEPROM_KEY1_LOC, EEPROM_KEY1);
+        EEPROM.write(EEPROM_KEY2_LOC, EEPROM_KEY2);
+    }
+}
+
+void writeEEPROM(){
+    EEPROM.put(EEPROM_COMP_CAL_LOC, compOffset);    //Write the compass calibration
 }
 
 //Code to initially configure XBee module over serial. Sends newline and 'B' to bypass the microcontroller onboard the XBee module.
@@ -626,6 +659,22 @@ void setupGPS(){
     Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 }
 
+//Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset
+void compassCalibration(){
+    if(doCompassCal){
+        float sum = 0;
+        for(int i = 0; i < COMP_CAL_AVG_COUNT; i++){
+            sum += getRawCompassHeading();    //Get the raw compass heading from the compass
+            delay(10);    //Delay for 10ms between readings to allow the compass to stabilize
+        }
+        float avg = sum / (float)COMP_CAL_AVG_COUNT;    //Average the compass heading over the number of samples
+        compOffset = (int) avg;                 //Set the compass offset to the average heading
+        writeEEPROM();                     //Write the compass offset to the EEPROM so it is saved for next time
+        Serial.printlnf("Compass Calibration: %d",compOffset);    //Print the compass calibration to the console for debugging
+        doCompassCal = false;    //Set flag to false so we don't keep calibrating the compass
+    }
+}
+
 //Function to read power draw of the system and check for leaks. Updates global variables for power system. 
 uint8_t readPowerSys(){
     #ifdef BATT_VSENSE                                                      //Disable voltage sensing if on Boron
@@ -668,64 +717,13 @@ float deg2rad(float deg) {
   return deg * (3.14159/180);   //Multiply by Pi/180
 }
 
-//Function to take an x and y acceleration from the compass and calibrate the raw heading calulation for use by autonomous algorithm. Returns a value between -180 and +180 degrees
+//Function to take an x and y acceleration from the compass and return a raw value between -180 and +180 degrees
 float lis3mdlCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
-    rawHead = (double) rawHeading;
     #ifdef VERBOSE
     //Serial.printlnf("Raw Heading: %f", rawHeading);
     #endif
-    //Map the bearing based on which 1/8th section of the compass it it
-    if(rawHeading >= N_BEARING && rawHeading < NE_BEARING){
-        //Serial.println("Between N and NE");
-        float diff = NE_BEARING - N_BEARING;
-        return (45.0 * (rawHeading-N_BEARING)/diff);
-    }
-    else if(rawHeading >= NE_BEARING && rawHeading < E_BEARING){
-        //Serial.println("Between E and NE");
-        float diff = E_BEARING - NE_BEARING;
-        return (45.0 * (rawHeading-NE_BEARING)/diff) + 45.0;
-    }
-    else if(rawHeading >= E_BEARING && rawHeading < SE_BEARING){
-        //Serial.println("Between E and SE");
-        float diff = SE_BEARING - E_BEARING;
-        return (45.0 * (rawHeading-E_BEARING)/diff) + 90.0;
-    }
-    else if(rawHeading >= SE_BEARING && rawHeading < S_BEARING){
-        //Serial.println("Between S and SE");
-        float diff = S_BEARING - SE_BEARING;
-        return (45.0 * (rawHeading-SE_BEARING)/diff) + 135.0;
-    }
-    else if(rawHeading >= NW_BEARING && rawHeading < N_BEARING){
-        //Serial.println("Between N and NW");
-        float diff = NW_BEARING - N_BEARING;
-        return (-45.0 * (rawHeading-N_BEARING)/diff);
-    }
-    else if(rawHeading >= W_BEARING && rawHeading < NW_BEARING){
-        //Serial.println("Between W and NW");
-        float diff = W_BEARING - NW_BEARING;
-        return (-45.0 * (rawHeading-NW_BEARING)/diff) - 45.0;
-    }
-    else if(rawHeading >=SW_BEARING && rawHeading < W_BEARING){
-        //Serial.println("Between W and SW");
-        float diff = SW_BEARING - W_BEARING;
-        return (-45.0 * (rawHeading-W_BEARING)/diff) - 90.0;
-    }
-    
-    else{   //Somewhere between south and southwest
-        float maindiff = (180 + SW_BEARING) + (180 - S_BEARING);
-        if(rawHeading > 0){
-            //Serial.println("Between S and SW");
-            float diff = 180.0 - S_BEARING;
-            return -180.0 + (45.0 * (rawHeading - S_BEARING)/maindiff) ;
-        }
-        else{
-            //Serial.println("Between S and SW, NR");
-            float diff = 180.0 + SW_BEARING;
-            return (45.0 * (diff/maindiff) * (rawHeading - SW_BEARING)/diff) - 135.0;
-        }
-    }
-    return rawHeading;
+    return rawHeading;   //Call the remap function to get a calibrated heading
 }
 
 //function that takes two latitudes and longitudes and calculates the distance (in meters) between them. Used by autonomous system for determining arrival at a point
@@ -762,37 +760,45 @@ float calcDelta(float compassHead, float targetHead){
     }
 }
 
-//Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
-float getCalibratedCompassHeading(){
+//Function to get the raw compass heading from the compass module (0-360). This is used for debugging and testing purposes, as well as for the autonomous system to determine which way to turn
+float getRawCompassHeading(){
+    float rawHeading = 0;     //Create a variable to hold the heading from the compass, regardless
     if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
-        float lis3mdlHeading = 0.0;                       //Create a variable to hold the heading from the compass
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
-        if(CompassAvail) lis3mdlHeading = lis3mdlCompassHeading(event.magnetic.x,event.magnetic.y);
-        lis3mdlHeading += COMP_OFFSET;
-        if(lis3mdlHeading > 180) lis3mdlHeading = lis3mdlHeading - 360;
-        else if(lis3mdlHeading < -180) lis3mdlHeading = lis3mdlHeading + 360;
-        if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
-            travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
-            travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
-            targetDelta = calcDelta(lis3mdlHeading, travelHeading);                             //Calculate delta to control angle of the bot
-            lastTelemTime = millis();                                                           //Update telemetry time
-            if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
-            //rawHead = (double) targetDelta;
-            //char tempbuf[200];
-            //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
-            //printBLE(tempbuf);
-            Serial.printlnf("RAW: %0.2f, Head: %0.2f, Delta: %0.2f", lis3mdlHeading, travelHeading, targetDelta);
-        }  
-        return lis3mdlHeading;                    //Return the heading from the compass
+        if(CompassAvail) rawHeading = lis3mdlCompassHeading(event.magnetic.x,event.magnetic.y);
+        if(rawHead < 0) rawHead += 360;   //If the heading is negative, add 360 to it to get a positive value
     }
     else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
         lsm303.read();                              //Read the compass data from the LSM303 over I2C
-        float rawHeading = lsm303.heading();        //Library automatically converts to degrees
-        return rawHeading - 180;                    //Convert 0-360 to -180 to +180
+        rawHeading = lsm303.heading();        //Library automatically converts to degrees
     }
-    return 0.0;
+    Serial.printlnf("Raw Heading: %0.2f", compassHeading); 
+    return rawHeading;   //Return the raw heading from the compass module
+}
+
+//Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
+float getCalibratedCompassHeading(){
+    float cHeading = getRawCompassHeading();   //Get the raw compass heading from the compass module
+    cHeading -= compOffset;   //Add the offset to the compass heading to get the calibrated heading
+    if(cHeading > 180) cHeading -= 360;
+    else if(cHeading < -180) cHeading += 360;
+    if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
+        travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
+        travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
+        targetDelta = calcDelta(cHeading, travelHeading);                             //Calculate delta to control angle of the bot
+        lastTelemTime = millis();                                                           //Update telemetry time
+        if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
+        //rawHead = (double) targetDelta;
+        //char tempbuf[200];
+        //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
+        //printBLE(tempbuf);
+        #ifdef VERBOSE
+            Serial.printlnf("Head: %0.2f, Target: %0.2f, Delta: %0.2f", cHeading, travelHeading, targetDelta);
+        #endif
+    }  
+    return cHeading;
 }
 
 //Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement
@@ -811,8 +817,11 @@ void getPositionData(){
         //longitude = -78.67415;
     }
     if(millis() - compassTimer > COMP_POLL_TIME){
+        compassTimer = millis();                       //Reset timer
         compassHeading = getCalibratedCompassHeading();   //Get the calibrated compass heading
-        Serial.printlnf("Compass Heading: %0.2f", compassHeading);   //Print the heading to the console for debugging
+        #ifdef VERBOSE
+            Serial.printlnf("Compass Heading: %0.2f", compassHeading);   //Print the heading to the console for debugging
+        #endif
     }
 }
 
