@@ -53,7 +53,7 @@
 
 //Menu Parameters
 #define i2c_Address             0x3c            //initialize with the I2C addr 0x3C Typically eBay OLED's
-#define MAX_MENU_ITEMS          7               //Maximum number of settings per bot displayed on the menu (must go to where MenuItems.push_back() and count this)
+#define MAX_MENU_ITEMS          9               //Maximum number of settings per bot displayed on the menu (must go to where MenuItems.push_back() and count this)
 #define DEBOUNCE_MS             150             //Number of milliseconds to disable button effects after pressing a button
 #define OLED_MAX_X              128             //Number of pixels in the X direction
 #define OLED_MAX_Y              64              //Number of pixels in the Y direction
@@ -370,12 +370,12 @@ void setup() {
     m.tertiaryStart = 10;
     PopUps.push_back(m);
     
-    startupPair();                                      //Not significantly tested - Disable if using an emulated bot id or if the program is crashing on startup
+    //startupPair();                                      //Not significantly tested - Disable if using an emulated bot id or if the program is crashing on startup
     //delay(3000);
 
     at1.start();                                        //Start the timer used for requesting sensor data
 
-    //WaterBotSim(1);
+    WaterBotSim(1);
 
     
 }
@@ -543,7 +543,7 @@ void updateMenu(){
                 printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
             }
         }
-        else if(menuItem == MAX_MENU_ITEMS-1){  //If we are selecting the last menu item in the list, print it last (highlighted), then print the previous two unhighlighted
+        else if(menuItem == MenuItems.size() -1){  //If we are selecting the last menu item in the list, print it last (highlighted), then print the previous two unhighlighted
             //Serial.printlnf("Menu item %d", menuItem);
             printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));      //Print bottom menu item as highlighted
             //Serial.printlnf("Menu item %d", menuItem-1);
@@ -1542,7 +1542,7 @@ void dHandler(){
     redrawMenu = true;                                      //Set redraw flag always so the display is updated with new highlighted item
     if(millis()-debounceTime < DEBOUNCE_MS) return;         //debounce this button, to make sure only one trigger is registered per press
     debounceTime = millis();
-    if(menuItem < MAX_MENU_ITEMS-1) menuItem++;             //Go down by one menu item by incrementing the counter by one, as long as we are not at the bottom already
+    if(menuItem < MenuItems.size()-1) menuItem++;             //Go down by one menu item by incrementing the counter by one, as long as we are not at the bottom already
     SelectedItem = &MenuItems.at(menuItem);                 //Update which item is selected so the redraw function can use it
     #ifdef VERBOSE
     Serial.println("Down trigger");

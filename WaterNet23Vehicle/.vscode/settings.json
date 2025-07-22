@@ -13,6 +13,5 @@
         "vector": "cpp"
     },
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": "gerbil_pirate"
+    "particle.firmwareVersion": "4.0.0"
 }

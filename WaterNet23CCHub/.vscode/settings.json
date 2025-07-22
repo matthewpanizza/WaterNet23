@@ -7,5 +7,5 @@
         "string_view": "cpp",
         "vector": "cpp"
     },
-    "particle.targetDevice": "burrito_sniper"
+    "particle.targetDevice": ""
 }
