@@ -16,6 +16,7 @@
 //////////////////////////////////////////////////////////////
 
 #include "application.h"                    //Needed for I2C to GPS
+#define ARDUINO 0
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
 #include <Adafruit_LIS3MDL.h>
 #include <Adafruit_Sensor.h>
@@ -29,13 +30,16 @@
 #undef max
 #include <vector>
 #include "CompassEKF.h"
-#include "CompassManager.h"
+#include "Compass.h"
+#include "LIS3MDLCompass.h"
+#include "LSM303Compass.h"
 #include "SimulationData.h"
 
 #define COMPASS_TYPE            0           //0 = LSM303DLHC, 1 = LIS3MDL
 
 #define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
 #define COMPASS_TYPE_LIS3MDL    1           //Value for COMPASS_TYPE to indicate LIS3MDL
+#define COMPASS_TYPE_AUTO       2           //Value for COMPASS_TYPE to auto-detect compass
 
 
 
@@ -76,6 +80,7 @@ void handleTableCommand(const char* dataStr, uint8_t mode);
 void cmdLTEHandler(const char *event, const char *data);                    //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void setupXBee();
 bool setupCompass();
+void cleanupCompass();
 void compassCalibration();
 void setupGPS();
 uint8_t readPowerSys();
@@ -84,6 +89,7 @@ float lis3mdlCompassHeading(float x_accel, float y_accel);
 float calcDistance(float lat1, float lat2, float lon1, float lon2);
 float calcDelta(float compassHead, float targetHead);
 float getRawCompassHeading();
+float getRawCompassHeadingFallback();
 float getCalibratedCompassHeading();
 void getPositionData();
 void sendResponseData();
@@ -107,6 +113,9 @@ void logMessage(const char *message);
 void LEDHandler();
 void printStatusTable();
 void initializeSimulationLog(const char* filename);
+void initializeAutonomousLog(const char* filename);
+void logAutonomousData();
+void writeMotionDataLog();
 void logSimulationData();
 int LTEInputCommand(String cmd);
 
@@ -144,6 +153,7 @@ Timer motorHandler(MTR_RAMP_TIME,updateMotors);
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
 Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);    //Create timer for shutdown, which runs when the button is pressed to calculate if the button has been held for SHUTDOWN_HOLD seconds 
 Timer statusTableTimer(1000, printStatusTable);     //Create timer for status table, which prints the availability status every second
+Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomous navigation data logging every 500ms
 
 
 
@@ -158,16 +168,17 @@ SFE_UBLOX_GNSS myGPS;                           //GPS Buffer and Objects
 
 Adafruit_LIS3MDL lis3mdl;                 //Compass object for LIS3MDL
 LSM303 lsm303;                            //Compass object for LSM303DLHC
-CompassManager compassManager;            //Unified compass manager
+Compass* compass = nullptr;               //Unified compass pointer using abstract base class
 
 LEDStatus status;                               //LED Control object
 
 //SD File system object                 
 SdFat sd((SPIClass*)&SPI);                      //SD card object, initialized on SPI for the Beta/Alpha PCB, SPI1 on the Bsom breakout board
 
-File myFile;                                    //File for the sensor data
+File dataFile;                                    //File for the sensor data
 File logFile;                                   //File for messages logged by the program
 File simLogFile;                                //File for simulation data logging
+File autLogFile;                                //File for autonomous navigation data logging
 File logDir;                                    //File directory 
 
 SerialLogHandler logHandler(LOG_LEVEL_INFO);    //Log Configuration
@@ -200,6 +211,7 @@ uint16_t LTEStatusCount;                                                //Counte
 uint16_t statusFlags;                                                   //Global status flag
 bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail, SDAvail;    //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait;                                 //Flags for sensor timing/enables
+bool autLogReady;                                                       //Flag to indicate autonomous navigation data is ready to log
 bool offloadMode;                                                       //Flag to indicate that SD card data is being offloaded
 bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
 bool shutdownActive;                                                    //Flag to indicate that the button has been pressed down and a shutdown is initiated
@@ -213,6 +225,7 @@ float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global
 char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
 char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
 char simFilename[MAX_FILENAME_LEN];                                     //Filename for the simulation data log file
+char autFilename[MAX_FILENAME_LEN];                                     //Filename for the autonomous navigation data log file
 double varCompassHead;
 double rawHead;
 uint32_t BLEdbgTimer;
@@ -325,7 +338,7 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
     //Control command from CC that contains data about the drive mode, target latitude and longitude, and offloading
     char tLat[10];              //String buffer for latitude, as sscanf doesn't handle floats well
     char tLon[10];              //String buffer for longitude, as sscanf doesn't handle floats well
-    sscanf(dataStr,"%s %s %d %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal
+    sscanf(dataStr,"%s %s %u %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal
     targetLat = atof(tLat);     //Convert latitude string to float
     targetLon = atof(tLon);     //Convert longitude string to float
     #ifdef VERBOSE
@@ -459,29 +472,94 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
     
     if(strlen(dataStr) == 0) {
         // Status report
-        Serial.printlnf("Compass Manager Status:");
-        Serial.printlnf("  Manager initialized: %s", compassManager.isInitialized() ? "Yes" : "No");
-        Serial.printlnf("  Active compass: %s", compassManager.getCompassTypeString());
-        Serial.printlnf("  Manager connected: %s", compassManager.isConnected() ? "Yes" : "No");
-        Serial.printlnf("  Fallback compass type: %d", COMPASS_TYPE);
-        Serial.printlnf("  Current heading: %0.2f", getRawCompassHeading());
+        Serial.printlnf("Compass Status:");
+        Serial.printlnf("  Compass pointer: %s", compass ? "Valid" : "NULL");
+        Serial.printlnf("  Active compass: %s", compass ? compass->getType() : "None");
+        Serial.printlnf("  Compass connected: %s", compass && compass->isConnected() ? "Yes" : "No");
+        Serial.printlnf("  Configured compass type: %d", COMPASS_TYPE);
+        
+        float heading = getRawCompassHeading();
+        if (isnan(heading)) {
+            Serial.printlnf("  Current heading: NaN (ERROR!)");
+        } else {
+            Serial.printlnf("  Current heading: %0.2f", heading);
+        }
+        
+        Serial.printlnf("  Compass offset: %0.2f", compOffset);
+
     } else {
         int compassTypeCmd = atoi(dataStr);
-        CompassType newType = (CompassType)compassTypeCmd;
         
         if(compassTypeCmd == 2) {
-            // Auto-detect
-            if(compassManager.begin(COMPASS_TYPE_AUTO, &lis3mdl, &lsm303)) {
-                Serial.printlnf("Compass auto-detection successful: %s", compassManager.getCompassTypeString());
+            // Auto-detect - try both compass types
+            Serial.println("Attempting compass auto-detection...");
+            
+            // Clean up existing compass
+            if (compass) {
+                delete compass;
+                compass = nullptr;
+            }
+            
+            // Try to reinitialize with auto-detection
+            int originalType = COMPASS_TYPE;
+            // Temporarily set to auto for setupCompass function
+            #define COMPASS_TYPE_AUTO_TEMP 2
+            bool success = false;
+            
+            // Try LIS3MDL first
+            compass = new LIS3MDLCompass(&lis3mdl);
+            if (compass->begin()) {
+                Serial.printlnf("Auto-detection successful: %s", compass->getType());
+                success = true;
             } else {
+                delete compass;
+                compass = nullptr;
+                
+                // Try LSM303
+                compass = new LSM303Compass(&lsm303);
+                if (compass->begin()) {
+                    Serial.printlnf("Auto-detection successful: %s", compass->getType());
+                    success = true;
+                } else {
+                    delete compass;
+                    compass = nullptr;
+                }
+            }
+            
+            if (!success) {
                 Serial.println("Compass auto-detection failed");
             }
+            
         } else if(compassTypeCmd == 0 || compassTypeCmd == 1) {
             // Switch to specific compass type
-            if(compassManager.begin(newType, &lis3mdl, &lsm303)) {
-                Serial.printlnf("Switched to compass type: %s", compassManager.getCompassTypeString());
+            Serial.printlnf("Switching to compass type: %d", compassTypeCmd);
+            
+            // Clean up existing compass
+            if (compass) {
+                delete compass;
+                compass = nullptr;
+            }
+            
+            if (compassTypeCmd == 0) {
+                // LSM303
+                compass = new LSM303Compass(&lsm303);
+                if (compass->begin()) {
+                    Serial.printlnf("Successfully switched to: %s", compass->getType());
+                } else {
+                    Serial.printlnf("Failed to initialize LSM303 compass");
+                    delete compass;
+                    compass = nullptr;
+                }
             } else {
-                Serial.printlnf("Failed to switch to compass type: %d", compassTypeCmd);
+                // LIS3MDL
+                compass = new LIS3MDLCompass(&lis3mdl);
+                if (compass->begin()) {
+                    Serial.printlnf("Successfully switched to: %s", compass->getType());
+                } else {
+                    Serial.printlnf("Failed to initialize LIS3MDL compass");
+                    delete compass;
+                    compass = nullptr;
+                }
             }
         } else {
             Serial.println("Invalid compass type. Use: 0=LSM303, 1=LIS3MDL, 2=Auto-detect");
@@ -604,6 +682,22 @@ void initializeSimulationLog(const char* filename) {
     }
 }
 
+//Function to initialize autonomous navigation logging file
+void initializeAutonomousLog(const char* filename) {
+    if(!SDAvail) return; // No SD card available
+    
+    if(!autLogFile.isOpen()) {
+        autLogFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+        if(autLogFile.isOpen()) {
+            autLogFile.println("Timestamp,CurrentHeading,TargetHeading,CurrentLat,CurrentLon,TargetLat,TargetLon,LeftMotor,RightMotor");
+            autLogFile.close();
+            Serial.printlnf("Autonomous log file created: %s", filename);
+        } else {
+            Serial.printlnf("Failed to create autonomous log file: %s", filename);
+        }
+    }
+}
+
 //Function to log simulation data to SD card
 void logSimulationData() {
     if(!SDAvail || !simulationData.isSimulationEnabled()) return;
@@ -652,6 +746,40 @@ void logSimulationData() {
                         timestamp, gps.latitude, gps.longitude, compass.heading,
                         leftMotorSpeed, rightMotorSpeed, modeName);
     }
+}
+
+//Function to log autonomous navigation data to SD card
+void logAutonomousData() {
+    autLogReady = true;  // Set flag for main loop to handle actual logging
+}
+
+//Helper function to write autonomous navigation data to SD card (called from main loop)
+void writeMotionDataLog() {
+    if(!autLogReady || !SDAvail) return; // No logging needed or SD card unavailable
+    
+    // Create timestamp
+    char timestamp[20];
+    snprintf(timestamp, 20, "%02d/%02d/%04d %02d:%02d:%02d", 
+             Time.month(), Time.day(), Time.year(),
+             Time.hour(), Time.minute(), Time.second());
+    
+    // Use filtered compass heading if available, otherwise use regular compass heading
+    float currentHeading = (filteredCompassHeading != 0.0) ? filteredCompassHeading : compassHeading;
+    
+    // Write to file
+    if(!autLogFile.isOpen()) {
+        autLogFile.open(autFilename, O_RDWR | O_CREAT | O_AT_END);
+    }
+    
+    if(autLogFile.isOpen()) {
+        autLogFile.printlnf("%s,%0.1f,%0.1f,%0.6f,%0.6f,%0.6f,%0.6f,%d,%d",
+                           timestamp, currentHeading, travelHeading,
+                           latitude, longitude, targetLat, targetLon,
+                           leftMotorSpeed, rightMotorSpeed);
+        autLogFile.close();
+    }
+    
+    autLogReady = false; // Clear the flag
 }
 
 //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
@@ -727,6 +855,7 @@ void setup(){
     dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
     logSensors = true;                          //By default, log sensor data to SD card, if SD card is inserted
     logMessages = true;                         //By default, log debug messages to SD card, if SD card is inserted
+    autLogReady = false;                        //Initialize autonomous logging flag to false
     offloadMode = false;                        //Set offload to false, otherwise could try to offload with no CC connected
     requestActive = false;                      //Set request to false, otherwise we are trying to send sensor data with no CC connected
     LTEStatusCount = LTE_MAX_STATUS;            //Initialize counter for LTE backup messages. This counter limits the number of LTE messages being sent so we don't burn through the data limit
@@ -760,6 +889,10 @@ void setup(){
     // Initialize EKF for compass heading filtering
     if(CompassAvail) {
         float initialHeading = getRawCompassHeading();
+        if (isnan(initialHeading)) {
+            Serial.println("Error: Compass heading is NaN, cannot initialize EKF");
+            initialHeading = 0.0; // Fallback to zero if heading is invalid
+        }
         compassEKF.init(initialHeading - compOffset);
         lastEKFUpdateTime = millis();
         Serial.printlnf("EKF initialized with heading: %0.2f", initialHeading - compOffset);
@@ -770,18 +903,22 @@ void setup(){
     strcpy(filename,DEF_FILENAME);              //Copy in all of the necessary elements of the file name
     strcat(filename,timestamp);
     strcpy(filenameMessages,filename);
+    strcpy(autFilename,filename);
     strcat(filename,".csv");
     strcat(filenameMessages,"_LOG.txt");
+    strcat(autFilename,"_AUT.csv");
     strcpy(simFilename, "");                        //Initialize simulation filename as empty until simulation is enabled
 
     Serial.println(filename);                   //Print the filenames to the console for debugging
     Serial.println(filenameMessages);
+    Serial.println(autFilename);
 
     watchdog.start();                           //Start the timers
     //motionTimer.start();
     ledTimer.start();
     statusPD.start();
     statusTableTimer.start();
+    autLogTimer.start();
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Try to connect to the SD card
         Serial.println("Error: could not connect to SD card!");     //If not, warn the user in the console
@@ -790,14 +927,17 @@ void setup(){
         SDAvail = false;
     }
     if(logSensors){                                 //Logsensors enables logging of sensor data, if enabled, then create the file on the SD card
-        myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-        myFile.println(FILE_LABELS);
-        myFile.close();
+        dataFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+        dataFile.println(FILE_LABELS);
+        dataFile.close();
     }
     if(logMessages){                                //Logsensors enables logging of messages, if enabled, then create the file on the SD card
         if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
         logFile.printlnf("[INFO] WaterBot %d: Started Logging!",BOTNUM);
         logFile.close();
+    }
+    if(SDAvail){                                    //Initialize autonomous navigation log file if SD card is available
+        initializeAutonomousLog(autFilename);
     }
     if(STARTUP_WAIT_PAIR){                          //If a wait pair is enabled, wait for an acknowlede from the CChub before continuing to the main loop
         waitForConnection = true;                   //Set flag true, which will be set false when command received from CChub
@@ -834,6 +974,7 @@ void loop(){
     //XBeeHandler();          //Check if a string has come in from XBee
     SerialConsoleHandler(); //Check if a string has come in from Serial console
     statusUpdate();         //Check if a status update has to be sent out
+    writeMotionDataLog();   //Write autonomous navigation data if timer flag is set
     //updateMotors();         //Update the motor speeds dependent on the mode
     simulationData.updateSimulation(); //Update simulation data and handle logging
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
@@ -883,45 +1024,46 @@ void setupXBee(){
 
 //Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
 bool setupCompass(){
-    // First try to initialize with compass manager for auto-detection
-    if (compassManager.begin(COMPASS_TYPE_AUTO, &lis3mdl, &lsm303)) {
-        Serial.printlnf("Compass manager initialized with: %s", compassManager.getCompassTypeString());
-        return true;
-    }
+    // Try to auto-detect and initialize compass, or use specified type
     
-    // Fallback to original initialization method
-    if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
-        if (! lis3mdl.begin_I2C()) {                // hardware I2C mode, can pass in address & alt Wire
-            Serial.println("Failed to find LIS3MDL chip");   //Couldn't connect over I2C, so assume the compass is unavailable. Flag disables Autonomous/Sentry mode
+    // Try LIS3MDL first (either explicitly requested or auto-detect mode)
+    if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
+        compass = new LIS3MDLCompass(&lis3mdl);
+        if (compass->begin()) {
+            Serial.printlnf("Compass initialized with: %s", compass->getType());
+            return true;
+        }
+        delete compass;
+        compass = nullptr;
+        
+        // If explicitly requested LIS3MDL and it failed, don't try others
+        if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL) {
+            Serial.println("Failed to initialize LIS3MDL compass");
             return false;
         }
-        else Serial.println("LIS3MDL Found!");
-        lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
-        lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
-        lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
-        lis3mdl.setRange(LIS3MDL_RANGE_8_GAUSS);
-        lis3mdl.setIntThreshold(500);
-        lis3mdl.configInterrupt(false, false, true, // enable z axis
-                              true, // polarity
-                              false, // don't latch
-                              true); // enabled!
     }
-    else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
-        if(!lsm303.init()) return false;
-        lsm303.enableDefault();
+    
+    // Try LSM303 (either explicitly requested or auto-detect mode)
+    if (COMPASS_TYPE == COMPASS_TYPE_LSM303 || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
+        compass = new LSM303Compass(&lsm303);
+        if (compass->begin()) {
+            Serial.printlnf("Compass initialized with: %s", compass->getType());
+            return true;
+        }
+        delete compass;
+        compass = nullptr;
+    }
+    
+    Serial.println("Failed to initialize any compass");
+    return false;
+}
 
-        /*
-        Calibration values; the default values of +/-32767 for each axis
-        lead to an assumed magnetometer bias of 0. Use the Calibrate example
-        program to determine appropriate values for your particular unit.
-        */
-        lsm303.m_min = (LSM303::vector<int16_t>){-32767, -32767, -32767};
-        lsm303.m_max = (LSM303::vector<int16_t>){+32767, +32767, +32767};
+//Function to cleanup compass resources
+void cleanupCompass() {
+    if (compass) {
+        delete compass;
+        compass = nullptr;
     }
-    else{
-        return false;
-    }
-    return true;
 }
 
 //I2C setup for NEO-M8U GPS
@@ -1059,31 +1201,46 @@ float getRawCompassHeading(){
         }
     }
     
-    // Try compass manager first if initialized
-    if (compassManager.isInitialized()) {
-        rawHeading = compassManager.getRawHeading();
-        // Convert from -180/+180 range to 0-360 range for compatibility
-        if (rawHeading < 0) rawHeading += 360;
-        #ifdef VERBOSE
-        Serial.printlnf("Raw Heading (via manager): %0.2f", rawHeading); 
-        #endif
+    // Use the new compass interface if available
+    if (compass && compass->isConnected()) {
+        rawHeading = compass->getCompassHeading();
+        
+        // Check for NaN values and handle gracefully
+        if (isnan(rawHeading)) {
+            Serial.println("Warning: Compass returned NaN, trying fallback method");
+            // Fallback to original direct sensor access
+            rawHeading = getRawCompassHeadingFallback();
+        } else {
+            // Convert from -180/+180 range to 0-360 range for compatibility
+            if (rawHeading < 0) rawHeading += 360;
+            #ifdef VERBOSE
+            Serial.printlnf("Raw Heading (via compass): %0.2f", rawHeading); 
+            #endif
+        }
         return rawHeading;
     }
     
-    // Fallback to original method
+    // Final fallback to original method
+    return getRawCompassHeadingFallback();
+}
+
+// Fallback method using direct sensor access
+float getRawCompassHeadingFallback() {
+    float rawHeading = 0;
+    
     if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
         lis3mdl.read();                                 // get X Y and Z data at once
         sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
         bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
         if(CompassAvail) rawHeading = lis3mdlCompassHeading(event.magnetic.x,event.magnetic.y);
-        if(rawHead < 0) rawHead += 360;   //If the heading is negative, add 360 to it to get a positive value
+        if(rawHeading < 0) rawHeading += 360;   //If the heading is negative, add 360 to it to get a positive value
     }
     else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
         lsm303.read();                              //Read the compass data from the LSM303 over I2C
         rawHeading = lsm303.heading();        //Library automatically converts to degrees
     }
     #ifdef VERBOSE
-    Serial.printlnf("Raw Heading: %0.2f", rawHeading); 
+    Serial.printlnf("Raw Heading (fallback): %0.2f", rawHeading); 
     #endif
     return rawHeading;   //Return the raw heading from the compass module
 }
@@ -1374,7 +1531,7 @@ void sensorHandler(){
     if(!SENS_CONNECTED) return;                //If sensors are not connected, then return and do nothing
     if(dataTimer < millis() && dataWait){       //Check if the timer for waiting after a data request has expired
         if(Wire.requestFrom(PHADDR, 20, 1)){    //Request 20 bytes from the PH sensor
-            byte code = Wire.read();            //the first byte is the response code, we read this separately.
+            Wire.read();            //the first byte is the response code, we read this separately.
             char tempSense[20];                 //Temporary string to hold string returned by the sensor
             int c = 0;                          //Index variable for the temporary string
             while(Wire.available()){            // slave may send less than requested
@@ -1385,7 +1542,7 @@ void sensorHandler(){
         }
         //Serial.printlnf("pH: %f", sensePH);
         if(Wire.requestFrom(MCOND, 20, 1)){
-            byte code = Wire.read();            //the first byte is the response code, we read this separately.
+            Wire.read();            //the first byte is the response code, we read this separately.
             char mcondSense[20];
             int c = 0;
             while(Wire.available()){   // slave may send less than requested
@@ -1396,7 +1553,7 @@ void sensorHandler(){
         }
         //Serial.printlnf("MiniCond: %f",senseMCond);
         if(Wire.requestFrom(COND, 20, 1)){
-            byte code = Wire.read();            //the first byte is the response code, we read this separately.
+            Wire.read();            //the first byte is the response code, we read this separately.
             char condSense[20];
             int c = 0;
             while(Wire.available()){   // slave may send less than requested
@@ -1407,7 +1564,7 @@ void sensorHandler(){
         }
         //Serial.printlnf("Conductivity: %f",senseCond);
         if(Wire.requestFrom(TEMPADDR, 20, 1)){
-            byte code = Wire.read();             //the first byte is the response code, we read this separately.
+            Wire.read();             //the first byte is the response code, we read this separately.
             char addrSense[20];
             int c = 0;
             while(Wire.available()){   // slave may send less than requested
@@ -1417,7 +1574,7 @@ void sensorHandler(){
             senseTemp = atof(addrSense);
         }
         if(Wire.requestFrom(DOADDR, 20, 1)){
-            byte code = Wire.read();             //the first byte is the response code, we read this separately.
+            Wire.read();             //the first byte is the response code, we read this separately.
             char addrSense[20];
             int c = 0;
             while(Wire.available()){   // slave may send less than requested
@@ -1431,13 +1588,13 @@ void sensorHandler(){
         if(logSensors){                         //Log sensors to SD card if enabled
             char timestamp[18];                 //String to hold timestamp being logged
             snprintf(timestamp,16,"%02d%02d%04d%02d%02d%02d",Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
-            if(!myFile.isOpen()){               //Print out each of the global sensor values
-                myFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-                myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
-                myFile.close();
+            if(!dataFile.isOpen()){               //Print out each of the global sensor values
+                dataFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+                dataFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
+                dataFile.close();
             } 
             else{
-                myFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
+                dataFile.printlnf("%s,%f,%f,%f,%f,%f,%f,%f",timestamp,latitude,longitude,senseTemp,sensePH,senseDO,senseMCond,senseCond);
             }
         }
     }
@@ -1478,7 +1635,7 @@ void XBeeHandler(){
         if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis(); //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-            logFile.printlnf("[INFO] Received XBee Message: %s",data);
+            logFile.printlnf("[INFO] Received XBee Message: %s",data.c_str());
             logFile.close();
         }
     }
@@ -1622,7 +1779,7 @@ void wdogHandler(){
 //Function to pause operation and copy data off of SD card over bluetooth to the CChub
 void dataOffloader(){
     Serial.println("Entering Data Offloader Mode");
-    myFile.close();
+    dataFile.close();
     if (!logDir.open("/")) {
         offloadMode = false;
         Serial.println("Error, could not open root SD card directory");
@@ -1635,12 +1792,12 @@ void dataOffloader(){
     }
     Serial.println("Starting transfer...");
     char fileCode[8 + MAX_FILENAME_LEN];
-    while (myFile.openNext(&logDir, O_RDONLY) && BLE.connected()) {
+    while (dataFile.openNext(&logDir, O_RDONLY) && BLE.connected()) {
         char namebuf[MAX_FILENAME_LEN];
-        myFile.getName(namebuf,MAX_FILENAME_LEN);
+        dataFile.getName(namebuf,MAX_FILENAME_LEN);
         Serial.printlnf("Checking if file %s is a .csv or .txt...", namebuf);
         if(!strstr(strlwr(namebuf + (strlen(namebuf) - 4)), ".csv")){
-            myFile.close();
+            dataFile.close();
             continue;
         }
         else{
@@ -1652,11 +1809,11 @@ void dataOffloader(){
             Serial.printlnf("File %s is a .csv or .txt printing data", namebuf);
             delay(150);
             noInterrupts();
-            while(myFile.available()){
+            while(dataFile.available()){
                 char lineBuffer[BLE_OFFLD_BUF];
                 memset(lineBuffer,0,BLE_OFFLD_BUF);
-                //myFile.readBytes(lineBuffer,BLE_OFFLD_BUF);
-                myFile.readBytesUntil('\r',lineBuffer,BLE_OFFLD_BUF);
+                //dataFile.readBytes(lineBuffer,BLE_OFFLD_BUF);
+                dataFile.readBytesUntil('\r',lineBuffer,BLE_OFFLD_BUF);
                 offloadCharacteristic.setValue(lineBuffer);
                 //Serial.println(lineBuffer);
             }
@@ -1667,7 +1824,7 @@ void dataOffloader(){
             offloadCharacteristic.setValue(fileCode);
             delay(150);
             
-            myFile.close();
+            dataFile.close();
         }
     }
     logDir.close();
