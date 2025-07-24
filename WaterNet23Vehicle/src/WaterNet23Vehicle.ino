@@ -100,7 +100,6 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 void motionHandler();
 void wdogHandler();
 void dataOffloader();
-void buttonTimer();
 void buttonHandler();
 void LEDHandler();
 void printStatusTable();
@@ -143,7 +142,6 @@ Timer ledTimer(300,LEDHandler);                     //Create timer for LED, whic
 Timer motionTimer(250, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
 Timer motorHandler(MTR_RAMP_TIME,updateMotors);
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
-Timer shutdownTimer(SHUTDOWN_HOLD, buttonTimer);    //Create timer for shutdown, which runs when the button is pressed to calculate if the button has been held for SHUTDOWN_HOLD seconds 
 Timer statusTableTimer(1000, printStatusTable);     //Create timer for status table, which prints the availability status every second
 Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomous navigation data logging every 500ms
 
@@ -214,6 +212,7 @@ uint32_t senseTimer, dataTimer, positionTimer, compassTimer;            //Timers
 uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
 uint32_t motionTime, lastMtrTime, lastTelemTime;                        //Timers for when the last motor and telemetry commands were received
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
+uint32_t lastButtonClickTime;                                           //Timer for when the last button click was received
 uint32_t stopTime;
 float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
 char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
@@ -229,6 +228,8 @@ bool doCompassCal = false;                                              //Flag t
 float xAccel;
 float yAccel;
 float zAccel;
+bool buttonPressSequenceStarted = false;                                //Flag to indicate that the button press sequence has started
+uint16_t buttonPressCount = 0;                                          //Counter for the number of repeated button presses
 
 // EKF variables for improved compass heading
 CompassEKF compassEKF;                                                  //Extended Kalman Filter for compass heading fusion
@@ -814,7 +815,7 @@ void setup(){
     pinMode(SENSE_EN, OUTPUT);                          //Configure the pin for the Atlas sensors as an output and pull low to enable power to the Atlas sensors
     digitalWrite(SENSE_EN,LOW);                     
     pinMode(PWR_BUT, INPUT);                            //Configure power button input as an input, no pull as the resistor divider will handle pin floating
-    attachInterrupt(PWR_BUT, buttonHandler, CHANGE);    //Attach the buttonHandler function to trigger whenever the button is pressed or released
+    attachInterrupt(PWR_BUT, buttonHandler, RISING);    //Attach the buttonHandler function to trigger whenever the button is pressed
     #ifdef LEAK_DET
     pinMode(LEAK_DET,INPUT);                            //Configure the leak detect output of the PCB to be an input with no pull. External pull on PCB
     #endif
@@ -984,6 +985,7 @@ void loop(){
     statusUpdate();                     //Check if a status update has to be sent out
     writeMotionDataLog();               //Write autonomous navigation data if timer flag is set
     updateMotors();                     //Update the motor speeds dependent on the mode
+    buttonActionDecode();
     simulationData.updateSimulation();  //Update simulation data and handle logging
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();                 //Send sensor data if requested from the CC
@@ -1825,27 +1827,42 @@ void dataOffloader(){
     offloadMode = false;
 }
 
-//Timer that activates whenever the power button is pressed
-void buttonTimer(){
-    #ifdef PWR_EN
-    if(digitalRead(PWR_BUT)) digitalWrite(PWR_EN, LOW); //Turn off system
-    #endif
-    shutdownTimer.stopFromISR();
+/// @brief Function that decodes a sequence of button presses into a command. This does various actions based on the number of presses and the time between them
+void buttonActionDecode(){
+    //If the button press sequence has started and the last button click time is greater than the idle time, then decode the button presses
+    if(buttonPressSequenceStarted && (millis() - lastButtonClickTime > BUTTON_IDLE_TIME)){  
+        buttonPressSequenceStarted = false;                //Set the flag to false, so we don't decode the same sequence again
+        if(buttonPressCount == 3){
+            signalLED = !signalLED;                     //If the button was pressed 8 times, then toggle the signal LED mode
+        }
+        else if(buttonPressCount == 5){
+            logToDebugFile("[INFO] Power off button pressed 5 times, shutting down bot");
+            sendData("B1ABsdn",0,true,true,true);         //Send shutdown executed command to CChub
+            digitalWrite(PWR_EN, LOW);                      //If the button was pressed 5 times, then turn off the power to the bot
+        }
+        else if(buttonPressCount == 7){
+            doCompassCal = true;                          //If the button was pressed 7 times, then set the compass calibration
+            logToDebugFile("[INFO] Compass calibration button pressed 7 times, setting compass calibration mode");
+        }
+        else if(buttonPressCount == 10){
+            logToDebugFile("[INFO] Entering DFU mode, button pressed 10 times");
+            System.dfu();              // Enters DFU mode normally
+        }
+        buttonPressCount = 0;
+    }
+
 }
 
 //ISR triggered when button is pressed or released
 void buttonHandler(){
-    if(digitalRead(PWR_BUT)){               //If the interrupt was triggered by the button being pressed
-        shutdownTimer.startFromISR();       //Start the shutdown timer, which will check if the button has been held for long enough
-        shutdownActive = true;              //Set flag to true to make LED flash and indicate shutdown initiate
-        //char teststr[15];
-        //sprintf(teststr,"B%dCCptsShutdown",BOTNUM);
-        //sendData(teststr,0,false,true,false);
+    if(millis() - lastButtonClickTime < BUTTON_DEB_TIME){  //If the button was pressed within the debounce time, then ignore this press
+        lastButtonClickTime = millis();                        //Update the last button click time
+        return;
     }
-    else{                                   //If the interrupt was triggered by the button being released
-        shutdownTimer.stopFromISR();        //Stop the ISR which will shut off the bot
-        shutdownActive = false;             //Clear shutdown flag to make LED stop blinking
-    }
+    lastButtonClickTime = millis();                        //Update the last button click time
+    buttonPressSequenceStarted = true;
+    buttonPressCount++;                                    //Increment the button press count
+
 }
 
 //ISR timer to update the color and pattern of the LED based on the status of the system

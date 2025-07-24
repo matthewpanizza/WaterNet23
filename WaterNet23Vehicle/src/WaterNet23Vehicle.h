@@ -65,7 +65,8 @@
 #define SENS_POLL_RT        2500            //Number of milliseconds between sensor reads
 #define SENS_DATA_DLY       825             //Number of milliseconds between a request to a sensor and actually retrieving the reading
 
-#define SHUTDOWN_HOLD       3000            //Number of milliseconds that the power button must be held to actually shut off bot
+#define BUTTON_DEB_TIME     25              //Debounce time for button presses
+#define BUTTON_IDLE_TIME    2000            //Time in milliseconds to wait before considering the button idle
 #define WATCHDOG_PD         1000           //Watchdog timer period in milliseconds
 #define STATUS_PD           10000            //Time between status updates published to CC Hub
 #define STOP_RST_TIME       10000           //Time after receiving the last stop command to exit stop mode
