@@ -10,7 +10,8 @@
         "istream": "cpp",
         "cmath": "cpp",
         "ios": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "ostream": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0"

@@ -108,3 +108,11 @@
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
 #define COMP_POLL_TIME      250             //Rate to poll the Compass and calculate the target heading
+
+////////////////////////
+// Drive Mode Macros ///
+////////////////////////
+
+#define DRIVE_MODE_MANUAL        0               // Manual drive mode
+#define DRIVE_MODE_SENTRY        1               // Sentry mode
+#define DRIVE_MODE_AUTONOMOUS    2               // Autonomous drive mode
