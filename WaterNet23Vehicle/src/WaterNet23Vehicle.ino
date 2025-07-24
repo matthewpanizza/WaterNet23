@@ -35,6 +35,7 @@
 #include "LIS3MDLCompass.h"
 #include "LSM303Compass.h"
 #include "SimulationData.h"
+#include "CommandQueue.h"
 
 #define COMPASS_TYPE            0           //0 = LSM303DLHC, 1 = LIS3MDL
 
@@ -52,15 +53,6 @@ SYSTEM_THREAD(ENABLED);
 /////////////////////////
 
 void processCommand(const char *command, uint8_t mode, bool sendAck);
-
-// Command handler function type
-typedef void (*CommandHandler)(const char* dataStr, uint8_t mode);
-
-// Command structure for lookup table
-struct CommandEntry {
-    const char* cmd;
-    CommandHandler handler;
-};
 
 // Command handler functions
 void handleControlCommand(const char* dataStr, uint8_t mode);
@@ -165,6 +157,8 @@ SFE_UBLOX_GNSS myGPS;                           //GPS Buffer and Objects
 //char nmeaBuffer[100];
 //MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 //SFE_UBLOX_GPS myGPS;
+
+CommandQueue commandQueue;                //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
 
 Adafruit_LIS3MDL lis3mdl;                 //Compass object for LIS3MDL
 LSM303 lsm303;                            //Compass object for LSM303DLHC
@@ -281,6 +275,11 @@ void logToDebugFile(const char* fmt, ...) {
 
 //Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
 void processCommand(const char *command, uint8_t mode, bool sendAck){
+    const char* modeStr = "UNKNOWN";
+    if (mode == 1) modeStr = "BLE";
+    else if (mode == 2) modeStr = "XBEE";
+    else if (mode == 4) modeStr = "LTE";
+    logToDebugFile("[INFO] Received Message (%s): %s", modeStr, command);
     //Process if command is addressed to this bot "Bx" or all bots "AB"
     if((command[2] == 'B' && command[3] == BOTNUM+48) || (command[2] == 'A' && command[3] == 'B')){
         
@@ -791,10 +790,17 @@ void writeMotionDataLog() {
     autLogReady = false; // Clear the flag
 }
 
+// Call this in loop() to process queued commands
+void processQueuedCommands() {
+    CommandMsg msg;
+    while (commandQueue.pop(msg)) {
+        processCommand(msg.msg, msg.mode, msg.sendAck);
+    }
+}
+
 //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void cmdLTEHandler(const char *event, const char *data){
-    processCommand(data, 4,false);      //Pass received string directly to the processCommand directory
-    logToDebugFile("[LTE] Received Command: %s", data);
+    commandQueue.push(data, 4, false); // Mode 4 = LTE
 }
 
 //Function that is called by the system once upon startup. Initializes variables used by the system as well as all hardware like the SD card, GPS, sensors, XBee
@@ -968,22 +974,20 @@ void setup(){
 //Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
 void loop(){
     //Serial.printlnf("Time: %d", millis());
-    compassCalibration();    //Check if the compass calibration has been requested, and if so, run the calibration function
-    getPositionData();      //Grab position data from GPS and Compass
-    readPowerSys();         //Read power from battery and solar panel
-    //sensorHandler();        //Read and request data from Atlas sensor
-    //XBeeHandler();          //Check if a string has come in from XBee
-    SerialConsoleHandler(); //Check if a string has come in from Serial console
-    statusUpdate();         //Check if a status update has to be sent out
-    writeMotionDataLog();   //Write autonomous navigation data if timer flag is set
-    updateMotors();         //Update the motor speeds dependent on the mode
-    simulationData.updateSimulation(); //Update simulation data and handle logging
+    compassCalibration();               //Check if the compass calibration has been requested, and if so, run the calibration function
+    getPositionData();                  //Grab position data from GPS and Compass
+    readPowerSys();                     //Read power from battery and solar panel
+    //sensorHandler();                    //Read and request data from Atlas sensor
+    //XBeeHandler();                      //Check if a string has come in from XBee
+    processQueuedCommands();            //Process any queued commands from the command queue
+    SerialConsoleHandler();             //Check if a string has come in from Serial console
+    statusUpdate();                     //Check if a status update has to be sent out
+    writeMotionDataLog();               //Write autonomous navigation data if timer flag is set
+    updateMotors();                     //Update the motor speeds dependent on the mode
+    simulationData.updateSimulation();  //Update simulation data and handle logging
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
-    sendResponseData();     //Send sensor data if requested from the CC
+    sendResponseData();                 //Send sensor data if requested from the CC
     varCompassHead = (double)compassHeading;
-    //rawHead = (double) targetDelta;
-    delay(3);              //Slow down the program a little bit, 10ms per loop
-    //Serial.printlnf("Hello World, %d", millis());
 }
 
 //Reads from the EEPROM if it is properly formatted. Updates the EEPROM if formatting does not match
@@ -1635,9 +1639,8 @@ void XBeeHandler(){
         Serial.println("New XBee Command:");
         Serial.println(data);                           //Print out command for debugging
         #endif
-        processCommand(buffer,2,true);                  //Process the command received over Xbee using the dictionary
+        commandQueue.push(buffer, 2, true); // Mode 2 = XBEE
         if(buffer[0] == 'B' || buffer[0] == 'C') XBeeRxTime = millis(); //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
-        logToDebugFile("[INFO] Received XBee Message: %s",data.c_str());
     }
 }
 
@@ -1689,9 +1692,7 @@ void SerialConsoleHandler(){
             #endif
             processCommand(buffer, 1, true);             //Process the formatted command
         }
-        
-        logToDebugFile("[INFO] Received Serial Console Message: %s", data.c_str());
-        
+                
         Serial.println(""); // Add blank line for readability
     }
 }
@@ -1706,9 +1707,8 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     Serial.println("New BT Command:");
     Serial.println(btBuf);                                          //Print out command for debugging purposes
     #endif
-    processCommand(btBuf,1,true);                                   //Process the command received over BLE using the dictionary
+    commandQueue.push(btBuf, 1, true); // Mode 1 = BLE
     if(btBuf[0] == 'A' || btBuf[0] == 'C') BLERxTime = millis();    //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
-    logToDebugFile("[INFO] Received BLE Message: %s",btBuf);
 }
 
 //ISR timer to check if strings have been received from the CCHub, and will cut off motors if an update has not been received recently
@@ -1942,7 +1942,6 @@ int LTEInputCommand(String cmd){
     char cmdBuf[100];
     cmd.toCharArray(cmdBuf, 100);
     processCommand(cmdBuf, 4,false);
-    logToDebugFile("[INFO] Received LTE Command: %s",cmdBuf);
     return 1;
 }
 
