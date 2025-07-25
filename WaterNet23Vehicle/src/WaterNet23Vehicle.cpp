@@ -992,7 +992,7 @@ void loop(){
     getPositionData();                  //Grab position data from GPS and Compass
     readPowerSys();                     //Read power from battery and solar panel
     //sensorHandler();                    //Read and request data from Atlas sensor
-    //XBeeHandler();                      //Check if a string has come in from XBee
+    XBeeHandler();                      //Check if a string has come in from XBee
     processQueuedCommands();            //Process any queued commands from the command queue
     SerialConsoleHandler();             //Check if a string has come in from Serial console
     statusUpdate();                     //Check if a status update has to be sent out
@@ -1413,21 +1413,46 @@ void updateMotors(){
     //    motionTime = millis();
     //}
     //if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
-        
-        // Handle pointArrived flag logic for close distances
-        if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS) {
-            if(travelDistance < MTR_CUTOFF_RAD) {
-                pointArrived = true;                        //Indicate that the bot has arrived at the target point
+        if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){               //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
+            if(travelDistance < MTR_CUTOFF_RAD){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
+                pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
+                leftMotorSpeed = setLSpeed = 90;            //Set left and right motor speeds to off
+                rightMotorSpeed = setRSpeed = 90;
             }
-            else if(travelDistance >= SENTRY_IDLE_RAD) {
-                pointArrived = false;                       //Set flag back to false when outside the larger radius
+            else if(travelDistance < SENTRY_IDLE_RAD){      //Check if the bot is inside of the larger radius of approaching the target point, start slowing motors here
+                if(pointArrived){                           //If we had already arrived at the target point, then use this larger radius as a deadzone so we don't have rapid on/off on the small radius border
+                    setLSpeed = 90;                         //Keep motors off here
+                    setRSpeed = 90;
+                }
+                else{                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
+                    int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
+                    int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);
+                    if(Lset < 0) setLSpeed = 0;             //Cap the speed between 0 and 180
+                    else if(Lset > 180) setLSpeed = 180;
+                    else Lset = setLSpeed;
+                    if(Rset < 0) setRSpeed = 0;
+                    else if(Rset > 180) setRSpeed = 180;
+                    else Rset = setRSpeed;
+                }
+            }
+            else{                                           //Otherwise, we are outside the radius of both circles
+                pointArrived = false;                       //Set flag back to false so we have to travel to the inner circle, also happens usually when a new point is specified
+                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
+                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2); 
+                if(Lset < 0) setLSpeed = 0;                 //Cap speed between 0 and 180
+                else if(Lset > 180) setLSpeed = 180;
+                else setLSpeed = Lset;
+                if(Rset < 0) setRSpeed = 0;
+                else if(Rset > 180) setRSpeed = 180;
+                else setRSpeed = Rset;
             }
         }
-        
-        // Use the new parameterized function to calculate target motor speeds
-        calculateMotorSpeeds(driveMode, travelDistance, targetDelta, autoMoveRate, pointArrived, setLSpeed, setRSpeed);
 
-        // Motor ramping logic (same as before)
+        if(setLSpeed > 90 && setLSpeed <= MTR_ST_FWD) setLSpeed = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
+        if(setRSpeed > 90 && setRSpeed <= MTR_ST_FWD) setRSpeed = MTR_ST_FWD;
+        if(setLSpeed < 90 && setLSpeed >= MTR_ST_REV) setLSpeed = MTR_ST_REV;
+        if(setRSpeed < 90 && setRSpeed >= MTR_ST_REV) setRSpeed = MTR_ST_REV;
+
         if(leftMotorSpeed < setLSpeed){                                                     //If the acutal motor (leftMotorSpeed) speed is less than the target motor speed (setLSpeed), then ramp the acutal motor speed to reach target
             if(setLSpeed - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;   //If we're off by more than one step size, then increment by one step
             else leftMotorSpeed = setLSpeed;                                                //Otherwise, we're less than one step, so finish step function
