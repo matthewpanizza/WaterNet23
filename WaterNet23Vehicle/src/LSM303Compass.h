@@ -1,38 +1,36 @@
 #pragma once
 
-#include "Compass.h"
+#include "CompassBase.h"
 #include <LSM303.h>
 
 /**
  * LSM303 compass implementation
  */
-class LSM303Compass : public Compass {
+class LSM303Compass : public CompassBase {
 public:
-    LSM303Compass(LSM303* sensor) : sensor_(sensor) {}
+    LSM303Compass() {}
     
     bool begin() override {
-        if (!sensor_) return false;
-        
-        sensor_->init();
-        if (sensor_->last_status != 0) {
+        sensor_.init();
+        if (sensor_.last_status != 0) {
             connected = false;
             return false;
         }
         
-        sensor_->enableDefault();
+        sensor_.enableDefault();
         connected = true;
         return true;
     }
     
     bool readMagnetometer() override {
-        if (!sensor_ || !connected) return false;
+        if (!connected) return false;
         
-        sensor_->read();
-        if (sensor_->last_status == 0) {
+        sensor_.read();
+        if (sensor_.last_status == 0) {
             // LSM303 library provides raw values, convert to float
-            mag_x = sensor_->m.x;
-            mag_y = sensor_->m.y;
-            mag_z = sensor_->m.z;
+            mag_x = sensor_.m.x;
+            mag_y = sensor_.m.y;
+            mag_z = sensor_.m.z;
             return true;
         }
         return false;
@@ -51,5 +49,5 @@ public:
     }
     
 private:
-    LSM303* sensor_;
+    LSM303 sensor_;
 };

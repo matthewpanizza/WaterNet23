@@ -31,9 +31,7 @@ void buttonActionDecode();
 #line 19 "c:/Users/mligh/OneDrive/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
 #define ARDUINO 0
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
-#include <Adafruit_LIS3MDL.h>
 #include <Adafruit_Sensor.h>
-#include "LSM303.h"
 #define X_AXIS_ACCELERATION 0
 //#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
 //#include <MicroNMEA.h>                      //http://librarymanager/All#MicroNMEA
@@ -44,18 +42,19 @@ void buttonActionDecode();
 #include <vector>
 #include <stdarg.h>
 #include "CompassEKF.h"
-#include "Compass.h"
+#include "CompassBase.h"
+#include "GPSBase.h"
 #include "LIS3MDLCompass.h"
 #include "LSM303Compass.h"
+#include "NeoM8UGPS.h"
 #include "SimulationData.h"
 #include "CommandQueue.h"
-
-#define COMPASS_TYPE            0           //0 = LSM303DLHC, 1 = LIS3MDL
 
 #define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
 #define COMPASS_TYPE_LIS3MDL    1           //Value for COMPASS_TYPE to indicate LIS3MDL
 #define COMPASS_TYPE_AUTO       2           //Value for COMPASS_TYPE to auto-detect compass
 
+#define COMPASS_TYPE            COMPASS_TYPE_AUTO           //0 = LSM303DLHC, 1 = LIS3MDL
 
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -95,7 +94,6 @@ float lis3mdlCompassHeading(float x_accel, float y_accel);
 float calcDistance(float lat1, float lat2, float lon1, float lon2);
 float calcDelta(float compassHead, float targetHead);
 float getRawCompassHeading();
-float getRawCompassHeadingFallback();
 float getCalibratedCompassHeading();
 void getPositionData();
 void sendResponseData();
@@ -164,16 +162,10 @@ Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomou
 // Global Variables //
 //////////////////////
 
-SFE_UBLOX_GNSS myGPS;                           //GPS Buffer and Objects
-//char nmeaBuffer[100];
-//MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
-//SFE_UBLOX_GPS myGPS;
-
 CommandQueue commandQueue;                //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
 
-Adafruit_LIS3MDL lis3mdl;                 //Compass object for LIS3MDL
-LSM303 lsm303;                            //Compass object for LSM303DLHC
-Compass* compass = nullptr;               //Unified compass pointer using abstract base class
+CompassBase* compass = nullptr;                 //Unified compass pointer using abstract base class
+GPSBase* gps = nullptr;                         //Unified gps pointer using abstract base class
 
 LEDStatus status;                               //LED Control object
 
@@ -528,7 +520,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
             bool success = false;
             
             // Try LIS3MDL first
-            compass = new LIS3MDLCompass(&lis3mdl);
+            compass = new LIS3MDLCompass();
             if (compass->begin()) {
                 Serial.printlnf("Auto-detection successful: %s", compass->getType());
                 success = true;
@@ -537,7 +529,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
                 compass = nullptr;
                 
                 // Try LSM303
-                compass = new LSM303Compass(&lsm303);
+                compass = new LSM303Compass();
                 if (compass->begin()) {
                     Serial.printlnf("Auto-detection successful: %s", compass->getType());
                     success = true;
@@ -563,7 +555,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
             
             if (compassTypeCmd == 0) {
                 // LSM303
-                compass = new LSM303Compass(&lsm303);
+                compass = new LSM303Compass();
                 if (compass->begin()) {
                     Serial.printlnf("Successfully switched to: %s", compass->getType());
                 } else {
@@ -573,7 +565,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
                 }
             } else {
                 // LIS3MDL
-                compass = new LIS3MDLCompass(&lis3mdl);
+                compass = new LIS3MDLCompass();
                 if (compass->begin()) {
                     Serial.printlnf("Successfully switched to: %s", compass->getType());
                 } else {
@@ -1047,7 +1039,7 @@ bool setupCompass(){
     
     // Try LIS3MDL first (either explicitly requested or auto-detect mode)
     if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
-        compass = new LIS3MDLCompass(&lis3mdl);
+        compass = new LIS3MDLCompass();
         if (compass->begin()) {
             Serial.printlnf("Compass initialized with: %s", compass->getType());
             return true;
@@ -1064,7 +1056,7 @@ bool setupCompass(){
     
     // Try LSM303 (either explicitly requested or auto-detect mode)
     if (COMPASS_TYPE == COMPASS_TYPE_LSM303 || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
-        compass = new LSM303Compass(&lsm303);
+        compass = new LSM303Compass();
         if (compass->begin()) {
             Serial.printlnf("Compass initialized with: %s", compass->getType());
             return true;
@@ -1087,20 +1079,13 @@ void cleanupCompass() {
 
 //I2C setup for NEO-M8U GPS
 void setupGPS(){
-    GPSAvail = true;
-    /*myGPS.begin(Wire);
-    if (myGPS.isConnected() == false){
-        //Log.warn("Ublox GPS not detected at default I2C address, freezing.");
-        GPSAvail = false;
-    }*/
-    if(myGPS.begin() == false){
-        GPSAvail = false;
-        Serial.println("Error, Could not initialize GPS");
+    gps = new NeoM8UGPS();
+    if(gps->begin()){
+        GPSAvail = true;
     }
-    myGPS.setI2COutput(COM_TYPE_UBX);
-    myGPS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX);
-    myGPS.setNavigationFrequency(2);
-    Wire.setClock(400000); //Increase I2C clock speed to 400kHz
+    else{
+        GPSAvail = false;
+    }
 }
 
 //Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset
@@ -1230,9 +1215,8 @@ float getRawCompassHeading(){
         
         // Check for NaN values and handle gracefully
         if (isnan(rawHeading)) {
-            Serial.println("Warning: Compass returned NaN, trying fallback method");
-            // Fallback to original direct sensor access
-            rawHeading = getRawCompassHeadingFallback();
+            Serial.println("Warning: Compass returned NaN");
+            return 0.0; // Return 0 as fallback heading
         } else {
             // Convert from -180/+180 range to 0-360 range for compatibility
             if (rawHeading < 0) rawHeading += 360;
@@ -1243,29 +1227,9 @@ float getRawCompassHeading(){
         return rawHeading;
     }
     
-    // Final fallback to original method
-    return getRawCompassHeadingFallback();
-}
-
-// Fallback method using direct sensor access
-float getRawCompassHeadingFallback() {
-    float rawHeading = 0;
-    
-    if(COMPASS_TYPE == COMPASS_TYPE_LIS3MDL){
-        lis3mdl.read();                                 // get X Y and Z data at once
-        sensors_event_t event;                          //"Event" for compass reading which contains x and y acceleration
-        bool CompassAvail = lis3mdl.getEvent(&event);   //Get event data over I2C from compass
-        if(CompassAvail) rawHeading = lis3mdlCompassHeading(event.magnetic.x,event.magnetic.y);
-        if(rawHeading < 0) rawHeading += 360;   //If the heading is negative, add 360 to it to get a positive value
-    }
-    else if(COMPASS_TYPE == COMPASS_TYPE_LSM303){
-        lsm303.read();                              //Read the compass data from the LSM303 over I2C
-        rawHeading = lsm303.heading();        //Library automatically converts to degrees
-    }
-    #ifdef VERBOSE
-    Serial.printlnf("Raw Heading (fallback): %0.2f", rawHeading); 
-    #endif
-    return rawHeading;   //Return the raw heading from the compass module
+    // No compass available
+    Serial.println("Warning: No compass available");
+    return 0.0; // Return 0 as default heading
 }
 
 //Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
@@ -1289,10 +1253,10 @@ float getCalibratedCompassHeading(){
             compassEKF.updateCompass(cHeading, compassVariance);
             
             // Update with GPS course if available and moving
-            if(GPSAvail && myGPS.isConnected()) {
-                float gpsSpeed = myGPS.getGroundSpeed() * 0.001; // Convert mm/s to m/s
+            if(GPSAvail && gps->isConnected()) {
+                float gpsSpeed = gps->getGroundSpeed(); // Convert mm/s to m/s
                 if(gpsSpeed > 0.5) { // Only use GPS course if moving fast enough
-                    float gpsCourse = myGPS.getHeading() / 100000.0; // Convert to degrees
+                    float gpsCourse = gps->getHeading(); // Convert to degrees
                     if(gpsCourse > 180) gpsCourse -= 360;
                     float gpsVariance = 100.0; // GPS course is typically less accurate than compass
                     compassEKF.updateGPS(gpsCourse, gpsSpeed, gpsVariance);
@@ -1350,9 +1314,9 @@ void getPositionData(){
             }
         } else {
             // Use real GPS
-            if(myGPS.isConnected()){                        //Only read from GPS if it is connected
-                latitude = ((float)myGPS.getLatitude())/10000000.0;      //Get latitude and divide by 1000000 to get in degrees
-                longitude = ((float)myGPS.getLongitude())/10000000.0;    //Get longitude and divide by 1000000 to get in degrees
+            if(gps->isConnected()){                        //Only read from GPS if it is connected
+                latitude = gps->getLatitude();      //Get latitude in degrees
+                longitude = gps->getLongitude();    //Get longitude in degrees
                 //Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
                 GPSAvail = true;
             }

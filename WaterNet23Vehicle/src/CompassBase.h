@@ -4,13 +4,13 @@
  * Abstract base class for compass sensors
  * Provides a unified interface for different compass types (LIS3MDL, LSM303, etc.)
  */
-class Compass {
+class CompassBase {
 public:
     // Constructor
-    Compass() : mag_x(0.0), mag_y(0.0), mag_z(0.0) {}
+    CompassBase() : mag_x(0.0), mag_y(0.0), mag_z(0.0) {}
     
     // Virtual destructor for proper cleanup
-    virtual ~Compass() {}
+    virtual ~CompassBase() {}
     
     // Pure virtual functions that must be implemented by derived classes
     virtual bool begin() = 0;
