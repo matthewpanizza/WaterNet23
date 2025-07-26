@@ -15,8 +15,8 @@
 
 #define EEPROM_KEY1_LOC         0x00                    //Location of the first key in EEPROM, used to check if the EEPROM is valid
 #define EEPROM_KEY2_LOC         0x01                    //Location of the second key in EEPROM, used to check if the EEPROM is valid
-#define EEPROM_KEY1             0x23                    //Key for the first byte of the EEPROM, used to check if the EEPROM is valid
-#define EEPROM_KEY2             0x129                   //Key for the second byte of the EEPROM, used to check if the EEPROM is valid
+#define EEPROM_KEY1             (uint8_t)0x23           //Key for the first byte of the EEPROM, used to check if the EEPROM is valid
+#define EEPROM_KEY2             (uint8_t)0x129          //Key for the second byte of the EEPROM, used to check if the EEPROM is valid
 #define EEPROM_COMP_CAL_LOC     0x02                    //Location of the compass calibration in EEPROM, used to store the calibration values for the compass
 
 
@@ -47,8 +47,8 @@
 /////////////////////////
 
 #define COMP_OFFSET 0                       //Number of degrees to add to the raw compass reading to calibrate it to true north. This is a constant offset, not a full calibration
-
 #define COMP_CAL_AVG_COUNT      5         //Number of samples to average for the compass calibration
+#define COMPASS_CAL_TIMEOUT     3000      //Time in milliseconds to flash the LED while calibrating the compass
 
 ////////////////////
 // PROGRAM MACROS //

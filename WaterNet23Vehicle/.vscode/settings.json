@@ -14,5 +14,6 @@
         "ostream": "cpp"
     },
     "particle.targetPlatform": "bsom",
-    "particle.firmwareVersion": "4.0.0"
+    "particle.firmwareVersion": "4.0.0",
+    "particle.targetDevice": "e00fce68476ea817dacf8d77"
 }

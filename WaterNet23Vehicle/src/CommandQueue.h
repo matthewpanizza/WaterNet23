@@ -19,7 +19,7 @@ public:
             return false; // Queue full
         }
         strncpy(buffer[tail].msg, str, MSG_MAX_LEN-1);
-        buffer[tail].msg[MSG_MAX_LEN-1] = '\\0';
+        buffer[tail].msg[MSG_MAX_LEN-1] = '\0';
         buffer[tail].mode = mode;
         buffer[tail].sendAck = sendAck;
         tail = (tail + 1) % MSG_QUEUE_SIZE;

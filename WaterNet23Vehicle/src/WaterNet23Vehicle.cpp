@@ -227,6 +227,7 @@ uint32_t motionTime, lastMtrTime, lastTelemTime;                        //Timers
 uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
 uint32_t lastButtonClickTime;                                           //Timer for when the last button click was received
 uint32_t stopTime;
+uint32_t lastCalibrationTime;                                           //Timer for when the last compass calibration occurred                              
 float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
 char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
 char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
@@ -507,7 +508,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
             Serial.printlnf("  Current heading: %0.2f", heading);
         }
         
-        Serial.printlnf("  Compass offset: %0.2f", compOffset);
+        Serial.printlnf("  Compass offset: %d", compOffset);
 
     } else {
         int compassTypeCmd = atoi(dataStr);
@@ -522,8 +523,6 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
                 compass = nullptr;
             }
             
-            // Try to reinitialize with auto-detection
-            int originalType = COMPASS_TYPE;
             // Temporarily set to auto for setupCompass function
             #define COMPASS_TYPE_AUTO_TEMP 2
             bool success = false;
@@ -1107,6 +1106,7 @@ void setupGPS(){
 //Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset
 void compassCalibration(){
     if(doCompassCal){
+        lastCalibrationTime = millis();    //Set the last calibration time to the current time
         float sum = 0;
         for(int i = 0; i < COMP_CAL_AVG_COUNT; i++){
             sum += getRawCompassHeading();    //Get the raw compass heading from the compass
@@ -1910,15 +1910,15 @@ void LEDHandler(){
     LEDSpeed SetSpeed;
     uint8_t statusMode;
     //Special LED Modes
-    /*if(shutdownActive){     //The user is holding down the power off button
-        status.setPattern(LED_PATTERN_BLINK);
-        status.setColor(RGB_COLOR_GREEN);
-        status.setSpeed(LED_SPEED_FAST);
-        return;   
-    }*/
     if(stopActive){         //The user has pressed the stop button on the CChub
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_YELLOW);
+        status.setSpeed(LED_SPEED_FAST);
+        return;
+    }
+    if(millis() - lastCalibrationTime < COMPASS_CAL_TIMEOUT){ //The bot is currently calibrating the compass
+        status.setPattern(LED_PATTERN_BLINK);
+        status.setColor(RGB_COLOR_MAGENTA);
         status.setSpeed(LED_SPEED_FAST);
         return;
     }

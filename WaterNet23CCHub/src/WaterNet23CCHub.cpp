@@ -445,6 +445,7 @@ void loop() {
     RPiHandler();                                       //Check USB serial to see if Raspberry Pi or computer has sent a new control packet which contains the drive mode and target latitude and longitude
     XBeeLTEPairSet();                                   //Call pair function to see if any bots have come online after the initial pair sequence
     RPiStatusUpdate();                                  //Periodically send a status update for all of the bots to the Raspberry Pi so the user interface is populated with recent data and status
+    calibrateCompass();                                 //Check if the compass calibration request has been set by a the menu interface, and if so, pop up an info screen to tell the user to calibrate the compass
     if(stopActive){                                     //If the user has pressed the stop button and has not yet cleared it, periodically publish the stop button in case the bot missed the previous message
         if(millis() - stopTime > STOP_PUB_TIME){        //Check timer to publish periodically, stops sending periodically after being cleared by hitting stop again
             stopTime = millis();
@@ -1244,8 +1245,8 @@ void calibrateCompass(){
             wb.requestCompCalibration = false;          //Set the flag to false so we don't keep sending this command over and over again
             MenuPopUp m;                                //Create a pop-up for the low battery warning
             sprintf(m.primaryLine,"Compass\0");         //Populate strings of the compass calibration mode with the bot number
-            sprintf(m.secondaryLine,"Turn B%d to face North\0", wb.botNum);
-            sprintf(m.tertiaryLine, "Press OK when faced North\0");
+            sprintf(m.secondaryLine,"Turn B%d facing North\0", wb.botNum);
+            sprintf(m.tertiaryLine, "Press OK to calibrate\0");
             m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
             m.secondaryStart = 5;
             m.tertiaryStart = 5;
@@ -1259,6 +1260,7 @@ void calibrateCompass(){
             wb.calRequestAcknowledged = false;          //Reset the flag to false so we don't keep sending this command over and over again
             char calStr[10];                            //String to hold the calibration command
             sprintf(calStr,"CCB%dcmp",wb.botNum);       //Create the command string to send out
+            sendData(calStr,0,(!wb.XBeeAvail),true,(!wb.BLEAvail && !wb.XBeeAvail));        //Send the command out over BLE to the bot
             #ifdef VERBOSE
             Serial.printlnf("Sending compass calibration command to Bot %d",wb.botNum);
             #endif
