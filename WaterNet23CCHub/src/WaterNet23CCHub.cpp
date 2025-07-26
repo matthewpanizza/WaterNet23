@@ -14,6 +14,7 @@
 #include "application.h"
 #include "SdFat.h"                              //Library for SD Card
 void init(uint16_t inStep, uint16_t minV, uint16_t maxV, bool switchOnOff, const char * itemString);
+void initializeCellularConnection();
 void setup();
 void loop();
 void logMessage(const char *message);
@@ -105,6 +106,7 @@ int LTEInputCommand(String cmd);
 // This example does not require the cloud so you can run it in manual mode or
 // normal cloud-connected mode
 SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_THREAD(ENABLED);
 
 // These UUIDs were defined by Nordic Semiconductor and are now the defacto standard for
 // UART-like services over BLE. Many apps support the UUIDs now, like the Adafruit Bluefruit app.
@@ -148,6 +150,7 @@ bool stopActive;                                //Flag set active when the stop 
 uint8_t BLEBotNum;                              //Bot id of the bot currently connected to over BLE
 bool ctlSpeedDiff = false;                      //Flag set true when the motor has a significant enough speed change to warrant sending a new speed immediately
 uint8_t LSpeed, RSpeed;
+bool LTEConnected = false;                      //Flag set true if the user has allowed connection to LTE
 
 //Menu variables
 uint8_t botSelect = 0;                          //Which bot in the menu is currently selected
@@ -267,6 +270,36 @@ void dataLTEHandler(const char *event, const char *data){           //Interrupt 
     }
 }
 
+/// @brief Function which waits for the LTE connection to the Particle cloud. Shows an animation on LCD to indicate status
+void initializeCellularConnection(){
+    Particle.connect();                                         //Initiate connection to the cloud
+    oled.clearDisplay();                                        //Empty the display for the new startup item
+    oled.setCursor(0,0);                                        //Scanning text put on first line
+    oled.print("Connecting ");                                  //Show connecting text on first line
+    oled.setCursor(0,16);                                       //Move to next line
+    oled.print("to LTE");                                       //Show secondary line
+    oled.display();                                             //Update the LCD
+    uint8_t loadAnim = 0;
+    while(!Particle.connected()){                               //While we are still connecting to LTE, show animation
+        for(int i = 0; i < loadAnim; i++){                      //Show a set of LTE signal bars while connecting
+            oled.fillRect(90 + (i*4), 28, 2, -(i*2) - 2, SH110X_WHITE);
+        }
+        oled.display();                                         //Display the animated circle
+        loadAnim++;                                             //Increment the counter so the next loop displays the circle
+        if(loadAnim > 5){                                       //Loop back to center for animation
+            loadAnim = 0;
+            oled.fillRect(90, 28, 20, -12, 0);
+        }
+        delay(150);
+
+        //Override for continuing to connect to LTE.
+        if(digitalRead(U_DPAD) == HIGH && digitalRead(D_DPAD) == HIGH){
+            LTEConnected = false;
+            return;
+        }
+    }
+}
+
 void startupPair(){                                             //Function to run on startup to display how many bots have been discovered and wait until at least on is discovered
     startConnect = false;                                       //Flag set true while scanning for bots, cleared upon bluetooth connection or a 
     oled.clearDisplay();                                        //Empty the display for the new startup item
@@ -334,8 +367,6 @@ void setup() {
 
     delay(5);
 
-    if(digitalRead(U_DPAD) == LOW || digitalRead(D_DPAD) == LOW) Particle.connect();    //Debug function, disables LTE if both up and down are held when first plugged in to not wait for cell tower connection
-
     debounceTime = millis();                        //Initialize timers to current startup time so they are accuracte when the program starts
     controlUpdateTime = millis();
     rcTime = millis();
@@ -386,7 +417,10 @@ void setup() {
     oled.print(" Starting ");                       //Print label to tell user the system is starting
     oled.display();
 
-    delay(250);
+    if(digitalRead(U_DPAD) == LOW || digitalRead(D_DPAD) == LOW){
+        LTEConnected = true;
+        initializeCellularConnection();
+    }
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Begin communication with the SD card at 8MHz, using chipSelect as the GPIO for selecting this SPI device
         #ifdef VERBOSE
@@ -396,14 +430,14 @@ void setup() {
     }
 
     MenuPopUp m;                                        //Create initial pop-up to greet user
-    sprintf(m.primaryLine,"Hello!\0");                  //Display hello as the main text
-    sprintf(m.secondaryLine,"Scanning for Bots\0", 1);  //Second line for information
-    sprintf(m.tertiaryLine, "OK when bots ready\0",15); //Third line for information
+    sprintf(m.primaryLine, "Hello!");                   //Display hello as the main text
+    sprintf(m.secondaryLine, "Scanning for Bots");      //Second line for information
+    sprintf(m.tertiaryLine, "OK when bots ready");      //Third line for information
     m.primaryStart = 32;                                //Values to center the text found by experimentation
     m.secondaryStart = 12;
     m.tertiaryStart = 10;
     PopUps.push_back(m);
-    
+
     //startupPair();                                      //Not significantly tested - Disable if using an emulated bot id or if the program is crashing on startup
     //delay(3000);
 
