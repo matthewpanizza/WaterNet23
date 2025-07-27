@@ -22,6 +22,7 @@
 
 #include "application.h"                    //Needed for I2C to GPS
 void handleEKFCommand(const char* dataStr, uint8_t mode);
+void handleSimulationCommand(const char* dataStr, uint8_t mode);
 void processQueuedCommands();
 void setup();
 void loop();
@@ -47,7 +48,6 @@ void buttonActionDecode();
 #include "LIS3MDLCompass.h"
 #include "LSM303Compass.h"
 #include "NeoM8UGPS.h"
-#include "SimulationData.h"
 #include "CommandQueue.h"
 
 #define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
@@ -78,7 +78,6 @@ void handleCompassCal(const char* dataStr, uint8_t mode);
 void handleEmulatedGPS(const char* dataStr, uint8_t mode);
 void handleStopCommand(const char* dataStr, uint8_t mode);
 void handleCompassCommand(const char* dataStr, uint8_t mode);
-void handleSimulationCommand(const char* dataStr, uint8_t mode);
 void handleHelpCommand(const char* dataStr, uint8_t mode);
 void handleTableCommand(const char* dataStr, uint8_t mode);
 
@@ -420,13 +419,7 @@ void handleCompassCal(const char* dataStr, uint8_t mode) {
 
 void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
     //Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
-    
-    // Check if simulation is currently enabled - warn user about conflict
-    if(simulationData.isSimulationEnabled()) {
-        Serial.println("WARNING: Simulation is currently enabled. Disabling simulation to use manual GPS override.");
-        simulationData.disableSimulation();
-    }
-    
+        
     char tLat[12];                      //Strings for the latitude and longitude, as sscanf cannot handle floats very well, copies string then converts to a float using atof()
     char tLon[12];
     sscanf(dataStr,"%s %s",tLat,tLon);      //Scan in the target latitude and longitude from the data string
@@ -586,30 +579,18 @@ void handleSimulationCommand(const char* dataStr, uint8_t mode) {
     if(strlen(dataStr) == 0) {
         // Status report
         Serial.printlnf("Simulation Status:");
-        Serial.printlnf("  Enabled: %s", simulationData.isSimulationEnabled() ? "Yes" : "No");
-        Serial.printlnf("  Mode: %d", simulationData.getSimulationMode());
-        Serial.printlnf("  Mode names: 0=Disabled, 1=Static, 2=Waypoint, 3=Circle, 4=Random Walk");
-        
-        if(simulationData.isSimulationEnabled()) {
-            GPSSimData gpsData = simulationData.getGPSData();
-            CompassSimData compassData = simulationData.getCompassData();
-            Serial.printlnf("  Current GPS: Lat=%0.6f, Lon=%0.6f, Course=%0.1f", 
-                           gpsData.latitude, gpsData.longitude, gpsData.course);
-            Serial.printlnf("  Current Compass: Heading=%0.1f", compassData.heading);
-            Serial.printlnf("  Motor data: Real hardware (not simulated)");
-            Serial.printlnf("  Simulation logging: %s", SDAvail ? "Enabled (CSV)" : "Console only");
-        }
+
     } else {
         int simMode = atoi(dataStr);
         
         if(simMode == 0) {
             // Disable simulation
-            simulationData.disableSimulation();
+            //simulationData.disableSimulation();
             strcpy(simFilename, "");  // Clear the simulation filename when disabled
             Serial.println("Simulation disabled - using real sensors");
         } else if(simMode >= 1 && simMode <= 4) {
             // Enable simulation with specified mode
-            simulationData.enableSimulation(simMode);
+            //simulationData.enableSimulation(simMode);
             const char* modeNames[] = {"", "Static", "Waypoint", "Circle", "Random Walk"};
             Serial.printlnf("Simulation enabled: %s mode", modeNames[simMode]);
             
@@ -652,22 +633,14 @@ void handleHelpCommand(const char* dataStr, uint8_t mode) {
     Serial.println("  hlp                                 - Show this help");
     Serial.println("");
     Serial.println("Examples:");
-    Serial.println("  sim1                    - Enable static simulation");
-    Serial.println("  sim2                    - Enable waypoint simulation (5-min cycles)");
     Serial.println("  egp 42.360 -83.073     - Override GPS to specific coordinates");
     Serial.println("  cms                     - Show compass status");
     Serial.println("  ekf1                    - Enable EKF filtering");
     Serial.println("  tbl                     - Re-enable status table");
     Serial.println("  mtr090090               - Stop both motors");
     Serial.println("  pts Hello World         - Print 'Hello World'");
-    Serial.println("  B1CCsim1F               - Raw format simulation command");
     Serial.printlnf("Current Bot Number: %d", BOTNUM);
     Serial.println("");
-    Serial.println("Simulation Features:");
-    Serial.println("  - Auto-generates realistic GPS/compass readings");
-    Serial.println("  - 5-minute sequences with smooth waypoint progression");
-    Serial.println("  - Automatic CSV logging to SD card (if available)");
-    Serial.println("  - Logs actual motor responses (motors not simulated)");
     Serial.println("================================");
 }
 
@@ -713,52 +686,7 @@ void initializeAutonomousLog(const char* filename) {
 
 //Function to log simulation data to SD card
 void logSimulationData() {
-    if(!SDAvail || !simulationData.isSimulationEnabled()) return;
-    
-    // Get current simulation data
-    GPSSimData gps = simulationData.getGPSData();
-    CompassSimData compass = simulationData.getCompassData();
-    
-    if(!gps.valid || !compass.valid) return;
-    
-    // Create timestamp
-    char timestamp[20];
-    snprintf(timestamp, 20, "%02d/%02d/%04d %02d:%02d:%02d", 
-             Time.month(), Time.day(), Time.year(),
-             Time.hour(), Time.minute(), Time.second());
-    
-    // Get current simulation mode name
-    const char* modeNames[] = {"Disabled", "Static", "Waypoint", "Circle", "Random Walk"};
-    const char* modeName = (simulationData.getSimulationMode() >= 0 && simulationData.getSimulationMode() <= 4) ? 
-                          modeNames[simulationData.getSimulationMode()] : "Unknown";
-    
-    // Write to file
-    if(!simLogFile.isOpen()) {
-        // Use the persistent simulation filename set when simulation was enabled
-        if(strlen(simFilename) > 0) {
-            simLogFile.open(simFilename, O_RDWR | O_CREAT | O_AT_END);
-        } else {
-            // Fallback filename if somehow not set
-            char fallbackFilename[50];
-            snprintf(fallbackFilename, 50, "SimData%02d%02d%02d.csv", Time.month(), Time.day(), Time.hour());
-            simLogFile.open(fallbackFilename, O_RDWR | O_CREAT | O_AT_END);
-        }
-    }
-    
-    if(simLogFile.isOpen()) {
-        Serial.printlnf("SIM_LOG: %s,%0.6f,%0.6f,%0.1f,%d,%d,%s",
-                        timestamp, gps.latitude, gps.longitude, compass.heading,
-                        leftMotorSpeed, rightMotorSpeed, modeName);
-        simLogFile.printlnf("%s,%0.6f,%0.6f,%0.1f,%d,%d,%s",
-                           timestamp, gps.latitude, gps.longitude, compass.heading,
-                           leftMotorSpeed, rightMotorSpeed, modeName);
-        simLogFile.close();
-    } else {
-        // Fallback to console if file operation fails
-        Serial.printlnf("SIM_LOG: %s,%0.6f,%0.6f,%0.1f,%d,%d,%s",
-                        timestamp, gps.latitude, gps.longitude, compass.heading,
-                        leftMotorSpeed, rightMotorSpeed, modeName);
-    }
+    if(!SDAvail) return;
 }
 
 //Function to log autonomous navigation data to SD card
@@ -990,7 +918,6 @@ void loop(){
     writeMotionDataLog();               //Write autonomous navigation data if timer flag is set
     updateMotors();                     //Update the motor speeds dependent on the mode
     buttonActionDecode();
-    simulationData.updateSimulation();  //Update simulation data and handle logging
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();                 //Send sensor data if requested from the CC
     varCompassHead = (double)compassHeading;
@@ -1197,18 +1124,6 @@ float calcDelta(float compassHead, float targetHead){
 float getRawCompassHeading(){
     float rawHeading = 0;     //Create a variable to hold the heading from the compass, regardless
     
-    // Check if simulation is enabled for compass
-    if(simulationData.isSimulationEnabled()) {
-        CompassSimData simCompass = simulationData.getCompassData();
-        if(simCompass.valid) {
-            rawHeading = simCompass.heading;
-            #ifdef VERBOSE
-            Serial.printlnf("SIM Compass Raw Heading: %0.2f", rawHeading); 
-            #endif
-            return rawHeading;
-        }
-    }
-    
     // Use the new compass interface if available
     if (compass && compass->isConnected()) {
         rawHeading = compass->getCompassHeading();
@@ -1299,32 +1214,14 @@ void getPositionData(){
     if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
         
-        // Check if simulation is enabled for GPS
-        if(simulationData.isSimulationEnabled()) {
-            GPSSimData simGPS = simulationData.getGPSData();
-            if(simGPS.valid) {
-                latitude = simGPS.latitude;
-                longitude = simGPS.longitude;
-                GPSAvail = true;
-                #ifdef VERBOSE
-                Serial.printlnf("SIM GPS - Lat: %0.7f Lon: %0.7f Course: %0.1f", latitude, longitude, simGPS.course);
-                #endif
-            } else {
-                GPSAvail = false;
-            }
-        } else {
-            // Use real GPS
-            if(gps->isConnected()){                        //Only read from GPS if it is connected
-                latitude = gps->getLatitude();      //Get latitude in degrees
-                longitude = gps->getLongitude();    //Get longitude in degrees
-                //Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
-                GPSAvail = true;
-            }
-            else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
+        // Use real GPS
+        if(gps->isConnected()){                        //Only read from GPS if it is connected
+            latitude = gps->getLatitude();      //Get latitude in degrees
+            longitude = gps->getLongitude();    //Get longitude in degrees
+            //Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
+            GPSAvail = true;
         }
-        //GPSAvail = true;
-        //latitude = 35.77185;
-        //longitude = -78.67415;
+        else GPSAvail = false;                          //Set flag to indicate GPS unavailable if not connected
     }
     if(millis() - compassTimer > COMP_POLL_TIME){
         compassTimer = millis();                       //Reset timer
