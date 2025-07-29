@@ -34,6 +34,7 @@
 #include "LIS3MDLCompass.h"
 #include "LSM303Compass.h"
 #include "NeoM8UGPS.h"
+#include "VehicleSimulator.h"
 #include "CommandQueue.h"
 
 #define COMPASS_TYPE_LSM303     0           //Value for COMPASS_TYPE to indicate LSM303DLHC    
@@ -69,10 +70,7 @@ void handleTableCommand(const char* dataStr, uint8_t mode);
 
 void cmdLTEHandler(const char *event, const char *data);                    //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void setupXBee();
-bool setupCompass();
-void cleanupCompass();
 void compassCalibration();
-void setupGPS();
 uint8_t readPowerSys();
 float deg2rad(float deg);
 float lis3mdlCompassHeading(float x_accel, float y_accel);
@@ -147,8 +145,9 @@ Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomou
 // Global Variables //
 //////////////////////
 
-CommandQueue commandQueue;                //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
+CommandQueue commandQueue;                      //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
 
+VehicleSimulator* vehicleSim = nullptr;         //Pointer to the vehicle simulator object, if enabled
 CompassBase* compass = nullptr;                 //Unified compass pointer using abstract base class
 GPSBase* gps = nullptr;                         //Unified gps pointer using abstract base class
 
@@ -191,6 +190,7 @@ bool statusTableEnabled;                                                //Flag t
 uint8_t requestActive;                                                  //Flag to indicate that a sensor request has been made from the CChub
 uint16_t LTEStatusCount;                                                //Counter to determine number of LTE messages that should be sent to limit data usage
 uint16_t statusFlags;                                                   //Global status flag
+bool usingVehicleSim = false;                                           //Flag to indicate that the vehicle simulator is being used instead of real GPS/compass
 bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail, SDAvail;    //Flags for communicaton keep-alives/available
 bool logSensors, logMessages, dataWait;                                 //Flags for sensor timing/enables
 bool autLogReady;                                                       //Flag to indicate autonomous navigation data is ready to log
@@ -572,12 +572,13 @@ void handleSimulationCommand(const char* dataStr, uint8_t mode) {
         if(simMode == 0) {
             // Disable simulation
             //simulationData.disableSimulation();
+            vehicleSim->disableSimulation();
             strcpy(simFilename, "");  // Clear the simulation filename when disabled
-            Serial.println("Simulation disabled - using real sensors");
+            Serial.println("Simulation disabled");
         } else if(simMode >= 1 && simMode <= 4) {
             // Enable simulation with specified mode
-            //simulationData.enableSimulation(simMode);
-            const char* modeNames[] = {"", "Static", "Waypoint", "Circle", "Random Walk"};
+            vehicleSim->setScenario(simMode);
+            const char* modeNames[] = {"", "Lake Raleigh - Vertical", "", "", ""};
             Serial.printlnf("Simulation enabled: %s mode", modeNames[simMode]);
             
             // Initialize logging if SD card is available
@@ -668,6 +669,23 @@ void initializeAutonomousLog(const char* filename) {
             Serial.printlnf("Failed to create autonomous log file: %s", filename);
         }
     }
+}
+
+/// @brief Function to update the state of the simulation and water vehicle. Motor speed is fed in, target lat/lon is fetched for scenarios
+void updateSimulationData(){
+    // Update simulation data
+    if(!usingVehicleSim || !vehicleSim->isSimulationActive()) return;
+
+    // Limit update rate of simulation
+    static uint32_t lastSimulationUpdate = 0;
+    if(millis() - lastSimulationUpdate < 500) return;
+    lastSimulationUpdate = millis();
+
+    vehicleSim->updateSimulationKinematics(leftMotorSpeed, rightMotorSpeed);
+    
+    targetLat = vehicleSim->getTargetLatitude();
+    targetLon = vehicleSim->getTargetLongitude();
+
 }
 
 //Function to log simulation data to SD card
@@ -766,7 +784,7 @@ void setup(){
     Serial1.begin(9600);                        //Start serial for XBee module
 
     setupXBee();                                //Setup XBee module
-    setupGPS();                                 //Setup GPS module
+    setupNavigationSensors();                   //Setup navigation sensors, which includes GPS and compass
     
     Particle.variable("Heading", varCompassHead);
     Particle.variable("TargetHead", rawHead);
@@ -813,8 +831,6 @@ void setup(){
 
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
-
-    CompassAvail = setupCompass();
 
     // Initialize EKF for compass heading filtering
     if(CompassAvail) {
@@ -903,6 +919,7 @@ void loop(){
     statusUpdate();                     //Check if a status update has to be sent out
     writeMotionDataLog();               //Write autonomous navigation data if timer flag is set
     updateMotors();                     //Update the motor speeds dependent on the mode
+    updateSimulationData();             //Updates the state of the simulation and the target waypoint based on the active simulation
     buttonActionDecode();
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();                 //Send sensor data if requested from the CC
@@ -936,69 +953,64 @@ void setupXBee(){
     //Serial1.printf("Hello from Bot %d\n", BOTNUM);   //Send Hello World message!
 }
 
-//This function gets called from the SparkFun Ublox Arduino Library
-//As each NMEA character comes in you can specify what to do with it
-//Useful for passing to other libraries like tinyGPS, MicroNMEA, or even
-//a buffer, radio, etc.
-//void SFE_UBLOX_GPS::processNMEA(char incoming){
-  //Take the incoming char from the Ublox I2C port and pass it on to the MicroNMEA lib
-  //for sentence cracking
-  //nmea.process(incoming);
-//}
-
 //Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
-bool setupCompass(){
-    // Try to auto-detect and initialize compass, or use specified type
+bool setupNavigationSensors(){
     
-    // Try LIS3MDL first (either explicitly requested or auto-detect mode)
-    if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
-        compass = new LIS3MDLCompass();
-        if (compass->begin()) {
-            Serial.printlnf("Compass initialized with: %s", compass->getType());
-            return true;
-        }
-        delete compass;
-        compass = nullptr;
-        
-        // If explicitly requested LIS3MDL and it failed, don't try others
-        if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL) {
-            Serial.println("Failed to initialize LIS3MDL compass");
-            return false;
-        }
-    }
-    
-    // Try LSM303 (either explicitly requested or auto-detect mode)
-    if (COMPASS_TYPE == COMPASS_TYPE_LSM303 || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
-        compass = new LSM303Compass();
-        if (compass->begin()) {
-            Serial.printlnf("Compass initialized with: %s", compass->getType());
-            return true;
-        }
-        delete compass;
-        compass = nullptr;
-    }
-    
-    Serial.println("Failed to initialize any compass");
-    return false;
-}
+    vehicleSim = new VehicleSimulator(); // Initialize vehicle simulator for testing purposes
 
-//Function to cleanup compass resources
-void cleanupCompass() {
-    if (compass) {
-        delete compass;
-        compass = nullptr;
-    }
-}
-
-//I2C setup for NEO-M8U GPS
-void setupGPS(){
+    // Try to initialize GPS first
     gps = new NeoM8UGPS();
-    if(gps->begin()){
+    if(gps->begin()){               // We were able to initialize the GPS
         GPSAvail = true;
     }
     else{
+        gps = vehicleSim;           // Use vehicle simulator if GPS fails to initialize
+        gps->begin();               // Initialize the simulator
+        usingVehicleSim = true;     // Set flag to indicate we are using the vehicle simulator
+        Serial.println("Failed to initialize GPS, using vehicle simulator instead");
         GPSAvail = false;
     }
+    
+    if(usingVehicleSim){    //If the GPS wasn't initialized, then we are using the vehicle simulator. Also use the simulator for compass data
+        vehicleSim->updateCompassOffset(compOffset); // Update the compass offset in the simulator so it doesn't use the real-sensor offset
+        compass = vehicleSim; // Use vehicle simulator for compass data
+        CompassAvail = false; // Set compass availability to false since we are using the simulator
+        Serial.println("Using Vehicle Simulator for Compass data");
+    }
+    else{
+        // Try LIS3MDL first (either explicitly requested or auto-detect mode)
+        if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
+            compass = new LIS3MDLCompass();
+            if (compass->begin()) {
+                Serial.printlnf("Compass initialized with: %s", compass->getType());
+                CompassAvail = true; // Set compass availability to true
+                return true;
+            }
+            delete compass;
+            compass = nullptr;
+
+            // If explicitly requested LIS3MDL and it failed, don't try others
+            if (COMPASS_TYPE == COMPASS_TYPE_LIS3MDL) {
+                Serial.println("Failed to initialize LIS3MDL compass");
+                CompassAvail = false; // Set compass availability to false
+                return false;
+            }
+        }
+
+        // Try LSM303 (either explicitly requested or auto-detect mode)
+        if (COMPASS_TYPE == COMPASS_TYPE_LSM303 || COMPASS_TYPE == COMPASS_TYPE_AUTO) {
+            compass = new LSM303Compass();
+            if (compass->begin()) {
+                Serial.printlnf("Compass initialized with: %s", compass->getType());
+                CompassAvail = true; // Set compass availability to true
+                return true;
+            }
+            delete compass;
+            compass = nullptr;
+        }
+    }   
+    
+    return true;
 }
 
 //Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset

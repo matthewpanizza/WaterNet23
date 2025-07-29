@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 /**
  * Abstract base class for compass sensors

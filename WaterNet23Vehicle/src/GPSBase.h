@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 /**
  * Abstract base class for GPS sensors
