@@ -136,7 +136,6 @@ Timer ledTimer(300,LEDHandler);                     //Create timer for LED, whic
 Timer motionTimer(250, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
 Timer motorHandler(MTR_RAMP_TIME,updateMotors);
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
-Timer statusTableTimer(1000, printStatusTable);     //Create timer for status table, which prints the availability status every second
 Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomous navigation data logging every 500ms
 
 
@@ -146,6 +145,8 @@ Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomou
 //////////////////////
 
 CommandQueue commandQueue;                      //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
+CommandQueue debugQueue;                        //Command queue for debug messages to be logged to the uSD card. Helps with thread-safety and asynchronous command processing
+
 
 VehicleSimulator* vehicleSim = nullptr;         //Pointer to the vehicle simulator object, if enabled
 CompassBase* compass = nullptr;                 //Unified compass pointer using abstract base class
@@ -735,6 +736,14 @@ void processQueuedCommands() {
     }
 }
 
+// Call this in loop() to process queued commands
+void processQueuedDebugMessages() {
+    CommandMsg msg;
+    while (debugQueue.pop(msg)) {
+        logToDebugFile(msg.msg);
+    }
+}
+
 //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
 void cmdLTEHandler(const char *event, const char *data){
     commandQueue.push(data, 4, false); // Mode 4 = LTE
@@ -863,7 +872,6 @@ void setup(){
     //motionTimer.start();
     ledTimer.start();
     statusPD.start();
-    statusTableTimer.start();
     autLogTimer.start();
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Try to connect to the SD card
@@ -915,14 +923,16 @@ void loop(){
     //sensorHandler();                    //Read and request data from Atlas sensor
     XBeeHandler();                      //Check if a string has come in from XBee
     processQueuedCommands();            //Process any queued commands from the command queue
+    processQueuedDebugMessages();       //Writes any debug messages from interrupts to the uSD card
     SerialConsoleHandler();             //Check if a string has come in from Serial console
     statusUpdate();                     //Check if a status update has to be sent out
     writeMotionDataLog();               //Write autonomous navigation data if timer flag is set
-    updateMotors();                     //Update the motor speeds dependent on the mode
+    //updateMotors();                     //Update the motor speeds dependent on the mode
     updateSimulationData();             //Updates the state of the simulation and the target waypoint based on the active simulation
     buttonActionDecode();
     if(offloadMode) dataOffloader();    //Check if a signal to offload has been received
     sendResponseData();                 //Send sensor data if requested from the CC
+    printStatusTable();                 //Prints the status table over Serial
     varCompassHead = (double)compassHeading;
 }
 
@@ -1621,7 +1631,7 @@ void motionHandler(){
         updateMotorControl = true;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);
-        Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
+        //Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
     }
     //If we're in an autonomous mode, also check that telemetry is available, otherwise, return to manual RC mode
     if(!telemetryAvail && driveMode != DRIVE_MODE_MANUAL && millis() - lastTelemTime > MTR_TIMEOUT){
@@ -1635,7 +1645,7 @@ void motionHandler(){
         updateMotorControl = true;
         ESCL.write(setLSpeed);
         ESCR.write(setRSpeed);
-        Serial.printlnf("Warning, GPS or Compass data not available for greater than %dms, exiting autonomous mode", MTR_TIMEOUT);
+        //Serial.printlnf("Warning, GPS or Compass data not available for greater than %dms, exiting autonomous mode", MTR_TIMEOUT);
     }
 }
 
@@ -1643,19 +1653,25 @@ void motionHandler(){
 void wdogHandler(){
     if(Particle.connected()) LTEAvail = true;   //If particle cloud is connected, assume that LTE is available
     else if(LTEAvail){
-        logToDebugFile("[WARN] LTE Messages have not been received in %ds, assuming XBee is unavailable",(XBEE_WDOG_AVAIL/1000));
+        char debugMsg[128];
+        snprintf(debugMsg, sizeof(debugMsg), "[WARN] LTE Messages have not been received in %ds, assuming LTE is unavailable", (XBEE_WDOG_AVAIL/1000));
+        debugQueue.push(debugMsg, 0, false);
         LTEAvail = false;
     }
     if(millis()-XBeeRxTime > XBEE_WDOG_AVAIL || !XBeeRxTime){   //If the time since the last XBee message is too long, print warning and set status flag to false
         if(XBeeAvail){
-            logToDebugFile("[WARN] XBee Messages have not been received in %ds, assuming XBee is unavailable",(XBEE_WDOG_AVAIL/1000));
+            char debugMsg[128];
+            snprintf(debugMsg, sizeof(debugMsg), "[WARN] XBee Messages have not been received in %ds, assuming XBee is unavailable", (XBEE_WDOG_AVAIL/1000));
+            debugQueue.push(debugMsg, 0, false);
         }
         XBeeAvail = false;
     }
     else XBeeAvail = true;
     if(millis()-BLERxTime > BLE_WDOG_AVAIL || !BLERxTime){      //If the time since the last BLE message is too long, print warning and set status flag to false
         if(BLEAvail && BLERxTime){
-            logToDebugFile("[WARN] BLE Messages have not been received in %ds, assuming BLE is unavailable",(BLE_WDOG_AVAIL/1000));
+            char debugMsg[128];
+            snprintf(debugMsg, sizeof(debugMsg), "[WARN] BLE Messages have not been received in %ds, assuming BLE is unavailable", (BLE_WDOG_AVAIL/1000));
+            debugQueue.push(debugMsg, 0, false);
         }
         if(BLE.connected() && XBeeAvail) BLEAvail = true;
         else BLEAvail = false;
@@ -1863,7 +1879,12 @@ int LTEInputCommand(String cmd){
 void printStatusTable(){
     // Check if status table printing is enabled
     if(!statusTableEnabled) return;
-    
+
+    // Only print once per second
+    static uint32_t lastUpdateTime;
+    if(millis() - lastUpdateTime < 1000) return;
+    lastUpdateTime = millis();
+
     // Clear the screen and move cursor to top-left
     Serial.print("\033[2J\033[H");
     
