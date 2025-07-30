@@ -82,8 +82,6 @@ void getPositionData();
 void sendResponseData();
 void statusUpdate();
 void updateMotors();
-void calculateMotorSpeeds(int driveMode, float travelDistance, float targetDelta, float autoMoveRate, 
-                         bool pointArrived, uint8_t& leftSpeed, uint8_t& rightSpeed);
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
 void printBLE(const char *dataOut);
 void StatusHandler();
@@ -176,8 +174,8 @@ float travelHeading, targetDelta;                                       //Compas
 float targetLat, targetLon;                                             //Globals to hold the latitude and longitude sent from the CC for where the bot should target
 float travelDistance;                                                   //Global to hold the distance between the current latitude and longitude and the target latitude and longitude
 bool telemetryAvail;                                                    //Boolean global to check if the compass and GPS are available
-uint8_t leftMotorSpeed, setLSpeed;                                      //Global for the left motor speed and left motor target speed
-uint8_t rightMotorSpeed, setRSpeed;                                     //Global for the right motor speed and right motor target speed
+uint8_t leftMotorSpeed, leftMotorSpeedSetpoint;                                      //Global for the left motor speed and left motor target speed
+uint8_t rightMotorSpeed, rightMotorSpeedSetpoint;                                     //Global for the right motor speed and right motor target speed
 float autoMoveRate = MTR_TRAVEL_SPD;                                    //Set the move rate of the motors, which makes the motor base speed faster/slower
 bool pointArrived;                                                      //Global to indicate that the target point has been reached
 bool warnedBattLeak, warnedLeak;                                        //Flags to indicate a leak warning has been published to avoid publishing too frequently
@@ -360,10 +358,10 @@ void handleMotorCommand(const char* dataStr, uint8_t mode) {
     }
     char lSpd[4] = {dataStr[0],dataStr[1],dataStr[2],'\0'};  //Get the first three characters of the data for the left target speed
     char rSpd[4] = {dataStr[3],dataStr[4],dataStr[5],'\0'};  //Get the second three characters of the data for the right target speed
-    setLSpeed = atoi(lSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
-    setRSpeed = atoi(rSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
+    leftMotorSpeedSetpoint = atoi(lSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
+    rightMotorSpeedSetpoint = atoi(rSpd);                             //Convert string to integer in global target speed, motor speed is ramped to new target by updateMotors
     #ifdef VERBOSE
-    Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",setLSpeed,setRSpeed);
+    Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",leftMotorSpeedSetpoint,rightMotorSpeedSetpoint);
     #endif
     lastMtrTime = millis();         //Update timer for the watchdog that a motor speed was received from CC hub
     driveMode = DRIVE_MODE_MANUAL;  //In case we missed the switch from an autonomous to manual mode, switch to manual mode
@@ -420,8 +418,8 @@ void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
 void handleStopCommand(const char* dataStr, uint8_t mode) {
     //Stop Command (Emergency stop for motors)
     driveMode = DRIVE_MODE_MANUAL;                      //Set drive mode back to manual mode
-    setLSpeed = 90;                     //Stop motors
-    setRSpeed = 90;                 
+    leftMotorSpeedSetpoint = 90;                     //Stop motors
+    rightMotorSpeedSetpoint = 90;                 
     leftMotorSpeed = 90;                //Immediately stop motors (no ramp)
     rightMotorSpeed = 90;
     ESCL.write(90);                     //Immediately write to the ESC a stopped state
@@ -778,12 +776,12 @@ void setup(){
     readEEPROM();                               //Read the EEPROM to get the compass calibration
     
     uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
-    leftMotorSpeed = setLSpeed = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
-    rightMotorSpeed = setRSpeed = 90;           //Set the initial right motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
+    leftMotorSpeed = leftMotorSpeedSetpoint = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
+    rightMotorSpeed = rightMotorSpeedSetpoint = 90;           //Set the initial right motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
     ESCL.attach(ESC_PWM_L,1000,2000);           //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
     ESCR.attach(ESC_PWM_R,1000,2000);           //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
-    ESCL.write(setLSpeed);                      //Set the initial speed of the left motor
-    ESCR.write(setRSpeed);                      //Set the initial speed of the right motor
+    ESCL.write(leftMotorSpeedSetpoint);                      //Set the initial speed of the left motor
+    ESCR.write(rightMotorSpeedSetpoint);                      //Set the initial speed of the right motor
     if(!STARTUP_WAIT_PAIR) delay(2000);         //Delay for 2 seconds to allow motor controllers to arm
 
     BLE.on();                                   //Turn on Bluetooth
@@ -1103,29 +1101,17 @@ float calcDistance(float lat1, float lat2, float lon1, float lon2){
     return 6371000.0 * c; // Distance in m
 }
 
-//Functio that takes compass and target headings from compass and two gps points and calculates which way the bot should rotate in order to get to that target point
+/// @brief Function to calculate the shortest rotation to get to the target heading based on the current heading
+/// @param compassHead current compass reading
+/// @param targetHead target heading from the current lat/lon to the target lat/lon
+/// @return Degrees to rotate the vehicle to get to target heading (-180 to 180)
 float calcDelta(float compassHead, float targetHead){
-    //Do math and comparisons to produce an output heading between -180 and 180, where positive values rotate the bot clockwise, and negative counterclockwise
-    if(targetHead > 0){ 
-        if(compassHead > 0){
-            return targetHead - compassHead;
-        }
-        else{
-            float diff = -(180.0 - targetHead);
-            if(diff < compassHead) return targetHead - compassHead;
-            else return 0 - (180.0 + compassHead) - (180.0 - targetHead);
-        }
-    }
-    else{
-        if(compassHead > 0){
-            float diff = 180.0 + targetHead;
-            if(diff > compassHead) return targetHead - compassHead;
-            else return (180.0 - compassHead) + (180.0 + targetHead);
-        }
-        else{
-            return targetHead - compassHead;
-        }
-    }
+    // Return the shortest signed angle difference between compassHead and targetHead
+    float delta = targetHead - compassHead;
+    // Wrap to [-180, 180]
+    while (delta > 180.0f) delta -= 360.0f;
+    while (delta < -180.0f) delta += 360.0f;
+    return delta;
 }
 
 //Function to get the raw compass heading from the compass module (0-360). This is used for debugging and testing purposes, as well as for the autonomous system to determine which way to turn
@@ -1208,7 +1194,7 @@ float getCalibratedCompassHeading(){
         if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
         //rawHead = (double) targetDelta;
         //char tempbuf[200];
-        //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, setLSpeed, setRSpeed);
+        //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, leftMotorSpeedSetpoint, rightMotorSpeedSetpoint);
         //printBLE(tempbuf);
         #ifdef VERBOSE
             Serial.printlnf("Head: %0.2f, Target: %0.2f, Delta: %0.2f", cHeading, travelHeading, targetDelta);
@@ -1275,126 +1261,177 @@ void statusUpdate(){
     }
 }
 
-//Function to calculate what speed the motors should move at based on the current drive mode (manual, sentry, autonomous)
+/// @brief Function to calculate the average of an array of floats
+/// @param arr array holding the previous error values
+/// @param len number of elements in the array
+/// @param idx circular buffer index
+/// @return average of elements in the array (before substitution)
+float averageAndAdvanceCircularBuffer(float* arr, int len, int *idx, float newVal) {
+    if (len <= 0 || arr == nullptr || idx == nullptr) return 0.0;
+    float sum = 0.0;
+    for (int i = 0; i < len; ++i) { // Sum up all errors
+        sum += arr[i];
+    }
+    if(*idx >= len) *idx = 0;       // Wrap circular buffer around
+    arr[*idx++] = newVal;            // Assign new error value to error array
+    return sum / len;               // Divide by sum to get average
+}
+
+/// @brief Function to calculate what speed the motors should move at based on the current drive mode (manual, sentry, autonomous)
 void updateMotors(){
+    // The control system architecture for movement will involve two PID controllers
+
+    bool doCompassPID = false;
+    if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){
+        doCompassPID = true;
+        if(travelDistance < MTR_CUTOFF_RAD || (travelDistance < SENTRY_IDLE_RAD && pointArrived)){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
+            pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
+            leftMotorSpeedSetpoint = 90;
+            rightMotorSpeedSetpoint = 90;
+        }
+        else{                                           //Otherwise, we are outside the radius of both circles
+            leftMotorSpeedSetpoint = 140;
+            rightMotorSpeedSetpoint = 140;
+        }
+    }
+
+    // The first PID controller is for controlling the speed of the vehicle.
+    // When the joystick is pressed forward, we don't want the motors to immediately jump to full speed or the power draw will be crazy
+    // Same thing for when a new waypoint is given, the vehicle would ramp to max speed without a control system.
+    // The error signal will be calculated by the current motor speed vs the commanded motor speed (either by joystick or waypoint)
+    const float kp_speed = 0.05f;
+    const float ki_speed = 0.3f;
+    const float kd_speed = 0.0f;
+
+    const uint8_t int_speed_count = 20;                         // Number of samples for the integral term
+    static int int_buf_idx_left = 0;                            // Index for the left motor error circular buffer
+    static int int_buf_idx_right = 0;                           // Index for the right motor error circular buffer
+    static float int_speed_left[int_speed_count] = {0.0f};      // Array to hold the previous error values for integral
+    static float int_speed_right[int_speed_count] = {0.0f};     // Array to hold the previous error values for integral
+
+
+    // The second PID controller is for controlling the vehicle rotation based on the compass heading
+    // When operating autonomously, we want to smooth out the rotation of the vehicle to the correct heading
+    // The error signal will be calculated by the current compass heading vs the target compass heading
+    const float kp_angle = 0.1f;
+    const float ki_angle = 0.1f;
+    const float kd_angle = 0.0f;
+    
+    const uint8_t int_angle_count = 15;                          // Number of samples for the integral term
+    static int int_buf_idx_angle = 0;                            // Index for the compass angle error circular buffer
+    static float int_angle[int_angle_count] = {0.0f};            // Array to hold the previous error values for integral
+    
+
+    // Speed PID Calculations
+    static float leftMotorSpeedSet = (float)leftMotorSpeed;    // Local variable to hold the left motor speed in float for better accuracy
+    static float rightMotorSpeedSet = (float)rightMotorSpeed;  // Local variable to hold the right motor speed in float for better accuracy
+
+    float e_speed_left = (float)leftMotorSpeedSetpoint - leftMotorSpeedSet;       // Calculate error for left motor speed
+    float e_speed_right = (float)rightMotorSpeedSetpoint - rightMotorSpeedSet;    // Calculate error for right motor speed
+
+    static float last_e_speed_left = 0.0f;                      // Copy of the last error value - use for differential term
+    static float last_e_speed_right = 0.0f;                     // Copy of the last error value - use for differential term
+
+    float e_int_speed_left = averageAndAdvanceCircularBuffer(int_speed_left, int_speed_count, &int_buf_idx_left, e_speed_left);
+    float e_int_speed_right = averageAndAdvanceCircularBuffer(int_speed_right, int_speed_count, &int_buf_idx_right, e_speed_right);
+
+    float e_diff_speed_left = e_speed_left - last_e_speed_left;
+    float e_diff_speed_right = e_speed_right - last_e_speed_right;
+
+    leftMotorSpeedSet = leftMotorSpeedSet + ((kp_speed * e_speed_left) + (ki_speed * e_int_speed_left) + (kd_speed * e_diff_speed_left));
+    rightMotorSpeedSet = rightMotorSpeedSet + ((kp_speed * e_speed_right) + (ki_speed * e_int_speed_right) + (kd_speed * e_diff_speed_right));
+
+
+    // Rotation PID Calculations
+    float e_angle = calcDelta(compassHeading, travelHeading);   // e will be positive if we need to rotate clockwise (faster left motor)
+    float e_int_angle = averageAndAdvanceCircularBuffer(int_angle, int_angle_count, &int_buf_idx_angle, e_angle);
+    
+    float leftRightDifferential = 0.0f;
+    if(doCompassPID) leftRightDifferential = ((kp_angle * e_angle) + (ki_angle * e_int_angle) + (kd_angle * 0));
+    
+
+    // Now feed in the output of the speed PID to the rotation differential PID to get the output motor speed
+    float leftMotorSpeedF = leftMotorSpeedSet + leftRightDifferential;
+    float rightMotorSpeedF = rightMotorSpeedSet - leftRightDifferential;
+
+    leftMotorSpeed = (uint8_t)leftMotorSpeedF;                  // Convert back to int to command ESC
+    rightMotorSpeed = (uint8_t)rightMotorSpeedF;                // Convert back to int to command ESC
+
+    // Clamp motor speeds to [0, 180]
+    if (leftMotorSpeed < 0) leftMotorSpeed = 0;
+    else if (leftMotorSpeed > 180) leftMotorSpeed = 180;
+    if (rightMotorSpeed < 0) rightMotorSpeed = 0;
+    else if (rightMotorSpeed > 180) rightMotorSpeed = 180;
+
     //if(millis() - motionTime > MTR_RAMP_TIME){
     //    updateMotorControl = true;
     //    motionTime = millis();
     //}
     //if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
-        if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){               //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
+        /*if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){               //Change the value of leftMotorSpeedSetpoint and rightMotorSpeedSetpoint here for the autonomous algorithm
             if(travelDistance < MTR_CUTOFF_RAD){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
                 pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
-                leftMotorSpeed = setLSpeed = 90;            //Set left and right motor speeds to off
-                rightMotorSpeed = setRSpeed = 90;
+                leftMotorSpeed = leftMotorSpeedSetpoint = 90;            //Set left and right motor speeds to off
+                rightMotorSpeed = rightMotorSpeedSetpoint = 90;
             }
             else if(travelDistance < SENTRY_IDLE_RAD){      //Check if the bot is inside of the larger radius of approaching the target point, start slowing motors here
                 if(pointArrived){                           //If we had already arrived at the target point, then use this larger radius as a deadzone so we don't have rapid on/off on the small radius border
-                    setLSpeed = 90;                         //Keep motors off here
-                    setRSpeed = 90;
+                    leftMotorSpeedSetpoint = 90;                         //Keep motors off here
+                    rightMotorSpeedSetpoint = 90;
                 }
                 else{                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
                     int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
                     int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);
-                    if(Lset < 0) setLSpeed = 0;             //Cap the speed between 0 and 180
-                    else if(Lset > 180) setLSpeed = 180;
-                    else Lset = setLSpeed;
-                    if(Rset < 0) setRSpeed = 0;
-                    else if(Rset > 180) setRSpeed = 180;
-                    else Rset = setRSpeed;
+                    if(Lset < 0) leftMotorSpeedSetpoint = 0;             //Cap the speed between 0 and 180
+                    else if(Lset > 180) leftMotorSpeedSetpoint = 180;
+                    else Lset = leftMotorSpeedSetpoint;
+                    if(Rset < 0) rightMotorSpeedSetpoint = 0;
+                    else if(Rset > 180) rightMotorSpeedSetpoint = 180;
+                    else Rset = rightMotorSpeedSetpoint;
                 }
             }
             else{                                           //Otherwise, we are outside the radius of both circles
                 pointArrived = false;                       //Set flag back to false so we have to travel to the inner circle, also happens usually when a new point is specified
                 int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
                 int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2); 
-                if(Lset < 0) setLSpeed = 0;                 //Cap speed between 0 and 180
-                else if(Lset > 180) setLSpeed = 180;
-                else setLSpeed = Lset;
-                if(Rset < 0) setRSpeed = 0;
-                else if(Rset > 180) setRSpeed = 180;
-                else setRSpeed = Rset;
+                if(Lset < 0) leftMotorSpeedSetpoint = 0;                 //Cap speed between 0 and 180
+                else if(Lset > 180) leftMotorSpeedSetpoint = 180;
+                else leftMotorSpeedSetpoint = Lset;
+                if(Rset < 0) rightMotorSpeedSetpoint = 0;
+                else if(Rset > 180) rightMotorSpeedSetpoint = 180;
+                else rightMotorSpeedSetpoint = Rset;
             }
         }
 
-        if(setLSpeed > 90 && setLSpeed <= MTR_ST_FWD) setLSpeed = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
-        if(setRSpeed > 90 && setRSpeed <= MTR_ST_FWD) setRSpeed = MTR_ST_FWD;
-        if(setLSpeed < 90 && setLSpeed >= MTR_ST_REV) setLSpeed = MTR_ST_REV;
-        if(setRSpeed < 90 && setRSpeed >= MTR_ST_REV) setRSpeed = MTR_ST_REV;
+        if(leftMotorSpeedSetpoint > 90 && leftMotorSpeedSetpoint <= MTR_ST_FWD) leftMotorSpeedSetpoint = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
+        if(rightMotorSpeedSetpoint > 90 && rightMotorSpeedSetpoint <= MTR_ST_FWD) rightMotorSpeedSetpoint = MTR_ST_FWD;
+        if(leftMotorSpeedSetpoint < 90 && leftMotorSpeedSetpoint >= MTR_ST_REV) leftMotorSpeedSetpoint = MTR_ST_REV;
+        if(rightMotorSpeedSetpoint < 90 && rightMotorSpeedSetpoint >= MTR_ST_REV) rightMotorSpeedSetpoint = MTR_ST_REV;
 
-        if(leftMotorSpeed < setLSpeed){                                                     //If the acutal motor (leftMotorSpeed) speed is less than the target motor speed (setLSpeed), then ramp the acutal motor speed to reach target
-            if(setLSpeed - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;   //If we're off by more than one step size, then increment by one step
-            else leftMotorSpeed = setLSpeed;                                                //Otherwise, we're less than one step, so finish step function
+        if(leftMotorSpeed < leftMotorSpeedSetpoint){                                                     //If the acutal motor (leftMotorSpeed) speed is less than the target motor speed (leftMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
+            if(leftMotorSpeedSetpoint - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;   //If we're off by more than one step size, then increment by one step
+            else leftMotorSpeed = leftMotorSpeedSetpoint;                                                //Otherwise, we're less than one step, so finish step function
         }
-        else if(leftMotorSpeed > setLSpeed){                                                //If the acutal motor (leftMotorSpeed) speed is greater than the target motor speed (setLSpeed), then ramp the acutal motor speed to reach target
-            if(leftMotorSpeed - setLSpeed > MTR_RAMP_SPD) leftMotorSpeed -= MTR_RAMP_SPD;   //If we're off by more than one step size, then decrement by one step
-            else leftMotorSpeed = setLSpeed;                                                //Otherwise, we're less than one step, so finish step function
+        else if(leftMotorSpeed > leftMotorSpeedSetpoint){                                                //If the acutal motor (leftMotorSpeed) speed is greater than the target motor speed (leftMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
+            if(leftMotorSpeed - leftMotorSpeedSetpoint > MTR_RAMP_SPD) leftMotorSpeed -= MTR_RAMP_SPD;   //If we're off by more than one step size, then decrement by one step
+            else leftMotorSpeed = leftMotorSpeedSetpoint;                                                //Otherwise, we're less than one step, so finish step function
         }
-        if(rightMotorSpeed < setRSpeed){                                                    //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (setRSpeed), then ramp the acutal motor speed to reach target
-            if(setRSpeed - rightMotorSpeed > MTR_RAMP_SPD) rightMotorSpeed += MTR_RAMP_SPD; //If we're off by more than one step size, then increment by one step
-            else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
+        if(rightMotorSpeed < rightMotorSpeedSetpoint){                                                    //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (rightMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
+            if(rightMotorSpeedSetpoint - rightMotorSpeed > MTR_RAMP_SPD) rightMotorSpeed += MTR_RAMP_SPD; //If we're off by more than one step size, then increment by one step
+            else rightMotorSpeed = rightMotorSpeedSetpoint;                                               //Otherwise, we're less than one step, so finish step function
         }
-        else if(rightMotorSpeed > setRSpeed){                                               //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (setRSpeed), then ramp the acutal motor speed to reach target
-            if(rightMotorSpeed - setRSpeed > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
-            else rightMotorSpeed = setRSpeed;                                               //Otherwise, we're less than one step, so finish step function
-        }
+        else if(rightMotorSpeed > rightMotorSpeedSetpoint){                                               //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (rightMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
+            if(rightMotorSpeed - rightMotorSpeedSetpoint > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
+            else rightMotorSpeed = rightMotorSpeedSetpoint;                                               //Otherwise, we're less than one step, so finish step function
+        }*/
         //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
         if(!stopActive){                    //If there has not been a stop command, then update the ESC
             ESCL.write(180-leftMotorSpeed);
             ESCR.write(rightMotorSpeed);
-            //Serial.printlnf("Update motor speed (%dms): %d %d", millis(), setRSpeed, setLSpeed);
+            //Serial.printlnf("Update motor speed (%dms): %d %d", millis(), rightMotorSpeedSetpoint, leftMotorSpeedSetpoint);
         }
         updateMotorControl = false;        //Set the flag to false
     //}
-}
-
-//Function to calculate motor speeds based on navigation parameters (extracted from updateMotors for simulation use)
-void calculateMotorSpeeds(int driveMode, float travelDistance, float targetDelta, float autoMoveRate, 
-                         bool pointArrived, uint8_t& leftSpeed, uint8_t& rightSpeed) {
-    uint8_t setLSpeed = 90, setRSpeed = 90; // Initialize to stopped position
-
-    if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS) {               //Change the value of setLSpeed and setRSpeed here for the autonomous algorithm
-        if(travelDistance < MTR_CUTOFF_RAD) {            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
-            setLSpeed = 90;                              //Set left and right motor speeds to off
-            setRSpeed = 90;
-        }
-        else if(travelDistance < SENTRY_IDLE_RAD) {      //Check if the bot is inside of the larger radius of approaching the target point, start slowing motors here
-            if(pointArrived) {                           //If we had already arrived at the target point, then use this larger radius as a deadzone so we don't have rapid on/off on the small radius border
-                setLSpeed = 90;                          //Keep motors off here
-                setRSpeed = 90;
-            }
-            else {                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
-                int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
-                int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);
-                if(Lset < 0) setLSpeed = 0;              //Cap the speed between 0 and 180
-                else if(Lset > 180) setLSpeed = 180;
-                else setLSpeed = Lset;
-                if(Rset < 0) setRSpeed = 0;
-                else if(Rset > 180) setRSpeed = 180;
-                else setRSpeed = Rset;
-            }
-        }
-        else {                                           //Otherwise, we are outside the radius of both circles
-            int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
-            int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2); 
-            if(Lset < 0) setLSpeed = 0;                  //Cap speed between 0 and 180
-            else if(Lset > 180) setLSpeed = 180;
-            else setLSpeed = Lset;
-            if(Rset < 0) setRSpeed = 0;
-            else if(Rset > 180) setRSpeed = 180;
-            else setRSpeed = Rset;
-        }
-    }
-
-    // Apply motor deadzone logic same as main system
-    if(setLSpeed > 90 && setLSpeed <= MTR_ST_FWD) setLSpeed = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
-    if(setRSpeed > 90 && setRSpeed <= MTR_ST_FWD) setRSpeed = MTR_ST_FWD;
-    if(setLSpeed < 90 && setLSpeed >= MTR_ST_REV) setLSpeed = MTR_ST_REV;
-    if(setRSpeed < 90 && setRSpeed >= MTR_ST_REV) setRSpeed = MTR_ST_REV;
-    
-    // Return the calculated speeds
-    leftSpeed = setLSpeed;
-    rightSpeed = setRSpeed;
 }
 
 //Majoy function for sending a string of data out over BLE, XBee or LTE. Automatically calculates the checksum from the given string
@@ -1623,14 +1660,14 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
 //ISR timer to check if strings have been received from the CCHub, and will cut off motors if an update has not been received recently
 void motionHandler(){
     //If the bot is operating in manual RC mode, then check that a mtr message has been received from the CC recently, otherwise cut off to prevent driving into oblivion
-    if(driveMode == DRIVE_MODE_MANUAL && setLSpeed != 90 && setRSpeed != 90 && millis() - lastMtrTime > MTR_TIMEOUT){
-        setLSpeed = 90;
-        setRSpeed = 90;
+    if(driveMode == DRIVE_MODE_MANUAL && leftMotorSpeedSetpoint != 90 && rightMotorSpeedSetpoint != 90 && millis() - lastMtrTime > MTR_TIMEOUT){
+        leftMotorSpeedSetpoint = 90;
+        rightMotorSpeedSetpoint = 90;
         leftMotorSpeed = 90;
         rightMotorSpeed = 90;
         updateMotorControl = true;
-        ESCL.write(setLSpeed);
-        ESCR.write(setRSpeed);
+        ESCL.write(leftMotorSpeedSetpoint);
+        ESCR.write(rightMotorSpeedSetpoint);
         //Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
     }
     //If we're in an autonomous mode, also check that telemetry is available, otherwise, return to manual RC mode
@@ -1638,13 +1675,13 @@ void motionHandler(){
         driveMode = DRIVE_MODE_MANUAL;
         telemetryAvail = false;
         pointArrived = false;
-        setLSpeed = 90;
-        setRSpeed = 90;
+        leftMotorSpeedSetpoint = 90;
+        rightMotorSpeedSetpoint = 90;
         leftMotorSpeed = 90;
         rightMotorSpeed = 90;
         updateMotorControl = true;
-        ESCL.write(setLSpeed);
-        ESCR.write(setRSpeed);
+        ESCL.write(leftMotorSpeedSetpoint);
+        ESCR.write(rightMotorSpeedSetpoint);
         //Serial.printlnf("Warning, GPS or Compass data not available for greater than %dms, exiting autonomous mode", MTR_TIMEOUT);
     }
 }
@@ -1882,7 +1919,7 @@ void printStatusTable(){
 
     // Only print once per second
     static uint32_t lastUpdateTime;
-    if(millis() - lastUpdateTime < 1000) return;
+    if(millis() - lastUpdateTime < 500) return;
     lastUpdateTime = millis();
 
     // Clear the screen and move cursor to top-left
@@ -1927,10 +1964,10 @@ void printStatusTable(){
     // GPS Position Data (more compact)
     Serial.printf("│  Current: Lat %10.6f  Lon %11.6f                       │\n", latitude, longitude);
     Serial.printf("│  Target:  Lat %10.6f  Lon %11.6f                       │\n", targetLat, targetLon);
-    Serial.printf("│  Heading: Compass %6.1f°  Travel %6.1f°  Motors L:%3d R:%3d        │\n", 
-                  compassHeading, travelHeading, leftMotorSpeed, rightMotorSpeed);
-    Serial.printf("|  Accel: X:%6.2f Y:%6.2f Z:%6.2f                         │\n", 
-                  xAccel, yAccel, zAccel);
+    Serial.printf("│  Heading: Compass %6.1f°  Travel %6.1f°  Delta %6.1f°  │\n", 
+                  compassHeading, travelHeading, targetDelta);
+    Serial.printf("|  Accel: X:%6.2f Y:%6.2f Z:%6.2f  Motors L:%3d R:%3d         │\n", 
+                  xAccel, yAccel, zAccel, leftMotorSpeed, rightMotorSpeed);
 
     Serial.println("├──────────────────────────────────────────────────────────────────────────┤");
     Serial.println("│                           System Information                             │");
