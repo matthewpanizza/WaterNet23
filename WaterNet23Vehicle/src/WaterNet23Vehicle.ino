@@ -47,62 +47,6 @@
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
-/////////////////////////
-// Function Prototypes //
-/////////////////////////
-
-void processCommand(const char *command, uint8_t mode, bool sendAck);
-
-// Command handler functions
-void handleControlCommand(const char* dataStr, uint8_t mode);
-void handleMotorCommand(const char* dataStr, uint8_t mode);
-void handleDataRequest(const char* dataStr, uint8_t mode);
-void handlePrintString(const char* dataStr, uint8_t mode);
-void handleStatusCommand(const char* dataStr, uint8_t mode);
-void handleHelloAck(const char* dataStr, uint8_t mode);
-void handleDumpMode(const char* dataStr, uint8_t mode);
-void handleCompassCal(const char* dataStr, uint8_t mode);
-void handleEmulatedGPS(const char* dataStr, uint8_t mode);
-void handleStopCommand(const char* dataStr, uint8_t mode);
-void handleCompassCommand(const char* dataStr, uint8_t mode);
-void handleHelpCommand(const char* dataStr, uint8_t mode);
-void handleTableCommand(const char* dataStr, uint8_t mode);
-
-void cmdLTEHandler(const char *event, const char *data);                    //ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
-void setupXBee();
-void compassCalibration();
-uint8_t readPowerSys();
-float deg2rad(float deg);
-float lis3mdlCompassHeading(float x_accel, float y_accel);
-float calcDistance(float lat1, float lat2, float lon1, float lon2);
-float calcDelta(float compassHead, float targetHead);
-float getRawCompassHeading();
-float getCalibratedCompassHeading();
-void getPositionData();
-void sendResponseData();
-void statusUpdate();
-void updateMotors();
-void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
-void printBLE(const char *dataOut);
-void StatusHandler();
-void sensorHandler();
-void XBeeHandler();
-void SerialConsoleHandler();
-static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
-void motionHandler();
-void wdogHandler();
-void dataOffloader();
-void buttonHandler();
-void LEDHandler();
-void printStatusTable();
-void initializeSimulationLog(const char* filename);
-void initializeAutonomousLog(const char* filename);
-void logAutonomousData();
-void writeMotionDataLog();
-void logSimulationData();
-int LTEInputCommand(String cmd);
-
-
 ///////////////////////
 // BLE Configuration //
 ///////////////////////
@@ -134,13 +78,11 @@ Timer ledTimer(300,LEDHandler);                     //Create timer for LED, whic
 Timer motionTimer(250, motionHandler);             //Create timer for motor watchdog, which cuts off motors if messages from CC have not been received recently enough
 Timer motorHandler(MTR_RAMP_TIME,updateMotors);
 Timer statusPD(STATUS_PD,StatusHandler);            //Create timer for status, which calculates the status values that will be transmitted to CC and sets a flag for transmitting out the status
-Timer autLogTimer(500, logAutonomousData);          //Create timer for autonomous navigation data logging every 500ms
 
 
-
-//////////////////////
-// Global Variables //
-//////////////////////
+//////////////////////////////
+// Logging Global Variables //
+//////////////////////////////
 
 CommandQueue commandQueue;                      //Command queue for incoming commands from various sources. Helps with thread-safety and asynchronous command processing
 CommandQueue debugQueue;                        //Command queue for debug messages to be logged to the uSD card. Helps with thread-safety and asynchronous command processing
@@ -152,80 +94,132 @@ GPSBase* gps = nullptr;                         //Unified gps pointer using abst
 
 LEDStatus status;                               //LED Control object
 
-//SD File system object                 
+//////////////////////////////
+// Logging Global Variables //
+//////////////////////////////
+
+// uSD controller class
 SdFat sd((SPIClass*)&SPI);                      //SD card object, initialized on SPI for the Beta/Alpha PCB, SPI1 on the Bsom breakout board
 
-File dataFile;                                    //File for the sensor data
+// Filename strings
+char filename[MAX_FILENAME_LEN];                //Filename for the file holding sensor data
+char logFileName[MAX_FILENAME_LEN];        //Filename for the file holding log messages
+char simFilename[MAX_FILENAME_LEN];             //Filename for the simulation data log file
+char autFilename[MAX_FILENAME_LEN];             //Filename for the autonomous navigation data log file
+
+// Data log files
+File dataFile;                                  //File for the sensor data
 File logFile;                                   //File for messages logged by the program
 File simLogFile;                                //File for simulation data logging
 File autLogFile;                                //File for autonomous navigation data logging
 File logDir;                                    //File directory 
 
+bool SDAvail;    
+bool logSensors = true; 
+bool logMessages = true;                                 //Flags for sensor timing/enables
+bool statusTableEnabled = true;                                                //Flag to control status table printing
+
 SerialLogHandler logHandler(LOG_LEVEL_INFO);    //Log Configuration
 
-Servo ESCL;                                     //Object for servo esc of left motor 
-Servo ESCR;                                     //Object for servo esc of right motor
+
+////////////////////////////////////
+// Motor Control Global Variables //
+////////////////////////////////////
+
+// Instances of the servo class for controlling the ESCs
+Servo ESCL;                                                             //Object for servo esc of left motor 
+Servo ESCR;                                                             //Object for servo esc of right motor
+
+uint8_t leftMotorSpeed, leftMotorSpeedSetpoint;                         //Global for the left motor speed and left motor target speed
+uint8_t rightMotorSpeed, rightMotorSpeedSetpoint;                       //Global for the right motor speed and right motor target speed
+
+bool stopActive = false;                                                //Flag to indicate that the CChub has had a stop hit
+uint32_t lastMotorCommandTime;                                          //Timers for when the last motor control command was received
 
 
-bool waitForConnection;                                                 //Flag used on startup until the CC acknowledges this bot
+////////////////////////////////////
+//   Navigation Global Variables  //
+////////////////////////////////////
+
+bool usingVehicleSim = false;                                           //Flag to indicate that the vehicle simulator is being used instead of real GPS/compass
 float latitude, longitude;                                              //Globals to hold the latitude and longitude read in from the GPS
 float compassHeading; 
-float travelHeading, targetDelta;                                       //Compassheading is the calibrated compass reading relative to north, travel heading is the heading between current point and target point
+float travelHeading, headingDelta;                                      //Compassheading is the calibrated compass reading relative to north, travel heading is the heading between current point and target point
 float targetLat, targetLon;                                             //Globals to hold the latitude and longitude sent from the CC for where the bot should target
 float travelDistance;                                                   //Global to hold the distance between the current latitude and longitude and the target latitude and longitude
-bool telemetryAvail;                                                    //Boolean global to check if the compass and GPS are available
-uint8_t leftMotorSpeed, leftMotorSpeedSetpoint;                                      //Global for the left motor speed and left motor target speed
-uint8_t rightMotorSpeed, rightMotorSpeedSetpoint;                                     //Global for the right motor speed and right motor target speed
-float autoMoveRate = MTR_TRAVEL_SPD;                                    //Set the move rate of the motors, which makes the motor base speed faster/slower
-bool pointArrived;                                                      //Global to indicate that the target point has been reached
-bool warnedBattLeak, warnedLeak;                                        //Flags to indicate a leak warning has been published to avoid publishing too frequently
-uint8_t battPercent;                                                    //Global battery percentage indicator
-float battVoltage, battCurrent, solarCurrent;                           //Global battery and solar current read in from power system
-bool updateMotorControl;                                                //Flag to update the motor control, which ramps speed slowly
-uint8_t driveMode = DRIVE_MODE_MANUAL;                                  //Global mode for drive mode, 0 = manual remote control, 1 = sentry, 2 = autonomous
-bool lowBattery;                                                        //Flag to indicate that the battery is low
-bool statusReady;                                                       //Flag to indicate that a status is ready
-bool statusTableEnabled;                                                //Flag to control status table printing
-uint8_t requestActive;                                                  //Flag to indicate that a sensor request has been made from the CChub
-uint16_t LTEStatusCount;                                                //Counter to determine number of LTE messages that should be sent to limit data usage
-uint16_t statusFlags;                                                   //Global status flag
-bool usingVehicleSim = false;                                           //Flag to indicate that the vehicle simulator is being used instead of real GPS/compass
-bool LTEAvail, XBeeAvail, BLEAvail, GPSAvail, CompassAvail, SDAvail;    //Flags for communicaton keep-alives/available
-bool logSensors, logMessages, dataWait;                                 //Flags for sensor timing/enables
-bool autLogReady;                                                       //Flag to indicate autonomous navigation data is ready to log
-bool offloadMode;                                                       //Flag to indicate that SD card data is being offloaded
-bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
-bool shutdownActive;                                                    //Flag to indicate that the button has been pressed down and a shutdown is initiated
-bool stopActive;                                                        //Flag to indicate that the CChub has had a stop hit
-uint32_t senseTimer, dataTimer, positionTimer, compassTimer;            //Timers for reading from the GPS and compass
-uint32_t XBeeRxTime, BLERxTime;                                         //Timers for when the last valid Xbee and BLE message was received
-uint32_t motionTime, lastMtrTime, lastTelemTime;                        //Timers for when the last motor and telemetry commands were received
-uint32_t lastStatusTime;                                                //Timer for when the last status control packet was received
-uint32_t lastButtonClickTime;                                           //Timer for when the last button click was received
-uint32_t stopTime;
-uint32_t lastCalibrationTime;                                           //Timer for when the last compass calibration occurred                              
-float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
-char filename[MAX_FILENAME_LEN];                                        //Filename for the file holding sensor data
-char filenameMessages[MAX_FILENAME_LEN];                                //Filename for the file holding log messages
-char simFilename[MAX_FILENAME_LEN];                                     //Filename for the simulation data log file
-char autFilename[MAX_FILENAME_LEN];                                     //Filename for the autonomous navigation data log file
+bool telemetryAvail = false;                                            //Boolean global to check if the compass and GPS are available
+
 double varCompassHead;
-double rawHead;
-uint32_t BLEdbgTimer;
-float last_lat, last_lon;
 int compOffset = COMP_OFFSET;                                           //Offset for the compass calibration. Degrees off north to add to the compass reading to calibrate it to true north
 bool doCompassCal = false;                                              //Flag to indicate that the compass calibration has been requested
-float xAccel;
-float yAccel;
-float zAccel;
-bool buttonPressSequenceStarted = false;                                //Flag to indicate that the button press sequence has started
-uint16_t buttonPressCount = 0;                                          //Counter for the number of repeated button presses
+bool GPSAvail = false;                                                  //Flag to indicate that the GPS is available
+bool CompassAvail = false;                                              //Flag to indicate that the compass is available
+
+uint32_t lastTelemTime = 0;
+uint32_t lastCalibrationTime = 0;                                       //Timer for when the last compass calibration occurred 
+uint32_t lastAutonomousLogTime = 0;                                     //Timer for when the last autonomous navigation data was logged
+
+uint8_t driveMode = DRIVE_MODE_MANUAL;                                  //Global mode for drive mode, 0 = manual remote control, 1 = sentry, 2 = autonomous
 
 // EKF variables for improved compass heading
 CompassEKF compassEKF;                                                  //Extended Kalman Filter for compass heading fusion
 float filteredCompassHeading = 0.0;                                     //EKF-filtered compass heading
 float lastEKFUpdateTime = 0.0;                                          //Last time EKF was updated
 bool useEKF = true;                                                     //Flag to enable/disable EKF filtering
+
+                             
+
+
+////////////////////////////////////
+// Communication Global Variables //
+////////////////////////////////////
+
+bool waitForConnection;                                                 //Flag used on startup until the CC acknowledges this bot
+bool LTEAvail = false;                                                  //Flag to indicate that LTE is available
+bool XBeeAvail = false;                                                 //Flag to indicate that XBee is available
+bool BLEAvail = false;                                                  //Flag to indicate that BLE is available
+uint32_t XBeeRxTime = 0, BLERxTime = 0;                                 //Timers for when the last valid Xbee and BLE message was received
+bool statusReady = false;                                               //Flag to indicate that a status is ready
+uint8_t requestActive = 0;                                              //Flag to indicate that a sensor request has been made from the CChub
+uint16_t LTEStatusCount = LTE_MAX_STATUS;                               //Counter to determine number of LTE messages that should be sent to limit data usage
+uint16_t statusFlags = 0;                                               //Global status flag
+uint32_t lastStatusTime = 0;                                            //Timer for when the last status control packet was received
+
+
+////////////////////////////////////
+// Power System Global Variables  //
+////////////////////////////////////
+
+bool warnedBattLeak = false; 
+bool warnedLeak = false;                                                //Flags to indicate a leak warning has been published to avoid publishing too frequently
+uint8_t battPercent;                                                    //Global battery percentage indicator
+float battVoltage, battCurrent, solarCurrent;                           //Global battery and solar current read in from power system
+bool lowBattery;                                                        //Flag to indicate that the battery is low
+
+
+////////////////////////////////////
+// Sensor System Global Variables //
+////////////////////////////////////
+
+float sensePH, senseTemp, senseCond, senseMCond, senseDO;               //Global variables for holding sensor data received from last Atlas sensors
+bool dataWait = false;                                                //Flag to indicate that the Atlas sensors are being read and data is being waited on
+
+
+////////////////////////////////////
+// Miscellaneous Global Variables //
+////////////////////////////////////
+
+bool offloadMode = false;                                               //Flag to indicate that SD card data is being offloaded
+bool signalLED;                                                         //Flag to indicate that the CC hub has requested that the LED should be signaling flashing orange
+uint32_t senseTimer = 0;                                                //Timer for when the last time data was requested from the Atlas sensors
+uint32_t dataTimer = 0;                                                 //Timer for when the last time data was read from the Atlas sensors
+uint32_t positionTimer = 0;                                             //Timer for when the last GPS reading was taken
+uint32_t compassTimer = 0;                                              //Timers for when the last compass reading was taken
+uint32_t lastButtonClickTime;                                           //Timer for when the last button click was received
+bool buttonPressSequenceStarted = false;                                //Flag to indicate that the button press sequence has started
+uint16_t buttonPressCount = 0;                                          //Counter for the number of repeated button presses
+
+
 
 // Command lookup table for cleaner command processing
 const CommandEntry commandTable[] = {
@@ -248,6 +242,11 @@ const CommandEntry commandTable[] = {
 const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 
 // Helper function to log to logFile with printf-style arguments (no vprintf in File, so use buffer)
+/**
+ * @brief Helper function to log messages to debug file with printf-style formatting
+ * @param fmt Format string (printf-style)
+ * @param ... Variable arguments for format string
+ */
 void logToDebugFile(const char* fmt, ...) {
     if(!SDAvail || !logMessages) return; // Do not log if SD card is not available
     char buf[256];
@@ -256,7 +255,7 @@ void logToDebugFile(const char* fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     if(!logFile.isOpen()) {
-        logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.open(logFileName, O_RDWR | O_CREAT | O_AT_END);
         logFile.println(buf);
         logFile.close();
     } else {
@@ -264,7 +263,12 @@ void logToDebugFile(const char* fmt, ...) {
     }
 }
 
-//Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
+/**
+ * @brief Dictionary for all bot commands that is called when XBee, BLE, and LTE strings are received. Mode 1 - BLE, Mode 2 - XBEE, Mode 4 - LTE
+ * @param command The command string to process
+ * @param mode Communication mode: 1 = BLE, 2 = XBEE, 4 = LTE
+ * @param sendAck Whether to send acknowledgment back to sender
+ */
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     const char* modeStr = "UNKNOWN";
     if (mode == 1) modeStr = "BLE";
@@ -329,12 +333,27 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
 }
 
 // Individual command handler functions for cleaner organization
+/**
+ * @brief Control command from CC that contains data about the drive mode, target latitude and longitude, and offloading
+ * @param dataStr The data string containing control parameters
+ * @param mode Communication mode the command was received from
+ */
 void handleControlCommand(const char* dataStr, uint8_t mode) {
     //Control command from CC that contains data about the drive mode, target latitude and longitude, and offloading
     char tLat[10];              //String buffer for latitude, as sscanf doesn't handle floats well
     char tLon[10];              //String buffer for longitude, as sscanf doesn't handle floats well
     uint8_t lastDriveMode = driveMode;  //Store the last drive mode to check if it has changed
-    sscanf(dataStr,"%s %s %u %d %d",tLat,tLon,&driveMode,&logSensors,&signalLED);    //Target lat, target lon, drive mode, dataRecord, signal
+    
+    // Use temporary variables with correct types for sscanf
+    unsigned int tempDriveMode;
+    int tempLogSensors, tempSignalLED;
+    sscanf(dataStr,"%s %s %u %d %d",tLat,tLon,&tempDriveMode,&tempLogSensors,&tempSignalLED);    //Target lat, target lon, drive mode, dataRecord, signal
+    
+    // Assign to actual variables
+    driveMode = (uint8_t)tempDriveMode;
+    logSensors = (bool)tempLogSensors;
+    signalLED = (bool)tempSignalLED;
+    
     if(lastDriveMode != DRIVE_MODE_SENTRY && driveMode == DRIVE_MODE_SENTRY) {
         //If the drive mode has changed to sentry, reset the target lat and lon
         targetLat = latitude;  //Set target lat to current lat
@@ -350,6 +369,11 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
     #endif
 }
 
+/**
+ * @brief Motor Speed Control
+ * @param dataStr The data string containing motor speed commands
+ * @param mode Communication mode the command was received from
+ */
 void handleMotorCommand(const char* dataStr, uint8_t mode) {
     //Motor Speed Control
     if(strlen(dataStr) < 6) {
@@ -363,31 +387,56 @@ void handleMotorCommand(const char* dataStr, uint8_t mode) {
     #ifdef VERBOSE
     Serial.printlnf("Received Motor Command: LSpeed=%d,RSpeed=%d",leftMotorSpeedSetpoint,rightMotorSpeedSetpoint);
     #endif
-    lastMtrTime = millis();         //Update timer for the watchdog that a motor speed was received from CC hub
+    lastMotorCommandTime = millis();         //Update timer for the watchdog that a motor speed was received from CC hub
     driveMode = DRIVE_MODE_MANUAL;  //In case we missed the switch from an autonomous to manual mode, switch to manual mode
 }
 
+/**
+ * @brief Data Request from CChub to get the bundle of sensor data and transmit it out
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from (used to determine response method)
+ */
 void handleDataRequest(const char* dataStr, uint8_t mode) {
     //Data Request from CChub to get the bundle of sensor data and transmit it out
     requestActive = mode;           //Set flag, as it's not possible to use 2/3 communication modes in an interrupt handler
 }
 
+/**
+ * @brief Command used for debugging, which allows the CChub (or any bluetooth device) to print a string to the console and to the SD card
+ * @param dataStr The string message to print and log
+ * @param mode Communication mode the command was received from
+ */
 void handlePrintString(const char* dataStr, uint8_t mode) {
     //Command used for debugging, which allows the CChub (or any bluetooth device) to print a string to the console and to the SD card
     Serial.println(dataStr);        //Print to console
     logToDebugFile("[PUTS] Received String Command: %s", dataStr); //Log to SD card
 }
 
+/**
+ * @brief Incoming communication status from CChub, this data is used in addition to control strings to determine which communication methods are available
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleStatusCommand(const char* dataStr, uint8_t mode) {
     //Incoming communication status from CChub, this data is used in addition to control strings to determine which communication methods are available
     lastStatusTime = millis();          //Update timer with the current time, and the watchdog will automatically set the flags based on this timer and the current time
 }
 
+/**
+ * @brief Hello-world acknowledge command from the CCHub, which will bring this bot out of pairing mode on startup
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleHelloAck(const char* dataStr, uint8_t mode) {
     //Hello-world acknowledge command from the CCHub, which will bring this bot out of pairing mode on startup
     waitForConnection = false;          //Setup loop waits for this to be set true before moving into main loop
 }
 
+/**
+ * @brief Enter SD Card "Dump Mode" for Bluetooth offloading
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleDumpMode(const char* dataStr, uint8_t mode) {
     //Enter SD Card "Dump Mode" for Bluetooth offloading
     offloadMode = true;                 //Set flag for offloading mode, which is checked by the main loop
@@ -396,12 +445,22 @@ void handleDumpMode(const char* dataStr, uint8_t mode) {
     status.setSpeed(LED_SPEED_FAST);
 }
 
+/**
+ * @brief Command to calibrate the compass, which is used to set the offset for the compass heading
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleCompassCal(const char* dataStr, uint8_t mode) {
     //Command to calibrate the compass, which is used to set the offset for the compass heading
     doCompassCal = true;               //Set flag to indicate that the compass calibration
     logToDebugFile("[INFO] Compass calibration requested");
 }
 
+/**
+ * @brief Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
+ * @param dataStr The data string containing latitude and longitude values
+ * @param mode Communication mode the command was received from
+ */
 void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
     //Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
         
@@ -415,6 +474,11 @@ void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
     #endif
 }
 
+/**
+ * @brief Stop Command (Emergency stop for motors)
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleStopCommand(const char* dataStr, uint8_t mode) {
     //Stop Command (Emergency stop for motors)
     driveMode = DRIVE_MODE_MANUAL;                      //Set drive mode back to manual mode
@@ -424,13 +488,17 @@ void handleStopCommand(const char* dataStr, uint8_t mode) {
     rightMotorSpeed = 90;
     ESCL.write(90);                     //Immediately write to the ESC a stopped state
     ESCR.write(90);
-    stopTime = millis();
     stopActive = true;                  //Set flag to indicate that stop was hit
     #ifdef VERBOSE
     Serial.println("Emergency stop activated");
     #endif
 }
 
+/**
+ * @brief EKF Control Command - enable/disable EKF filtering and tuning parameters
+ * @param dataStr The data string containing EKF enable flag and optional noise parameters
+ * @param mode Communication mode the command was received from
+ */
 void handleEKFCommand(const char* dataStr, uint8_t mode) {
     //EKF Control Command - enable/disable EKF filtering and tuning parameters
     int enableFlag = 0;
@@ -460,6 +528,11 @@ void handleEKFCommand(const char* dataStr, uint8_t mode) {
     }
 }
 
+/**
+ * @brief Compass Control Command - switch compass types, status, auto-detect
+ * @param dataStr The data string containing compass type (0=LSM303, 1=LIS3MDL, 2=Auto-detect) or empty for status
+ * @param mode Communication mode the command was received from
+ */
 void handleCompassCommand(const char* dataStr, uint8_t mode) {
     //Compass Control Command - switch compass types, status, auto-detect
     
@@ -558,6 +631,11 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
     }
 }
 
+/**
+ * @brief Simulation Control Command - enable/disable GPS and compass simulation
+ * @param dataStr The data string containing simulation mode (0=Disable, 1-4=Various simulation modes) or empty for status
+ * @param mode Communication mode the command was received from
+ */
 void handleSimulationCommand(const char* dataStr, uint8_t mode) {
     //Simulation Control Command - enable/disable GPS and compass simulation
     
@@ -572,28 +650,23 @@ void handleSimulationCommand(const char* dataStr, uint8_t mode) {
             // Disable simulation
             //simulationData.disableSimulation();
             vehicleSim->disableSimulation();
-            strcpy(simFilename, "");  // Clear the simulation filename when disabled
             Serial.println("Simulation disabled");
         } else if(simMode >= 1 && simMode <= 4) {
             // Enable simulation with specified mode
             vehicleSim->setScenario(simMode);
             const char* modeNames[] = {"", "Lake Raleigh - Vertical", "", "", ""};
             Serial.printlnf("Simulation enabled: %s mode", modeNames[simMode]);
-            
-            // Initialize logging if SD card is available
-            if(SDAvail) {
-                snprintf(simFilename, MAX_FILENAME_LEN, "SimData%02d%02d%02d%02d.csv", 
-                        Time.month(), Time.day(), Time.hour(), Time.minute());
-                initializeSimulationLog(simFilename);
-            } else {
-                Serial.println("SD card not available - logging to console only");
-            }
         } else {
             Serial.println("Invalid simulation mode. Use: 0=Disable, 1=Static, 2=Waypoint, 3=Circle, 4=Random Walk");
         }
     }
 }
 
+/**
+ * @brief Help Command - display available commands and usage
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleHelpCommand(const char* dataStr, uint8_t mode) {
     //Help Command - display available commands and usage
     Serial.println("\n=== WaterNet23 Vehicle Commands ===");
@@ -630,6 +703,11 @@ void handleHelpCommand(const char* dataStr, uint8_t mode) {
     Serial.println("================================");
 }
 
+/**
+ * @brief Table Command - enable/re-enable status table printing
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
+ */
 void handleTableCommand(const char* dataStr, uint8_t mode) {
     //Table Command - enable/re-enable status table printing
     statusTableEnabled = true;
@@ -638,34 +716,47 @@ void handleTableCommand(const char* dataStr, uint8_t mode) {
     printStatusTable();
 }
 
-//Function to initialize simulation logging file
-void initializeSimulationLog(const char* filename) {
+/// @brief Creates files on the SD card for logging purposes. This function is called once at startup to create the files needed for logging
+void initializeLogFiles(){
     if(!SDAvail) return; // No SD card available
-    
-    if(!simLogFile.isOpen()) {
-        simLogFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-        if(simLogFile.isOpen()) {
-            simLogFile.println("Timestamp,Latitude,Longitude,Heading,ActualLeftMotor,ActualRightMotor,Mode");
-            simLogFile.close();
-            Serial.printlnf("Simulation log file created: %s", filename);
-        } else {
-            Serial.printlnf("Failed to create simulation log file: %s", filename);
-        }
-    }
-}
 
-//Function to initialize autonomous navigation logging file
-void initializeAutonomousLog(const char* filename) {
-    if(!SDAvail) return; // No SD card available
-    
+    snprintf(filename, MAX_FILENAME_LEN-1, "%sB%d%02d%02d%04d%02d%02d%02d", DEF_FILENAME, BOTNUM, Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
+    strcpy(logFileName,filename);                           //Copy the base filename to the log file name
+    strcpy(autFilename,filename);                           //Copy the base filename to the autonomous navigation log file name    
+    strcpy(simFilename,filename);                           //Copy the base filename to the simulation log file name
+    strcat(autFilename,"_AUT.csv");                         //Append "_AUT.csv" suffix to the autonomous navigation log file name
+    strcat(logFileName,"_LOG.txt");                         //Append "_LOG.txt" suffix to the log file name
+    strcpy(simFilename, "_SIM.csv");                        //Initialize simulation filename as empty until simulation is enabled
+    strcat(filename,".csv");                                //Append ".csv" suffix to the base filename
+
+    //Open the log file for writing, if it doesn't exist, create it
+    if(logSensors){                                 //Logsensors enables logging of sensor data, if enabled, then create the file on the SD card
+        dataFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+        dataFile.println(FILE_LABELS);
+        dataFile.close();
+    }
+
+    //Create the autonomous navigation log file
     if(!autLogFile.isOpen()) {
-        autLogFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+        autLogFile.open(autFilename, O_RDWR | O_CREAT | O_AT_END);
         if(autLogFile.isOpen()) {
             autLogFile.println("Timestamp,CurrentHeading,TargetHeading,CurrentLat,CurrentLon,TargetLat,TargetLon,LeftMotor,RightMotor");
             autLogFile.close();
-            Serial.printlnf("Autonomous log file created: %s", filename);
+            Serial.printlnf("Autonomous log file created: %s", autFilename);
         } else {
             Serial.printlnf("Failed to create autonomous log file: %s", filename);
+        }
+    }
+
+    //Create the simulation log file
+    if(!simLogFile.isOpen()) {
+        simLogFile.open(simFilename, O_RDWR | O_CREAT | O_AT_END);
+        if(simLogFile.isOpen()) {
+            simLogFile.println("Timestamp,Latitude,Longitude,Heading,ActualLeftMotor,ActualRightMotor,Mode");
+            simLogFile.close();
+            Serial.printlnf("Simulation log file created: %s", simFilename);
+        } else {
+            Serial.printlnf("Failed to create simulation log file: %s", simFilename);
         }
     }
 }
@@ -687,20 +778,22 @@ void updateSimulationData(){
 
 }
 
-//Function to log simulation data to SD card
+/**
+ * @brief Function to log simulation data to SD card
+ */
 void logSimulationData() {
     if(!SDAvail) return;
 }
 
-//Function to log autonomous navigation data to SD card
-void logAutonomousData() {
-    autLogReady = true;  // Set flag for main loop to handle actual logging
-}
-
-//Helper function to write autonomous navigation data to SD card (called from main loop)
+/**
+ * @brief Helper function to write autonomous navigation data to SD card (called from main loop)
+ */
 void writeMotionDataLog() {
-    if(!autLogReady || !SDAvail) return; // No logging needed or SD card unavailable
+    if(!SDAvail) return; // No logging needed or SD card unavailable
     
+    if(millis() - lastAutonomousLogTime < AUTN_LOG_INTERVAL) return; // Limit log rate
+    lastAutonomousLogTime = millis(); // Update last log time
+
     // Create timestamp
     char timestamp[20];
     snprintf(timestamp, 20, "%02d/%02d/%04d %02d:%02d:%02d", 
@@ -722,11 +815,12 @@ void writeMotionDataLog() {
                            leftMotorSpeed, rightMotorSpeed);
         autLogFile.close();
     }
-    
-    autLogReady = false; // Clear the flag
+
 }
 
-// Call this in loop() to process queued commands
+/**
+ * @brief Call this in loop() to process queued commands
+ */
 void processQueuedCommands() {
     CommandMsg msg;
     while (commandQueue.pop(msg)) {
@@ -734,7 +828,9 @@ void processQueuedCommands() {
     }
 }
 
-// Call this in loop() to process queued commands
+/**
+ * @brief Call this in loop() to process queued commands
+ */
 void processQueuedDebugMessages() {
     CommandMsg msg;
     while (debugQueue.pop(msg)) {
@@ -742,99 +838,48 @@ void processQueuedDebugMessages() {
     }
 }
 
-//ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
+/**
+ * @brief ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
+ * @param event Event name from Particle cloud subscription
+ * @param data Command data received from Particle cloud
+ */
 void cmdLTEHandler(const char *event, const char *data){
     commandQueue.push(data, 4, false); // Mode 4 = LTE
 }
 
-//Function that is called by the system once upon startup. Initializes variables used by the system as well as all hardware like the SD card, GPS, sensors, XBee
+/**
+ * @brief Function that is called by the system once upon startup. Initializes variables used by the system as well as all hardware like the SD card, GPS, sensors, XBee
+ */
 void setup(){
     status.setPriority(LED_PRIORITY_IMPORTANT);         //First set the LED color to green to indicate to the user that the system has properly started up
     status.setColor(RGB_COLOR_GREEN);
     status.setPattern(LED_PATTERN_SOLID);
     status.setActive(true);                             //Set the LED status to active to change from Particle's LED scheme to the custom patterns
     
-    //Pin configuration
-    pinMode(SENSE_EN, OUTPUT);                          //Configure the pin for the Atlas sensors as an output and pull low to enable power to the Atlas sensors
-    digitalWrite(SENSE_EN,LOW);                     
-    pinMode(PWR_BUT, INPUT);                            //Configure power button input as an input, no pull as the resistor divider will handle pin floating
-    attachInterrupt(PWR_BUT, buttonHandler, RISING);    //Attach the buttonHandler function to trigger whenever the button is pressed
-    #ifdef LEAK_DET
-    pinMode(LEAK_DET,INPUT);                            //Configure the leak detect output of the PCB to be an input with no pull. External pull on PCB
-    #endif
-    pinMode(BAT_LEAK_DET,INPUT);                        //Configure the battery leak detect output of the PCB to be an input with no pull. External pull on PCB
-    #ifdef PWR_EN                                       //Macro to disable power disable if we are using the Boron as a test platform, as D22 is not present there
-        pinMode(PWR_EN, OUTPUT);
-        digitalWrite(PWR_EN,HIGH);                      //Set the power enable pin output high to latch the mosfet on the PCB so the system maintains power
-    #endif
-    #ifdef LEAK_DET                                     //Macro to disable battery leak if we are using the Boron as a test platform, as D23 is not present there
-        pinMode(LEAK_DET, INPUT);
-    #endif
+    setupPins();                                        //Setup the pins used by the system, which includes the motor control pins, LED pins, and sensor pins    
+    readEEPROM();                                       //Read the EEPROM to get the compass calibration
 
-    Particle.connect();
-
-    readEEPROM();                               //Read the EEPROM to get the compass calibration
+    Particle.connect();                                 //Connect to Particle Cloud via cellular to get LTE messages
     
-    uint32_t mtrArmTime = millis();             //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
-    leftMotorSpeed = leftMotorSpeedSetpoint = 90;            //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
-    rightMotorSpeed = rightMotorSpeedSetpoint = 90;           //Set the initial right motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
-    ESCL.attach(ESC_PWM_L,1000,2000);           //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
-    ESCR.attach(ESC_PWM_R,1000,2000);           //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
-    ESCL.write(leftMotorSpeedSetpoint);                      //Set the initial speed of the left motor
-    ESCR.write(rightMotorSpeedSetpoint);                      //Set the initial speed of the right motor
-    if(!STARTUP_WAIT_PAIR) delay(2000);         //Delay for 2 seconds to allow motor controllers to arm
+    uint32_t mtrArmTime = millis();                     //Create a timer to make sure the motors are initialized to 90 (stopped) for at least 2 seconds, otherwise ESC will not become armed
+    leftMotorSpeed = leftMotorSpeedSetpoint = 90;       //Set the initial left motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
+    rightMotorSpeed = rightMotorSpeedSetpoint = 90;     //Set the initial right motor speed of 90, which is stopped. The controller must be held here for 2 seconds to arm the ESC
+    ESCL.attach(ESC_PWM_L,1000,2000);                   //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
+    ESCR.attach(ESC_PWM_R,1000,2000);                   //Start PWM-based ESC, with 1ms min pulse width and 2ms max pulse width
+    ESCL.write(leftMotorSpeedSetpoint);                 //Set the initial speed of the left motor
+    ESCR.write(rightMotorSpeedSetpoint);                //Set the initial speed of the right motor
 
-    BLE.on();                                   //Turn on Bluetooth
-    BLE.setTxPower(8);                          //Max transmitting power
-    
-    Serial.begin(115200);
-    Serial1.begin(9600);                        //Start serial for XBee module
+    Serial.begin(115200);                               //Start serial for USB debugging, 115200 baud rate
+    Serial1.begin(9600);                                //Start serial for XBee module
 
-    setupXBee();                                //Setup XBee module
-    setupNavigationSensors();                   //Setup navigation sensors, which includes GPS and compass
-    
-    Particle.variable("Heading", varCompassHead);
-    Particle.variable("TargetHead", rawHead);
-    //Particle.variable("Distance", travelDistance);
-    //Particle.variable("Lat", latitude);
-    //Particle.variable("Lon", longitude);
+    setupBLE();                                         //Setup BLE module, which includes advertising and setting up the service and characteristics
+    setupXBee();                                        //Setup XBee module
+    setupNavigationSensors();                           //Setup navigation sensors, which includes GPS and compass
 
-    Particle.subscribe("CCHub", cmdLTEHandler); //Subscribe to LTE data from Central Control Hub
+    Particle.subscribe("CCHub", cmdLTEHandler);         //Subscribe to LTE data from Central Control Hub
     Particle.function("Input Command", LTEInputCommand);        //Debug function to feed in commands over LTE
-    LTEAvail = false;                           //Initialize LTE status indicator to false until we receive a message from CC
-    SDAvail = true;                             //SD initialized to true, but is set false when the SD is initialized unsucessfully
-    statusTableEnabled = true;                  //Initialize status table printing to enabled
-    BLEdbgTimer = compassTimer = motionTime = stopTime = positionTimer = lastTelemTime = lastStatusTime = dataTimer = senseTimer = millis();     //Initialize most software timers here to current time
-    XBeeRxTime = 0;                             //Initialize timer for checking that XBee is available
-    BLERxTime = 0;                              //Initialize timer for checking that BLE is available
-    dataWait = false;                           //Set false initially to first request data to sensors before attempting to read data
-    logSensors = true;                          //By default, log sensor data to SD card, if SD card is inserted
-    logMessages = true;                         //By default, log debug messages to SD card, if SD card is inserted
-    autLogReady = false;                        //Initialize autonomous logging flag to false
-    offloadMode = false;                        //Set offload to false, otherwise could try to offload with no CC connected
-    requestActive = false;                      //Set request to false, otherwise we are trying to send sensor data with no CC connected
-    LTEStatusCount = LTE_MAX_STATUS;            //Initialize counter for LTE backup messages. This counter limits the number of LTE messages being sent so we don't burn through the data limit
-    telemetryAvail = false;                     //Initially assume GPS and compass are not available until we receive the first point from each
-    shutdownActive = false;                     //Initially set the shutdown state to false until the button is pressed and held for 3 seconds, then shut off
-    stopActive = false;                         //Initially disable stop, otherwise user might not know that the stop button must be pressed
-    warnedBattLeak = false;                     //Initially set false so at least one leak message will be sent in the case of a leak
-    warnedLeak = false;                         //Initially set false so at least one leak message will be sent in the case of a leak
 
     battPercent = 50;                           //Initially set battery reading to 50% until we read the actual voltage so the LED states are not affected 
-
-    BLE.addCharacteristic(txCharacteristic);    //Add characteristic for the stream of transmitting out data over BLE
-    BLE.addCharacteristic(rxCharacteristic);    //Add characteristic for the stream of receiving data from BLE
-    BLE.addCharacteristic(offloadCharacteristic);   //Add characteristic for offloading stream for BLE
-    #ifdef BLE_DEBUG_ENABLED
-        BLE.addCharacteristic(bledbgCharacteristic);    //Add BLE Characteristics for BLE serial debug stream
-    #endif
-
-    BLECustomData[0] = BOTNUM;                  //Put this bot's bot number in the advertising data so other bots can see it's ID without connecting to it
-
-    advData.appendServiceUUID(WaterNetService); // Add the app service
-    advData.appendCustomData(BLECustomData,CUSTOM_DATA_LEN);
-
-    BLE.advertise(&advData);                    //Start advertising the characteristics
 
     Wire.begin();
     Wire.setClock(CLOCK_SPEED_400KHZ);
@@ -851,42 +896,23 @@ void setup(){
         Serial.printlnf("EKF initialized with heading: %0.2f", initialHeading - compOffset);
     }
 
-    char timestamp[16];                         //String that holds a timestamp for naming the files generated on the SD card
-    snprintf(timestamp,16,"B%d%02d%02d%04d%02d%02d%02d", BOTNUM, Time.month(),Time.day(),Time.year(),Time.hour(),Time.minute(),Time.second());
-    strcpy(filename,DEF_FILENAME);              //Copy in all of the necessary elements of the file name
-    strcat(filename,timestamp);
-    strcpy(filenameMessages,filename);
-    strcpy(autFilename,filename);
-    strcat(filename,".csv");
-    strcat(filenameMessages,"_LOG.txt");
-    strcat(autFilename,"_AUT.csv");
-    strcpy(simFilename, "");                        //Initialize simulation filename as empty until simulation is enabled
-
-    Serial.println(filename);                   //Print the filenames to the console for debugging
-    Serial.println(filenameMessages);
-    Serial.println(autFilename);
-
     watchdog.start();                           //Start the timers
     //motionTimer.start();
     ledTimer.start();
     statusPD.start();
-    autLogTimer.start();
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Try to connect to the SD card
+    if (sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Try to connect to the SD card
+        SDAvail = true;                          //Set flag that the SD card is available
+        initializeLogFiles();                       //Create the log files on the SD card
+        logToDebugFile("[INFO] WaterBot %d: Started Logging!",BOTNUM);
+    }
+    else{
         Serial.println("Error: could not connect to SD card!");     //If not, warn the user in the console
         logSensors = false;                         //Set flags that the SD card is not available which will warn the user on the CChub
         logMessages = false;
         SDAvail = false;
     }
-    if(logSensors){                                 //Logsensors enables logging of sensor data, if enabled, then create the file on the SD card
-        dataFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-        dataFile.println(FILE_LABELS);
-        dataFile.close();
-    }
-    logToDebugFile("[INFO] WaterBot %d: Started Logging!",BOTNUM);
-    if(SDAvail){                                    //Initialize autonomous navigation log file if SD card is available
-        initializeAutonomousLog(autFilename);
-    }
+    
     if(STARTUP_WAIT_PAIR){                          //If a wait pair is enabled, wait for an acknowlede from the CChub before continuing to the main loop
         waitForConnection = true;                   //Set flag true, which will be set false when command received from CChub
         uint32_t publishMS = millis();              //Get current time for limiting rate of publish over cellular
@@ -912,7 +938,9 @@ void setup(){
     Serial.println("=====================================\n");
 }
 
-//Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
+/**
+ * @brief Function called by the system that continuously loops as long as the device is on. Interrupts will pause this, execute what they are doing (change flags monitored here) and then return control here
+ */
 void loop(){
     //Serial.printlnf("Time: %d", millis());
     compassCalibration();               //Check if the compass calibration has been requested, and if so, run the calibration function
@@ -934,7 +962,49 @@ void loop(){
     varCompassHead = (double)compassHeading;
 }
 
-//Reads from the EEPROM if it is properly formatted. Updates the EEPROM if formatting does not match
+/// @brief Configures the pins used by the system. This function is called once at startup to configure the pins used by the system
+void setupPins(){
+    //Pin configuration
+    pinMode(SENSE_EN, OUTPUT);                          //Configure the pin for the Atlas sensors as an output and pull low to enable power to the Atlas sensors
+    digitalWrite(SENSE_EN,LOW);                     
+    pinMode(PWR_BUT, INPUT);                            //Configure power button input as an input, no pull as the resistor divider will handle pin floating
+    attachInterrupt(PWR_BUT, buttonHandler, RISING);    //Attach the buttonHandler function to trigger whenever the button is pressed
+    #ifdef LEAK_DET
+    pinMode(LEAK_DET,INPUT);                            //Configure the leak detect output of the PCB to be an input with no pull. External pull on PCB
+    #endif
+    pinMode(BAT_LEAK_DET,INPUT);                        //Configure the battery leak detect output of the PCB to be an input with no pull. External pull on PCB
+    #ifdef PWR_EN                                       //Macro to disable power disable if we are using the Boron as a test platform, as D22 is not present there
+        pinMode(PWR_EN, OUTPUT);
+        digitalWrite(PWR_EN,HIGH);                      //Set the power enable pin output high to latch the mosfet on the PCB so the system maintains power
+    #endif
+    #ifdef LEAK_DET                                     //Macro to disable battery leak if we are using the Boron as a test platform, as D23 is not present there
+        pinMode(LEAK_DET, INPUT);
+    #endif
+}
+
+/// @brief Configures the BLE advertising and callbacks. This function is called once at startup to configure the BLE module
+void setupBLE(){
+    BLE.on();                                           //Turn on Bluetooth
+    BLE.setTxPower(8);                                  //Max transmitting power
+
+    BLE.addCharacteristic(txCharacteristic);    //Add characteristic for the stream of transmitting out data over BLE
+    BLE.addCharacteristic(rxCharacteristic);    //Add characteristic for the stream of receiving data from BLE
+    BLE.addCharacteristic(offloadCharacteristic);   //Add characteristic for offloading stream for BLE
+    #ifdef BLE_DEBUG_ENABLED
+        BLE.addCharacteristic(bledbgCharacteristic);    //Add BLE Characteristics for BLE serial debug stream
+    #endif
+
+    BLECustomData[0] = BOTNUM;                  //Put this bot's bot number in the advertising data so other bots can see it's ID without connecting to it
+
+    advData.appendServiceUUID(WaterNetService); // Add the app service
+    advData.appendCustomData(BLECustomData,CUSTOM_DATA_LEN);
+
+    BLE.advertise(&advData);                    //Start advertising the characteristics
+}
+
+/**
+ * @brief Reads from the EEPROM if it is properly formatted. Updates the EEPROM if formatting does not match
+ */
 void readEEPROM(){
     //Check if the EEPROM has been configured for use by the CAN analyzer. Read memory items if the keys match
     if(EEPROM.read(EEPROM_KEY1_LOC) == EEPROM_KEY1 && EEPROM.read(EEPROM_KEY2_LOC) == EEPROM_KEY2){
@@ -952,7 +1022,9 @@ void writeEEPROM(){
     EEPROM.put(EEPROM_COMP_CAL_LOC, compOffset);    //Write the compass calibration
 }
 
-//Code to initially configure XBee module over serial. Sends newline and 'B' to bypass the microcontroller onboard the XBee module.
+/**
+ * @brief Code to initially configure XBee module over serial. Sends newline and 'B' to bypass the microcontroller onboard the XBee module.
+ */
 void setupXBee(){
     Serial1.printf("\n");    //First character to set Bypass mode
     delay(20);              //Wait some time before sending next character
@@ -961,7 +1033,10 @@ void setupXBee(){
     //Serial1.printf("Hello from Bot %d\n", BOTNUM);   //Send Hello World message!
 }
 
-//Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
+/**
+ * @brief Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
+ * @returns True if navigation sensors were successfully initialized, false otherwise
+ */
 bool setupNavigationSensors(){
     
     vehicleSim = new VehicleSimulator(); // Initialize vehicle simulator for testing purposes
@@ -1021,7 +1096,9 @@ bool setupNavigationSensors(){
     return true;
 }
 
-//Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset
+/**
+ * @brief Checks if the remote control has requested a compass calibration and reads the raw heading to calculate the offset
+ */
 void compassCalibration(){
     if(doCompassCal){
         lastCalibrationTime = millis();    //Set the last calibration time to the current time
@@ -1039,7 +1116,10 @@ void compassCalibration(){
     }
 }
 
-//Function to read power draw of the system and check for leaks. Updates global variables for power system. 
+/**
+ * @brief Function to read power draw of the system and check for leaks. Updates global variables for power system.
+ * @returns Battery percentage (0-100)
+ */
 uint8_t readPowerSys(){
     #ifdef BATT_VSENSE                                                      //Disable voltage sensing if on Boron
         battVoltage = (float) analogRead(BATT_VSENSE) * VDIV_MULT;          //Calculate voltage read in from voltage divider
@@ -1078,12 +1158,21 @@ uint8_t readPowerSys(){
     return battPercent;
 }
 
-//Convert degrees to radians, used by the compass bearing calculation
+/**
+ * @brief Convert degrees to radians, used by the compass bearing calculation
+ * @param deg Angle in degrees
+ * @returns Angle in radians
+ */
 float deg2rad(float deg) {
   return deg * (3.14159/180);   //Multiply by Pi/180
 }
 
-//Function to take an x and y acceleration from the compass and return a raw value between -180 and +180 degrees
+/**
+ * @brief Function to take an x and y acceleration from the compass and return a raw value between -180 and +180 degrees
+ * @param x_accel X-axis acceleration from compass
+ * @param y_accel Y-axis acceleration from compass
+ * @returns Compass heading in degrees (-180 to +180)
+ */
 float lis3mdlCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
     #ifdef VERBOSE
@@ -1092,7 +1181,14 @@ float lis3mdlCompassHeading(float x_accel, float y_accel){
     return rawHeading;   //Call the remap function to get a calibrated heading
 }
 
-//function that takes two latitudes and longitudes and calculates the distance (in meters) between them. Used by autonomous system for determining arrival at a point
+/**
+ * @brief function that takes two latitudes and longitudes and calculates the distance (in meters) between them. Used by autonomous system for determining arrival at a point
+ * @param lat1 First latitude in degrees
+ * @param lat2 Second latitude in degrees
+ * @param lon1 First longitude in degrees
+ * @param lon2 Second longitude in degrees
+ * @returns Distance between points in meters
+ */
 float calcDistance(float lat1, float lat2, float lon1, float lon2){
     float dLat = deg2rad(lat1-lat2);    //Calculate difference between latitudes
     float dLon = deg2rad(lon1-lon2);    //Calculate difference between longitudes
@@ -1114,7 +1210,10 @@ float calcDelta(float compassHead, float targetHead){
     return delta;
 }
 
-//Function to get the raw compass heading from the compass module (0-360). This is used for debugging and testing purposes, as well as for the autonomous system to determine which way to turn
+/**
+ * @brief Function to get the raw compass heading from the compass module (0-360). This is used for debugging and testing purposes, as well as for the autonomous system to determine which way to turn
+ * @returns Raw compass heading in degrees (0-360), or 0.0 if compass unavailable
+ */
 float getRawCompassHeading(){
     float rawHeading = 0;     //Create a variable to hold the heading from the compass, regardless
     
@@ -1141,7 +1240,10 @@ float getRawCompassHeading(){
     return 0.0; // Return 0 as default heading
 }
 
-//Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
+/**
+ * @brief Function to get the calibrated compass heading, which is used by the autonomous system to determine which way to turn
+ * @returns Calibrated compass heading in degrees (-180 to 180)
+ */
 float getCalibratedCompassHeading(){
     float cHeading = getRawCompassHeading();   //Get the raw compass heading from the compass module
     cHeading -= compOffset;   //Add the offset to the compass heading to get the calibrated heading
@@ -1186,24 +1288,20 @@ float getCalibratedCompassHeading(){
         }
     }
     
-    if(targetLat >= -90 && targetLat <= 90 && targetLon >= -90 && targetLon <= 90){         //Check that the target latitude and longitude are valid
+    if(targetLat >= -90.0f && targetLat <= 90.0f && targetLon >= -90.0f && targetLon <= 90.0f){         //Check that the target latitude and longitude are valid
         travelHeading = (atan2(targetLon-longitude, targetLat-latitude) * 180 / M_PI);      //Calculate the heading between the current and target location
         travelDistance = calcDistance(targetLat,latitude,targetLon,longitude);              //Calculate the distance between the current and target location
-        targetDelta = calcDelta(cHeading, travelHeading);                             //Calculate delta to control angle of the bot
+        headingDelta = calcDelta(cHeading, travelHeading);                             //Calculate delta to control angle of the bot
         lastTelemTime = millis();                                                           //Update telemetry time
         if(CompassAvail) telemetryAvail = true;                                             //If compass and GPS are available, set flag to true
-        //rawHead = (double) targetDelta;
-        //char tempbuf[200];
-        //sprintf(tempbuf,"Lat: %f Lon %f TLa: %f TLo: %f, Compass: %f, Trv hd: %f, Trv Del: %f, Dst: %f, L:%d, R: %d", latitude, longitude, targetLat, targetLon, compassHeading, travelHeading, targetDelta, travelDistance, leftMotorSpeedSetpoint, rightMotorSpeedSetpoint);
-        //printBLE(tempbuf);
         #ifdef VERBOSE
-            Serial.printlnf("Head: %0.2f, Target: %0.2f, Delta: %0.2f", cHeading, travelHeading, targetDelta);
+            Serial.printlnf("Head: %0.2f, Target: %0.2f, Delta: %0.2f", cHeading, travelHeading, headingDelta);
         #endif
     }  
     return cHeading;
 }
 
-//Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement
+/** @brief Function to read data from the GPS and compass module and then call the distance calculation functions for updating autonomous movement */
 void getPositionData(){
     if(millis() - positionTimer > GPS_POLL_TIME){       //Use a timer to slow the poll rate on GPS and Compass, as they do not same that quickly
         positionTimer = millis();                       //Reset timer
@@ -1227,7 +1325,7 @@ void getPositionData(){
     }
 }
 
-//Function to check if response data to a request needs to be sent out
+/** @brief Function to check if response data to a request needs to be sent out */
 void sendResponseData(){
     if(requestActive){              //If the CC has requested data using the req command
         char responseStr[65];       //Create string to hold sensor data
@@ -1238,7 +1336,7 @@ void sendResponseData(){
     }
 }
 
-//Function to check if the status is updated based on a flag and then transmit it out to the CChub
+/** @brief Function to check if the status is updated based on a flag and then transmit it out to the CChub */
 void statusUpdate(){
     if(statusReady){        //Check if status flag has been set by timer that calculates system status flags
         #ifdef VERBOSE
@@ -1282,6 +1380,7 @@ void updateMotors(){
     // The control system architecture for movement will involve two PID controllers
 
     bool doCompassPID = false;
+    static bool pointArrived = false;
     if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){
         doCompassPID = true;
         if(travelDistance < MTR_CUTOFF_RAD || (travelDistance < SENTRY_IDLE_RAD && pointArrived)){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
@@ -1290,8 +1389,9 @@ void updateMotors(){
             rightMotorSpeedSetpoint = 90;
         }
         else{                                           //Otherwise, we are outside the radius of both circles
-            leftMotorSpeedSetpoint = 140;
-            rightMotorSpeedSetpoint = 140;
+            pointArrived = false;
+            leftMotorSpeedSetpoint = MTR_TRAVEL_SPD;
+            rightMotorSpeedSetpoint = MTR_TRAVEL_SPD;
         }
     }
 
@@ -1363,78 +1463,21 @@ void updateMotors(){
     if (rightMotorSpeed < 0) rightMotorSpeed = 0;
     else if (rightMotorSpeed > 180) rightMotorSpeed = 180;
 
-    //if(millis() - motionTime > MTR_RAMP_TIME){
-    //    updateMotorControl = true;
-    //    motionTime = millis();
-    //}
-    //if(updateMotorControl){                                 //Flag to initialize a motor update, such that the motor speed is ramped to the target oover time
-        /*if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){               //Change the value of leftMotorSpeedSetpoint and rightMotorSpeedSetpoint here for the autonomous algorithm
-            if(travelDistance < MTR_CUTOFF_RAD){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
-                pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
-                leftMotorSpeed = leftMotorSpeedSetpoint = 90;            //Set left and right motor speeds to off
-                rightMotorSpeed = rightMotorSpeedSetpoint = 90;
-            }
-            else if(travelDistance < SENTRY_IDLE_RAD){      //Check if the bot is inside of the larger radius of approaching the target point, start slowing motors here
-                if(pointArrived){                           //If we had already arrived at the target point, then use this larger radius as a deadzone so we don't have rapid on/off on the small radius border
-                    leftMotorSpeedSetpoint = 90;                         //Keep motors off here
-                    rightMotorSpeedSetpoint = 90;
-                }
-                else{                                       //If we haven't arrived at the point, continue the autonomous movement, but start slowing the motors as we get closer so we don't go beyond due to p=m*v
-                    int Rset = (90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);    //Take the base 90 (stopped speed), add the delta for how much the heading is off, and slow with distance
-                    int Lset = (90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2.0)) * (travelDistance/SENTRY_IDLE_RAD);
-                    if(Lset < 0) leftMotorSpeedSetpoint = 0;             //Cap the speed between 0 and 180
-                    else if(Lset > 180) leftMotorSpeedSetpoint = 180;
-                    else Lset = leftMotorSpeedSetpoint;
-                    if(Rset < 0) rightMotorSpeedSetpoint = 0;
-                    else if(Rset > 180) rightMotorSpeedSetpoint = 180;
-                    else Rset = rightMotorSpeedSetpoint;
-                }
-            }
-            else{                                           //Otherwise, we are outside the radius of both circles
-                pointArrived = false;                       //Set flag back to false so we have to travel to the inner circle, also happens usually when a new point is specified
-                int Rset = 90 + (90 * autoMoveRate) + (targetDelta * autoMoveRate / 2); //Take the base 90 (stopped speed), add the delta for how much the heading is off, and the base move rate multiplier
-                int Lset = 90 + (90 * autoMoveRate) - (targetDelta * autoMoveRate / 2); 
-                if(Lset < 0) leftMotorSpeedSetpoint = 0;                 //Cap speed between 0 and 180
-                else if(Lset > 180) leftMotorSpeedSetpoint = 180;
-                else leftMotorSpeedSetpoint = Lset;
-                if(Rset < 0) rightMotorSpeedSetpoint = 0;
-                else if(Rset > 180) rightMotorSpeedSetpoint = 180;
-                else rightMotorSpeedSetpoint = Rset;
-            }
-        }
-
-        if(leftMotorSpeedSetpoint > 90 && leftMotorSpeedSetpoint <= MTR_ST_FWD) leftMotorSpeedSetpoint = MTR_ST_FWD; //Push motor speed out of deadzone to make sure the motors actually respond to non-90 inputs
-        if(rightMotorSpeedSetpoint > 90 && rightMotorSpeedSetpoint <= MTR_ST_FWD) rightMotorSpeedSetpoint = MTR_ST_FWD;
-        if(leftMotorSpeedSetpoint < 90 && leftMotorSpeedSetpoint >= MTR_ST_REV) leftMotorSpeedSetpoint = MTR_ST_REV;
-        if(rightMotorSpeedSetpoint < 90 && rightMotorSpeedSetpoint >= MTR_ST_REV) rightMotorSpeedSetpoint = MTR_ST_REV;
-
-        if(leftMotorSpeed < leftMotorSpeedSetpoint){                                                     //If the acutal motor (leftMotorSpeed) speed is less than the target motor speed (leftMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
-            if(leftMotorSpeedSetpoint - leftMotorSpeed > MTR_RAMP_SPD) leftMotorSpeed += MTR_RAMP_SPD;   //If we're off by more than one step size, then increment by one step
-            else leftMotorSpeed = leftMotorSpeedSetpoint;                                                //Otherwise, we're less than one step, so finish step function
-        }
-        else if(leftMotorSpeed > leftMotorSpeedSetpoint){                                                //If the acutal motor (leftMotorSpeed) speed is greater than the target motor speed (leftMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
-            if(leftMotorSpeed - leftMotorSpeedSetpoint > MTR_RAMP_SPD) leftMotorSpeed -= MTR_RAMP_SPD;   //If we're off by more than one step size, then decrement by one step
-            else leftMotorSpeed = leftMotorSpeedSetpoint;                                                //Otherwise, we're less than one step, so finish step function
-        }
-        if(rightMotorSpeed < rightMotorSpeedSetpoint){                                                    //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (rightMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
-            if(rightMotorSpeedSetpoint - rightMotorSpeed > MTR_RAMP_SPD) rightMotorSpeed += MTR_RAMP_SPD; //If we're off by more than one step size, then increment by one step
-            else rightMotorSpeed = rightMotorSpeedSetpoint;                                               //Otherwise, we're less than one step, so finish step function
-        }
-        else if(rightMotorSpeed > rightMotorSpeedSetpoint){                                               //If the acutal motor (rightMotorSpeed) speed is greater than the target motor speed (rightMotorSpeedSetpoint), then ramp the acutal motor speed to reach target
-            if(rightMotorSpeed - rightMotorSpeedSetpoint > MTR_RAMP_SPD) rightMotorSpeed -= MTR_RAMP_SPD; //If we're off by more than one step size, then decrement by one step
-            else rightMotorSpeed = rightMotorSpeedSetpoint;                                               //Otherwise, we're less than one step, so finish step function
-        }*/
-        //Serial.printlnf("Lspd: %d Rspd: %d HDelt: %d Hdist: %0.2f MR: %0.2f", leftMotorSpeed, rightMotorSpeed, (int)targetDelta, travelDistance, autoMoveRate);
-        if(!stopActive){                    //If there has not been a stop command, then update the ESC
-            ESCL.write(180-leftMotorSpeed);
-            ESCR.write(rightMotorSpeed);
-            //Serial.printlnf("Update motor speed (%dms): %d %d", millis(), rightMotorSpeedSetpoint, leftMotorSpeedSetpoint);
-        }
-        updateMotorControl = false;        //Set the flag to false
-    //}
+    if(!stopActive){                    //If there has not been a stop command, then update the ESC
+        ESCL.write(180-leftMotorSpeed);
+        ESCR.write(rightMotorSpeed);
+        //Serial.printlnf("Update motor speed (%dms): %d %d", millis(), rightMotorSpeedSetpoint, leftMotorSpeedSetpoint);
+    }
 }
 
-//Majoy function for sending a string of data out over BLE, XBee or LTE. Automatically calculates the checksum from the given string
+/**
+ * @brief Major function for sending a string of data out over BLE, XBee or LTE. Automatically calculates the checksum from the given string
+ * @param dataOut The data string to send
+ * @param sendMode Communication mode to use (0=use individual flags, 1=BLE, 2=XBEE, 4=LTE)
+ * @param sendBLE Flag to enable sending over BLE
+ * @param sendXBee Flag to enable sending over XBee
+ * @param sendLTE Flag to enable sending over LTE
+ */
 void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE){
     //Can either use sendMode or the individual flags. sendMode enables easy re-transmission from the same method that it was received from
     char outStr[strlen(dataOut)+2];                             //Make a temporary string to hold the inputted strigng and also the checksum
@@ -1452,9 +1495,10 @@ void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee
     }
 }
 
-//Function used for BLE debugging that allows printing debug messages to a remote device
+/** @brief Function used for BLE debugging that allows printing debug messages to a remote device */
 void printBLE(const char *dataOut){
     #ifdef BLE_DEBUG_ENABLED                                        //Only functional if BLE debugging is enabled, disable to reduce overhead in final build
+        static uint32_t BLEdbgTimer = 0;
         if(millis() - BLEdbgTimer < 1000) return;
         BLEdbgTimer = millis();
         uint8_t txBuf_tmp[strlen(dataOut)];                         //Convert input string to byte array to transmit out of BLE
@@ -1463,7 +1507,7 @@ void printBLE(const char *dataOut){
     #endif
 }
 
-//ISR Function to calculate bitmasked status number and signal to the main loop that the status is ready
+/** @brief ISR Function to calculate bitmasked status number and signal to the main loop that the status is ready */
 void StatusHandler(){
     statusFlags = 0;                    //Reset status flags to 0, then add up the individual flags
     statusFlags = LTEAvail;             //Bit 0 indicates LTE is available
@@ -1480,7 +1524,7 @@ void StatusHandler(){
     //Serial.println("Sending a status update!");
 }
 
-//Function to read and request data from the Atlas scientific sensors over I2C. Uses millis() timer to ensure at least 850ms between request and read (required for Atlas sensors)
+/** @brief Function to read and request data from the Atlas scientific sensors over I2C. Uses millis() timer to ensure at least 850ms between request and read (required for Atlas sensors) */
 void sensorHandler(){
     if(!SENS_CONNECTED) return;                //If sensors are not connected, then return and do nothing
     if(dataTimer < millis() && dataWait){       //Check if the timer for waiting after a data request has expired
@@ -1574,7 +1618,7 @@ void sensorHandler(){
     }
 }
 
-//Function to check the UART serial buffer from XBee and then send any received commands to the processCommand function
+/** @brief Function to check the UART serial buffer from XBee and then send any received commands to the processCommand function */
 void XBeeHandler(){  
     while(Serial1.available()){                         //Read data from the XBee buffer
         String data = Serial1.readStringUntil('\n');    //Each command is terminated by a null character, so use this to separate multiple commands if multiple in the buffer
@@ -1590,7 +1634,7 @@ void XBeeHandler(){
     }
 }
 
-//Function to handle commands received from Serial console (COM port)
+/** @brief Function to handle commands received from Serial console (COM port) */
 void SerialConsoleHandler(){
     while(Serial.available()){                          //Read data from the Serial buffer
         String data = Serial.readStringUntil('\n');     //Each command is terminated by a newline character
@@ -1643,7 +1687,13 @@ void SerialConsoleHandler(){
     }
 }
 
-//ISR function triggered whenever data is received over BLE. Converts to a string and then sends data to processCommand dictionary
+/**
+ * @brief ISR function triggered whenever data is received over BLE. Converts to a string and then sends data to processCommand dictionary
+ * @param data Pointer to received data buffer
+ * @param len Length of received data in bytes
+ * @param peer BLE peer device that sent the data
+ * @param context Context pointer (unused)
+ */
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context){
     char btBuf[len+1];                                              //Create character array for the received command
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];       //Convert byte array into character array
@@ -1657,15 +1707,14 @@ static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice
     if(btBuf[0] == 'A' || btBuf[0] == 'C') BLERxTime = millis();    //If the first characters were from another bot or from the CC, then assume Xbee is working, so update it's watchdog counter
 }
 
-//ISR timer to check if strings have been received from the CCHub, and will cut off motors if an update has not been received recently
+/** @brief ISR timer to check if strings have been received from the CCHub, and will cut off motors if an update has not been received recently */
 void motionHandler(){
     //If the bot is operating in manual RC mode, then check that a mtr message has been received from the CC recently, otherwise cut off to prevent driving into oblivion
-    if(driveMode == DRIVE_MODE_MANUAL && leftMotorSpeedSetpoint != 90 && rightMotorSpeedSetpoint != 90 && millis() - lastMtrTime > MTR_TIMEOUT){
+    if(driveMode == DRIVE_MODE_MANUAL && leftMotorSpeedSetpoint != 90 && rightMotorSpeedSetpoint != 90 && millis() - lastMotorCommandTime > MTR_TIMEOUT){
         leftMotorSpeedSetpoint = 90;
         rightMotorSpeedSetpoint = 90;
         leftMotorSpeed = 90;
         rightMotorSpeed = 90;
-        updateMotorControl = true;
         ESCL.write(leftMotorSpeedSetpoint);
         ESCR.write(rightMotorSpeedSetpoint);
         //Serial.printlnf("Warning, motor command has not been received in over %dms, cutting motors", MTR_TIMEOUT);
@@ -1674,19 +1723,17 @@ void motionHandler(){
     if(!telemetryAvail && driveMode != DRIVE_MODE_MANUAL && millis() - lastTelemTime > MTR_TIMEOUT){
         driveMode = DRIVE_MODE_MANUAL;
         telemetryAvail = false;
-        pointArrived = false;
         leftMotorSpeedSetpoint = 90;
         rightMotorSpeedSetpoint = 90;
         leftMotorSpeed = 90;
         rightMotorSpeed = 90;
-        updateMotorControl = true;
         ESCL.write(leftMotorSpeedSetpoint);
         ESCR.write(rightMotorSpeedSetpoint);
         //Serial.printlnf("Warning, GPS or Compass data not available for greater than %dms, exiting autonomous mode", MTR_TIMEOUT);
     }
 }
 
-//ISR timer to check if messages over communication modes have been received. updates flags used to determine which methods to send data over
+/** @brief ISR timer to check if messages over communication modes have been received. updates flags used to determine which methods to send data over */
 void wdogHandler(){
     if(Particle.connected()) LTEAvail = true;   //If particle cloud is connected, assume that LTE is available
     else if(LTEAvail){
@@ -1717,7 +1764,7 @@ void wdogHandler(){
     if(stopActive && millis() - stopActive > STOP_RST_TIME) stopActive = false;                          //Set stop to false in case the CChub somehow crashed (though we have already entered a "float" mode where drivemode = 0)
 }
 
-//Function to pause operation and copy data off of SD card over bluetooth to the CChub
+/** @brief Function to pause operation and copy data off of SD card over bluetooth to the CChub */
 void dataOffloader(){
     Serial.println("Entering Data Offloader Mode");
     dataFile.close();
@@ -1803,7 +1850,7 @@ void buttonActionDecode(){
 
 }
 
-//ISR triggered when button is pressed or released
+/** @brief ISR triggered when button is pressed or released */
 void buttonHandler(){
     if(millis() - lastButtonClickTime < BUTTON_DEB_TIME){  //If the button was pressed within the debounce time, then ignore this press
         lastButtonClickTime = millis();                        //Update the last button click time
@@ -1815,7 +1862,7 @@ void buttonHandler(){
 
 }
 
-//ISR timer to update the color and pattern of the LED based on the status of the system
+/** @brief ISR timer to update the color and pattern of the LED based on the status of the system */
 void LEDHandler(){
     uint32_t SetColor;
     LEDPattern SetPattern;
@@ -1904,7 +1951,11 @@ void LEDHandler(){
     status.setSpeed(SetSpeed);    
 }
 
-//Particle function for processing a debug string, for testing things like an emulated GPS point
+/**
+ * @brief Particle function for processing a debug string, for testing things like an emulated GPS point
+ * @param cmd Command string received from Particle cloud
+ * @returns Always returns 0 (success)
+ */
 int LTEInputCommand(String cmd){
     char cmdBuf[100];
     cmd.toCharArray(cmdBuf, 100);
@@ -1912,7 +1963,7 @@ int LTEInputCommand(String cmd){
     return 1;
 }
 
-//Function to print a status table showing availability of all communication and hardware systems
+/** @brief Function to print a status table showing availability of all communication and hardware systems */
 void printStatusTable(){
     // Check if status table printing is enabled
     if(!statusTableEnabled) return;
@@ -1964,10 +2015,8 @@ void printStatusTable(){
     // GPS Position Data (more compact)
     Serial.printf("│  Current: Lat %10.6f  Lon %11.6f                       │\n", latitude, longitude);
     Serial.printf("│  Target:  Lat %10.6f  Lon %11.6f                       │\n", targetLat, targetLon);
-    Serial.printf("│  Heading: Compass %6.1f°  Travel %6.1f°  Delta %6.1f°  │\n", 
-                  compassHeading, travelHeading, targetDelta);
-    Serial.printf("|  Accel: X:%6.2f Y:%6.2f Z:%6.2f  Motors L:%3d R:%3d         │\n", 
-                  xAccel, yAccel, zAccel, leftMotorSpeed, rightMotorSpeed);
+    Serial.printf("│  Heading: Compass %6.1f°  Travel %6.1f°  Delta %6.1f°  │\n", compassHeading, travelHeading, headingDelta);
+    Serial.printf("|  Motors L:%3d R:%3d                                    │\n", leftMotorSpeed, rightMotorSpeed);
 
     Serial.println("├──────────────────────────────────────────────────────────────────────────┤");
     Serial.println("│                           System Information                             │");

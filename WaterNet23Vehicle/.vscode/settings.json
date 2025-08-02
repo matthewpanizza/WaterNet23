@@ -11,7 +11,10 @@
         "cmath": "cpp",
         "ios": "cpp",
         "vector": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "initializer_list": "cpp",
+        "xhash": "cpp",
+        "xutility": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0",

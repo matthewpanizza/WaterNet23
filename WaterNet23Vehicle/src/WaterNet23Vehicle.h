@@ -76,12 +76,13 @@
 #define LTE_STAT_PD         4               //Divider for sending status via LTE to reduce data usage
 #define XBEE_START_PUB      5000            //Time period between sending "Hello World" messages over XBee during setup
 #define MANUAL_RAMP_PD      30             //Time period between motor ramp updates when in manual motor drive mode
+#define AUTN_LOG_INTERVAL   1000            //Time period between logging autonomous navigation data
 
 #define DEF_FILENAME        "WaterBot"
 #define FILE_LABELS         "Time,Latitude,Longitude,Temperature,pH,Dissolved O2,Conductivity 0.1K,Conductivity 1K"
 #define BLE_OFFLD_BUF       100
 #define CUSTOM_DATA_LEN     8
-#define MAX_FILENAME_LEN    32
+#define MAX_FILENAME_LEN    50
 
 /////////////////////////
 // Power System Macros //
@@ -104,7 +105,7 @@
 #define MTR_TIMEOUT         4000            //Timeout in milliseconds for turning off motors when being manually controlled
 #define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_RAMP_TIME       50              //Time between ramp iterations
-#define MTR_TRAVEL_SPD      0.45             //Percentage maximum travel speed for autonomous movement default
+#define MTR_TRAVEL_SPD      140             //Autonomous movement base speed
 #define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
 #define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
@@ -117,3 +118,56 @@
 #define DRIVE_MODE_MANUAL        0               // Manual drive mode
 #define DRIVE_MODE_SENTRY        1               // Sentry mode
 #define DRIVE_MODE_AUTONOMOUS    2               // Autonomous drive mode
+
+/////////////////////////
+// Function Prototypes //
+/////////////////////////
+
+void processCommand(const char *command, uint8_t mode, bool sendAck);
+
+// Command handler functions
+void handleControlCommand(const char* dataStr, uint8_t mode);
+void handleMotorCommand(const char* dataStr, uint8_t mode);
+void handleDataRequest(const char* dataStr, uint8_t mode);
+void handlePrintString(const char* dataStr, uint8_t mode);
+void handleStatusCommand(const char* dataStr, uint8_t mode);
+void handleHelloAck(const char* dataStr, uint8_t mode);
+void handleDumpMode(const char* dataStr, uint8_t mode);
+void handleCompassCal(const char* dataStr, uint8_t mode);
+void handleEmulatedGPS(const char* dataStr, uint8_t mode);
+void handleStopCommand(const char* dataStr, uint8_t mode);
+void handleEKFCommand(const char* dataStr, uint8_t mode);
+void handleCompassCommand(const char* dataStr, uint8_t mode);
+void handleSimulationCommand(const char* dataStr, uint8_t mode);
+void handleHelpCommand(const char* dataStr, uint8_t mode);
+void handleTableCommand(const char* dataStr, uint8_t mode);
+void cmdLTEHandler(const char *event, const char *data);
+void setupBLE();
+void setupXBee();
+bool setupNavigationSensors();
+void compassCalibration();
+uint8_t readPowerSys();
+float deg2rad(float deg);
+float lis3mdlCompassHeading(float x_accel, float y_accel);
+float calcDistance(float lat1, float lat2, float lon1, float lon2);
+float calcDelta(float compassHead, float targetHead);
+float getRawCompassHeading();
+void getPositionData();
+void statusUpdate();
+void updateMotors();
+void sendData(const char *dataOut, uint8_t sendMode, bool sendBLE, bool sendXBee, bool sendLTE);
+void printBLE(const char *dataOut);
+void StatusHandler();
+void sensorHandler();
+void XBeeHandler();
+void SerialConsoleHandler();
+static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
+void motionHandler();
+void wdogHandler();
+void dataOffloader();
+void buttonHandler();
+void LEDHandler();
+void printStatusTable();
+void writeMotionDataLog();
+void logSimulationData();
+int LTEInputCommand(String cmd);
