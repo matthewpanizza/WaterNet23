@@ -1835,7 +1835,9 @@ void buttonActionDecode(){
         else if(buttonPressCount == 5){
             logToDebugFile("[INFO] Power off button pressed 5 times, shutting down bot");
             sendData("B1ABsdn",0,true,true,true);         //Send shutdown executed command to CChub
+            #ifdef PWR_EN
             digitalWrite(PWR_EN, LOW);                      //If the button was pressed 5 times, then turn off the power to the bot
+            #endif
         }
         else if(buttonPressCount == 7){
             doCompassCal = true;                          //If the button was pressed 7 times, then set the compass calibration
@@ -1875,7 +1877,7 @@ void LEDHandler(){
         status.setSpeed(LED_SPEED_FAST);
         return;
     }
-    if(millis() - lastCalibrationTime < COMPASS_CAL_TIMEOUT){ //The bot is currently calibrating the compass
+    if(millis() - lastCalibrationTime < COMPASS_CAL_TIMEOUT && millis() > COMPASS_CAL_TIMEOUT){ //The bot is currently calibrating the compass
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_MAGENTA);
         status.setSpeed(LED_SPEED_FAST);

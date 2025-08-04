@@ -307,6 +307,11 @@ const CommandEntry commandTable[] = {
 const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 
 // Helper function to log to logFile with printf-style arguments (no vprintf in File, so use buffer)
+/**
+ * @brief Helper function to log messages to debug file with printf-style formatting
+ * @param fmt Format string (printf-style)
+ * @param ... Variable arguments for format string
+ */
 void logToDebugFile(const char* fmt, ...) {
     if(!SDAvail || !logMessages) return; // Do not log if SD card is not available
     char buf[256];
@@ -453,6 +458,8 @@ void handleMotorCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Data Request from CChub to get the bundle of sensor data and transmit it out
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from (used to determine response method)
  */
 void handleDataRequest(const char* dataStr, uint8_t mode) {
     //Data Request from CChub to get the bundle of sensor data and transmit it out
@@ -461,6 +468,8 @@ void handleDataRequest(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Command used for debugging, which allows the CChub (or any bluetooth device) to print a string to the console and to the SD card
+ * @param dataStr The string message to print and log
+ * @param mode Communication mode the command was received from
  */
 void handlePrintString(const char* dataStr, uint8_t mode) {
     //Command used for debugging, which allows the CChub (or any bluetooth device) to print a string to the console and to the SD card
@@ -470,6 +479,8 @@ void handlePrintString(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Incoming communication status from CChub, this data is used in addition to control strings to determine which communication methods are available
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleStatusCommand(const char* dataStr, uint8_t mode) {
     //Incoming communication status from CChub, this data is used in addition to control strings to determine which communication methods are available
@@ -478,6 +489,8 @@ void handleStatusCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Hello-world acknowledge command from the CCHub, which will bring this bot out of pairing mode on startup
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleHelloAck(const char* dataStr, uint8_t mode) {
     //Hello-world acknowledge command from the CCHub, which will bring this bot out of pairing mode on startup
@@ -486,6 +499,8 @@ void handleHelloAck(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Enter SD Card "Dump Mode" for Bluetooth offloading
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleDumpMode(const char* dataStr, uint8_t mode) {
     //Enter SD Card "Dump Mode" for Bluetooth offloading
@@ -497,6 +512,8 @@ void handleDumpMode(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Command to calibrate the compass, which is used to set the offset for the compass heading
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleCompassCal(const char* dataStr, uint8_t mode) {
     //Command to calibrate the compass, which is used to set the offset for the compass heading
@@ -506,6 +523,8 @@ void handleCompassCal(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
+ * @param dataStr The data string containing latitude and longitude values
+ * @param mode Communication mode the command was received from
  */
 void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
     //Emulated GPS point for testing purposes. Spoofs the GPS latitude and longitude which allows testing of the distance and bearing functions without hardware
@@ -522,6 +541,8 @@ void handleEmulatedGPS(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Stop Command (Emergency stop for motors)
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleStopCommand(const char* dataStr, uint8_t mode) {
     //Stop Command (Emergency stop for motors)
@@ -540,6 +561,8 @@ void handleStopCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief EKF Control Command - enable/disable EKF filtering and tuning parameters
+ * @param dataStr The data string containing EKF enable flag and optional noise parameters
+ * @param mode Communication mode the command was received from
  */
 void handleEKFCommand(const char* dataStr, uint8_t mode) {
     //EKF Control Command - enable/disable EKF filtering and tuning parameters
@@ -572,6 +595,8 @@ void handleEKFCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Compass Control Command - switch compass types, status, auto-detect
+ * @param dataStr The data string containing compass type (0=LSM303, 1=LIS3MDL, 2=Auto-detect) or empty for status
+ * @param mode Communication mode the command was received from
  */
 void handleCompassCommand(const char* dataStr, uint8_t mode) {
     //Compass Control Command - switch compass types, status, auto-detect
@@ -673,6 +698,8 @@ void handleCompassCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Simulation Control Command - enable/disable GPS and compass simulation
+ * @param dataStr The data string containing simulation mode (0=Disable, 1-4=Various simulation modes) or empty for status
+ * @param mode Communication mode the command was received from
  */
 void handleSimulationCommand(const char* dataStr, uint8_t mode) {
     //Simulation Control Command - enable/disable GPS and compass simulation
@@ -702,6 +729,8 @@ void handleSimulationCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Help Command - display available commands and usage
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleHelpCommand(const char* dataStr, uint8_t mode) {
     //Help Command - display available commands and usage
@@ -741,6 +770,8 @@ void handleHelpCommand(const char* dataStr, uint8_t mode) {
 
 /**
  * @brief Table Command - enable/re-enable status table printing
+ * @param dataStr The data string (unused for this command)
+ * @param mode Communication mode the command was received from
  */
 void handleTableCommand(const char* dataStr, uint8_t mode) {
     //Table Command - enable/re-enable status table printing
@@ -874,6 +905,8 @@ void processQueuedDebugMessages() {
 
 /**
  * @brief ISR Function to take in a command string received over Cellular and process it using the proccessCommand dictionary
+ * @param event Event name from Particle cloud subscription
+ * @param data Command data received from Particle cloud
  */
 void cmdLTEHandler(const char *event, const char *data){
     commandQueue.push(data, 4, false); // Mode 4 = LTE
@@ -927,8 +960,6 @@ void setup(){
         lastEKFUpdateTime = millis();
         Serial.printlnf("EKF initialized with heading: %0.2f", initialHeading - compOffset);
     }
-
-    delay(10000);
 
     watchdog.start();                           //Start the timers
     //motionTimer.start();
@@ -1069,6 +1100,7 @@ void setupXBee(){
 
 /**
  * @brief Function to initialize the compass (LIS3MDL or LSM303) and set the parameters for the compass
+ * @returns True if navigation sensors were successfully initialized, false otherwise
  */
 bool setupNavigationSensors(){
     
@@ -1202,6 +1234,9 @@ float deg2rad(float deg) {
 
 /**
  * @brief Function to take an x and y acceleration from the compass and return a raw value between -180 and +180 degrees
+ * @param x_accel X-axis acceleration from compass
+ * @param y_accel Y-axis acceleration from compass
+ * @returns Compass heading in degrees (-180 to +180)
  */
 float lis3mdlCompassHeading(float x_accel, float y_accel){
     float rawHeading = atan2(y_accel, x_accel) * 180.0 / M_PI;  //Convert x and y compass acceleration to a heading
@@ -1242,6 +1277,7 @@ float calcDelta(float compassHead, float targetHead){
 
 /**
  * @brief Function to get the raw compass heading from the compass module (0-360). This is used for debugging and testing purposes, as well as for the autonomous system to determine which way to turn
+ * @returns Raw compass heading in degrees (0-360), or 0.0 if compass unavailable
  */
 float getRawCompassHeading(){
     float rawHeading = 0;     //Create a variable to hold the heading from the compass, regardless
@@ -1716,7 +1752,13 @@ void SerialConsoleHandler(){
     }
 }
 
-/** @brief ISR function triggered whenever data is received over BLE. Converts to a string and then sends data to processCommand dictionary */
+/**
+ * @brief ISR function triggered whenever data is received over BLE. Converts to a string and then sends data to processCommand dictionary
+ * @param data Pointer to received data buffer
+ * @param len Length of received data in bytes
+ * @param peer BLE peer device that sent the data
+ * @param context Context pointer (unused)
+ */
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context){
     char btBuf[len+1];                                              //Create character array for the received command
     for (size_t ii = 0; ii < len; ii++) btBuf[ii] = data[ii];       //Convert byte array into character array
@@ -1858,7 +1900,9 @@ void buttonActionDecode(){
         else if(buttonPressCount == 5){
             logToDebugFile("[INFO] Power off button pressed 5 times, shutting down bot");
             sendData("B1ABsdn",0,true,true,true);         //Send shutdown executed command to CChub
+            #ifdef PWR_EN
             digitalWrite(PWR_EN, LOW);                      //If the button was pressed 5 times, then turn off the power to the bot
+            #endif
         }
         else if(buttonPressCount == 7){
             doCompassCal = true;                          //If the button was pressed 7 times, then set the compass calibration
@@ -1898,7 +1942,7 @@ void LEDHandler(){
         status.setSpeed(LED_SPEED_FAST);
         return;
     }
-    if(millis() - lastCalibrationTime < COMPASS_CAL_TIMEOUT){ //The bot is currently calibrating the compass
+    if(millis() - lastCalibrationTime < COMPASS_CAL_TIMEOUT && millis() > COMPASS_CAL_TIMEOUT){ //The bot is currently calibrating the compass
         status.setPattern(LED_PATTERN_BLINK);
         status.setColor(RGB_COLOR_MAGENTA);
         status.setSpeed(LED_SPEED_FAST);
@@ -1974,7 +2018,11 @@ void LEDHandler(){
     status.setSpeed(SetSpeed);    
 }
 
-/** @brief Particle function for processing a debug string, for testing things like an emulated GPS point */
+/**
+ * @brief Particle function for processing a debug string, for testing things like an emulated GPS point
+ * @param cmd Command string received from Particle cloud
+ * @returns Always returns 0 (success)
+ */
 int LTEInputCommand(String cmd){
     char cmdBuf[100];
     cmd.toCharArray(cmdBuf, 100);

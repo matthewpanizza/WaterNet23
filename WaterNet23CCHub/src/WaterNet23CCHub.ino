@@ -105,7 +105,8 @@ char filenameMessages[MAX_FILENAME_LEN];        //Filename of the file for debug
 bool logMessages;                               //Default flag for if debug messages should be logged to the SD card
 bool startConnect;                              //Flag used for finding bluetooth devices when pairing, set true once a device was found
 bool postStatus;                                //Flag set true when status should be posted to the bots
-int controlUpdateID;                            //Id to publish the next status update to. Updates go in a circle between all discovered bots
+bool publishedFirstStatus = false;              //Flag set true when the first status has been published to the bots
+uint32_t controlUpdateID;                            //Id to publish the next status update to. Updates go in a circle between all discovered bots
 bool LTEStopSent;                               //Only send stop command over LTE when first pressed instead of periodically publishing
 uint32_t stopTime;                              //Timer for periodically publishing stop command when a stop is active over XBee and BLE
 uint32_t controlUpdateTime;                     //Timer for periodically sending control packet to bots     
@@ -184,8 +185,8 @@ class MenuItem{                                 //Class for displaying menu on t
             onOffSetting = switchOnOff;         //Set true if this setting is an On/Off setting (like "Signal"). Causes the string "On" and "Off" to be displayed instead of a digit
             strcpy(itemName,itemString);        //Copy in the string displayed as the label of the menu item liike "Signal" or "Battery"
         }
-        uint16_t (WaterBot::*MethodPointer);    //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a 16-bit unsigned integer type. See menu creation for example
-        bool (WaterBot::*MethodPointerBool);    //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a boolean type. See menu creation for example
+        uint16_t WaterBot::*MethodPointer;      //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a 16-bit unsigned integer type. See menu creation for example
+        bool WaterBot::*MethodPointerBool;      //Pointer to one of the members of the WaterBot class that this menu item modifies. Modifies a boolean type. See menu creation for example
         uint16_t stepSize;                      //Internal step size variable, amount to step up/down by when pressing left or right button
         bool onOffSetting = false;              //Set true if this setting is an On/Off setting (like "Signal"). Causes the string "On" and "Off" to be displayed instead of a digit
         bool customLabel = false;               //If this flag is set true, then the labels in the "labels" vector are used instead of a numeric digits or the On/Off label
@@ -304,7 +305,7 @@ void startupPair(){                                             //Function to ru
 }
 
 void XBeeLTEPairSet(){                                                          //Function to send hello-world acknowledge string to bots when a hello world message has been received
-    for(int i = 0; i < PairBots.size(); i++){                                  //Loop over discovered bots, send the message, then pop it from the vector, since it will already be in the main WaterBots vector
+    for(uint8_t i = 0; i < PairBots.size(); i++){                                  //Loop over discovered bots, send the message, then pop it from the vector, since it will already be in the main WaterBots vector
         char replyStr[10];
         sprintf(replyStr,"CCB%dhwa",PairBots.back().botNum);                    //Bot will stop periodically sending "Hello World" after receiving the acknowledge
         sendData(replyStr,0,true,PairBots.back().XBeeAvail,PairBots.back().LTEAvail);
@@ -348,9 +349,6 @@ void setup() {
     peerTxCharacteristic.onDataReceived(BLEDataReceived, &peerTxCharacteristic);        //Create bluetooth characteristic which triggers the BLEDataReceived function whenever the connected bot publishes a command over BLE
     peerOffloadCharacteristic.onDataReceived(offloadDataReceived, &peerOffloadCharacteristic);
 
-    Particle.subscribe("Bot1dat",dataLTEHandler);   //Subscribe to LTE event that comes from bots. They will publish when sending LTE data and this will trigger the dataLTEHandler function
-    Particle.function("Input Command", LTEInputCommand);
-
     offloadingMode = false;                         //Initialize flags for offloading so we don't initially start offloading data from the SD card
     offloadingDone = false;
 
@@ -386,6 +384,9 @@ void setup() {
         LTEConnected = true;
         initializeCellularConnection();
     }
+
+    Particle.subscribe("Bot1dat",dataLTEHandler);   //Subscribe to LTE event that comes from bots. They will publish when sending LTE data and this will trigger the dataLTEHandler function
+    Particle.function("Input Command", LTEInputCommand);
 
     if (!sd.begin(chipSelect, SD_SCK_MHZ(8))) {     //Begin communication with the SD card at 8MHz, using chipSelect as the GPIO for selecting this SPI device
         #ifdef VERBOSE
@@ -624,8 +625,8 @@ void updateBotControl(){                    //Function to send control packet to
     }
     if(millis() - controlUpdateTime > CONTROL_PUB_TIME){        //Periodically send out the control packet - fixes problem when packets are missed
         controlUpdateTime = millis();                           //Update timer for sending status update
-        if(controlUpdateID == -1){                              //Check if this is the first status update
-            if(WaterBots.size() != 0) controlUpdateID = 0;      //Make sure some bots have been discovered before trying to send periodic status updates
+        if(!publishedFirstStatus){                              //Check if this is the first status update
+            if(WaterBots.size() != 0) publishedFirstStatus = true;      //Make sure some bots have been discovered before trying to send periodic status updates
             else return;                                        //Do nothing if no bots have been discovered
         }
         if(controlUpdateID > WaterBots.size()-1) controlUpdateID = 0;   //Go around the vector of water bots circularly so each one is published at some point.
@@ -696,14 +697,14 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         else if(!strcmp(cmdStr,"sup")){                             //Status update command, this is sent out by the bot periodically to give details about available communication methods, power data and location
             for(WaterBot &w: WaterBots){                            //Loop over available bots in the Water Bot vector
                 if(rxBotID == w.botNum){                            //Find the bot in the vector that matches the source of the status update
-                    uint8_t battpct;                                //Create local variables that the string will be parsed into
-                    uint16_t statflags;
+                    unsigned int battpct;                                //Create local variables that the string will be parsed into
+                    unsigned int statflags;
                     char testLat[12];                               //Have to use char arrays to copy in floats because C++ is not always smart
                     char testLon[12];
-                    uint16_t panelPwr;
-                    uint16_t battPwr;
-                    uint16_t compassHeading;
-                    sscanf(dataStr,"%u %u %s %s %d %d %d",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr, &compassHeading);       //Parse out the various pieced of data from the data string an put them in the local variables
+                    int panelPwr;
+                    int battPwr;
+                    unsigned int compassHeading;
+                    sscanf(dataStr,"%u %u %s %s %d %d %u",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr, &compassHeading);       //Parse out the various pieced of data from the data string an put them in the local variables
                     w.battPercent = battpct;                        //Copy in battery percent from the status update
                     w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
                     w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
@@ -726,9 +727,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     if(w.lowBatt && !w.warnedLowBatt){              //Check the status of the power system for low battery, warn the user if this bot's battery is low
                         w.warnedLowBatt = true;                     //Set this flag after the user has been warned so they don't get spammed every status update
                         MenuPopUp m;                                //Create a pop-up for the low battery warning
-                        sprintf(m.primaryLine,"Warning\0");         //Populate strings of the low battery warning with the bot number
-                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
-                        sprintf(m.tertiaryLine, "Low Battery: %d\0",w.battPercent);
+                        sprintf(m.primaryLine,"Warning");         //Populate strings of the low battery warning with the bot number
+                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                        sprintf(m.tertiaryLine, "Low Battery: %d",w.battPercent);
                         m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
                         m.secondaryStart = 40;
                         m.tertiaryStart = 20;
@@ -739,9 +740,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     if(!w.SDAvail && !w.warnedSDCard){              //Check if the SD card had a warning
                         w.warnedSDCard = true;                      //Set this flag after the user has been warned so they don't get spammed every status update
                         MenuPopUp m;                                //Create a pop-up for the SD card warning
-                        sprintf(m.primaryLine,"Warning\0");         //Populate strings of the SD card warning
-                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
-                        sprintf(m.tertiaryLine, "SD Card Failed\0");
+                        sprintf(m.primaryLine,"Warning");         //Populate strings of the SD card warning
+                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                        sprintf(m.tertiaryLine, "SD Card Failed");
                         m.primaryStart = 20;                        //Calculated offsets so the text is centered in the box - determined by experimentation
                         m.secondaryStart = 40;
                         m.tertiaryStart = 20;
@@ -751,9 +752,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
                     if((!w.CompassAvail || !w.GPSAvail) && !w.warnedTelem){     //Check if the compass or GPS had an error
                         MenuPopUp m;                                            //Create a pop-up for them - see comments for SD card and battery warnings above for how the details of creating a pop-up
                         w.warnedTelem = true;
-                        sprintf(m.primaryLine,"Warning\0");
-                        sprintf(m.secondaryLine,"Bot %d\0", w.botNum);
-                        sprintf(m.tertiaryLine, "GPS/Compass Error\0");
+                        sprintf(m.primaryLine,"Warning");
+                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                        sprintf(m.tertiaryLine, "GPS/Compass Error");
                         m.primaryStart = 20;
                         m.secondaryStart = 40;
                         m.tertiaryStart = 10;
@@ -779,7 +780,7 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             char GPSLatstr[12];         //Use strings for GPS latitude and longitude because scanf doesn't like scanning in floating point numbers
             char GPSLonstr[12];
             uint32_t do_in,pH_in,cond_in,mcond_in,temp_in;      //Variables to hold decimal-shifted sensor readings
-            sscanf(dataStr,"%s %s %d %d %d %d %d",GPSLatstr,GPSLonstr,&do_in,&pH_in,&cond_in,&mcond_in,&temp_in);       //Scan in the sensor readings and the GPS locations
+            sscanf(dataStr,"%s %s %lu %lu %lu %lu %lu",GPSLatstr,GPSLonstr,&do_in,&pH_in,&cond_in,&mcond_in,&temp_in);       //Scan in the sensor readings and the GPS locations
             TargetWB->DO = ((float)do_in)/1000.0;               //Update the bot object with the sensor readings - divide by 1000 to shift back the decimal
             TargetWB->pH = ((float)pH_in)/1000.0;
             TargetWB->Cond = ((float)cond_in)/1000.0;
@@ -818,9 +819,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         else if(!strcmp(cmdStr,"ldt") || !strcmp(cmdStr,"ldb")){    //Command for leak detection or battery detection shutoff - ldb = battery leak, ldt = main leak detect. Causes shutoff
             MenuPopUp m;                                            //Create pop-up item to warn the user
-            sprintf(m.primaryLine,"Warning\0");                     //Print warning strings into the pop-up item
-            sprintf(m.secondaryLine,"Bot %d\0", rxBotID);
-            sprintf(m.tertiaryLine, "Leak shutoff\0");
+            sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
+            sprintf(m.secondaryLine,"Bot %d", rxBotID);
+            sprintf(m.tertiaryLine, "Leak shutoff");
             m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
             m.secondaryStart = 40;
             m.tertiaryStart = 30;
@@ -829,9 +830,9 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
         }
         else if(!strcmp(cmdStr,"wld") || !strcmp(cmdStr,"wlb")){    //Command for leak detection - like ltd but is only a warning, shutoff has been disabled on this bot
             MenuPopUp m;                                            //Create pop-up item to warn the user
-            sprintf(m.primaryLine,"Warning\0");                     //Print warning strings into the pop-up item
-            sprintf(m.secondaryLine,"Bot %d\0", rxBotID);
-            sprintf(m.tertiaryLine, "Leak detected\0");
+            sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
+            sprintf(m.secondaryLine,"Bot %d", rxBotID);
+            sprintf(m.tertiaryLine, "Leak detected");
             m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
             m.secondaryStart = 40;
             m.tertiaryStart = 25;
@@ -883,8 +884,8 @@ void processRPiCommand(const char *command, uint8_t mode){
             char idStr[10];
             char GPSLatstr[12];
             char GPSLonstr[12];
-            uint8_t offloading, drivemode, recording, signal;
-            sscanf(dataStr,"%s %s %s %d %d %d %d",idStr,GPSLatstr,GPSLonstr,&drivemode,&offloading,&recording,&signal);
+            unsigned int offloading, drivemode, recording, signal;
+            sscanf(dataStr,"%s %s %s %u %u %u %u",idStr,GPSLatstr,GPSLonstr,&drivemode,&offloading,&recording,&signal);
             char botChar[2] = {command[8], '\0'};       //String to hold the bot identifier of the control packet
             uint8_t targetBot = atoi(botChar);
             #ifdef VERBOSE
@@ -998,9 +999,9 @@ void DataOffloader(uint8_t bot_id){         //Function to copy all .txt and .csv
     if (!logDir.open("/")) {                //Open the root directory of the SD card on the controller here
         offloadingDone = true;              //If we couldn't open the root directory, then break from the offload operation
         MenuPopUp m;                        //Create a pop-up to warn the user that the SD card is not functional (or at least cannot access root)
-        sprintf(m.primaryLine,"Warning\0"); //Print warning strings to the po-up item
+        sprintf(m.primaryLine,"Warning"); //Print warning strings to the po-up item
         sprintf(m.secondaryLine,"CCHub");
-        sprintf(m.tertiaryLine, "SD Card Failed\0");
+        sprintf(m.tertiaryLine, "SD Card Failed");
         m.primaryStart = 20;                //Calculated offsets to center the text in the warning box
         m.secondaryStart = 60;
         m.tertiaryStart = 20;
@@ -1021,9 +1022,9 @@ void DataOffloader(uint8_t bot_id){         //Function to copy all .txt and .csv
         #endif
         offloadingDone = true;              
         MenuPopUp m;                        //Inidicate with a pop-up to the user that there will be a delay, as we need to switch which bot is connected over BLE
-        sprintf(m.primaryLine,"Info\0");    //Print warning string to the pop-up
-        sprintf(m.secondaryLine,"Not connected to BLE\0");
-        sprintf(m.tertiaryLine, "Switching BLE conn\0");
+        sprintf(m.primaryLine,"Info");    //Print warning string to the pop-up
+        sprintf(m.secondaryLine,"Not connected to BLE");
+        sprintf(m.tertiaryLine, "Switching BLE conn");
         m.primaryStart = 30;                //Offsets for centering text in the pop-up box
         m.secondaryStart = 5;
         m.tertiaryStart = 10;
@@ -1099,7 +1100,7 @@ void RPiHandler(){                                          //Function to check 
             processRPiCommand(buffer,3);                    //Process the command received from the Pi
             if(logMessages){
                 if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-                logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data);
+                logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data.c_str());
                 logFile.close();
             }
     }
@@ -1118,7 +1119,7 @@ void XBeeHandler(){                                         //Function similar t
         processCommand(buffer,2,true);                      //Process the command using the dictionary
         if(logMessages){
             if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-            logFile.printlnf("[INFO] Received XBee Message: %s",data);
+            logFile.printlnf("[INFO] Received XBee Message: %s",data.c_str());
             logFile.close();
         }
     }
@@ -1128,7 +1129,7 @@ void manualMotorControl(uint8_t commandedBot){              //Function to read t
     static uint8_t lastLSpeed;                              //Variable to hold the last speed transmitted out for each motor, used to check if there is a significant change from the last sample
     static uint8_t lastRSpeed;
 
-    char mtrStr[15];                                        //Temporary string to hold the motor command
+    char mtrStr[18];                                        //Temporary string to hold the motor command
     int VRead, HRead, VSet, HSet;                           //Variables used to read the horizontal and vertical joystick and convert to fwd/backward values
     VRead = 4095-analogRead(JOYV_ADC);                      //Read the vertical joystick, invert the direction
     HRead = analogRead(JOYH_ADC);                           //Read horizontal joystick
@@ -1225,7 +1226,7 @@ void manualMotorControl(uint8_t commandedBot){              //Function to read t
         rcTime = millis();                      //Capture last time a motor command was sent to limit traffic
         for(WaterBot wb: WaterBots){            //Loop over water bots in vector and check if this one is selected and being controlled
             if(wb.driveMode == 0 && wb.botNum == botSelect){
-                sprintf(mtrStr,"CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);        //Craft the command string to be transmitted out
+                snprintf(mtrStr, 16, "CCB%dmtr%03d%03d",commandedBot, LSpeed, RSpeed);        //Craft the command string to be transmitted out
                 bool sendMTRLTE = false;                                                //Flag for limiting publish rate over LTE
                 if(!wb.XBeeAvail && !wb.BLEAvail && ctlSpeedDiff && (millis() - wb.LastMtrTime > MTR_LTE_PERIOD)){      //Check if XBee or BLE are available before trying to publish over LTE
                     wb.LastMtrTime = millis();  //Update timer for LTE publishes
@@ -1243,9 +1244,9 @@ void calibrateCompass(){
         if(wb.requestCompCalibration){
             wb.requestCompCalibration = false;          //Set the flag to false so we don't keep sending this command over and over again
             MenuPopUp m;                                //Create a pop-up for the low battery warning
-            sprintf(m.primaryLine,"Compass\0");         //Populate strings of the compass calibration mode with the bot number
-            sprintf(m.secondaryLine,"Turn B%d facing North\0", wb.botNum);
-            sprintf(m.tertiaryLine, "Press OK to calibrate\0");
+            sprintf(m.primaryLine,"Compass");         //Populate strings of the compass calibration mode with the bot number
+            sprintf(m.secondaryLine,"Turn B%d facing North", wb.botNum);
+            sprintf(m.tertiaryLine, "Press OK to calibrate");
             m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
             m.secondaryStart = 5;
             m.tertiaryStart = 5;
@@ -1599,7 +1600,7 @@ void sHandler(){
     debounceTime = millis();
     if(stopActive){                                         //Check if the user has initiated a stop, if so, then exit stop mode
         MenuPopUp m;                                        //Create pop-up to indicate to user that we are exiting stop mode
-        sprintf(m.primaryLine,"CLEARED\0");                 //Main display line
+        sprintf(m.primaryLine,"CLEARED");                 //Main display line
         sprintf(m.secondaryLine,"Motors Resuming");         //Secondary display line
         sprintf(m.tertiaryLine, "Press again to stop");     //Tertiary display line
         m.primaryStart = 20;                                //Horizontal pixel that the main line starts at
@@ -1612,7 +1613,7 @@ void sHandler(){
     }
     else{                                                   //If not in stop mode, initiate stop mode
         MenuPopUp m;                                        //Create pop-up to indicate to user that we are entering stop mode
-        sprintf(m.primaryLine,"STOPPED\0");                 //Main display line
+        sprintf(m.primaryLine,"STOPPED");                 //Main display line
         sprintf(m.secondaryLine,"Motors Stopped!");         //Secondary display line
         sprintf(m.tertiaryLine, "Press again to start");    //Tertiary display line
         m.primaryStart = 20;                                //Horizontal pixel that the main line starts at
