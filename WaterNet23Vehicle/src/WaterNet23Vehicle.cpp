@@ -23,6 +23,7 @@
 #include "application.h"                    //Needed for I2C to GPS
 void processCommand(const char *command, uint8_t mode, bool sendAck);
 void handleControlCommand(const char* dataStr, uint8_t mode);
+void handleStatusDelayPeriodCommand(const char* dataStr, uint8_t mode);
 void handleMotorCommand(const char* dataStr, uint8_t mode);
 void handleDataRequest(const char* dataStr, uint8_t mode);
 void handlePrintString(const char* dataStr, uint8_t mode);
@@ -302,6 +303,7 @@ const CommandEntry commandTable[] = {
     {"cms", handleCompassCommand},
     {"sim", handleSimulationCommand},
     {"tbl", handleTableCommand},
+    {"sdp", handleStatusDelayPeriodCommand},
     {"hlp", handleHelpCommand}
 };
 const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
@@ -432,6 +434,28 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
     #ifdef VERBOSE
     Serial.printlnf("New target GPS, Lat: %f Lon: %f", targetLat, targetLon);
     #endif
+}
+
+/**
+ * @brief Handler for the 'sdp' (status delay period) command.
+ *
+ * Allows dynamic adjustment of the status update period via command.
+ * Accepts a value in seconds (1-10) and updates the status timer period accordingly.
+ *
+ * @param dataStr The data string containing the new status period in seconds (as a string).
+ * @param mode Communication mode the command was received from (e.g., BLE, XBee, LTE).
+ */
+void handleStatusDelayPeriodCommand(const char* dataStr, uint8_t mode) {
+    int seconds = atoi(dataStr);
+    if (seconds < 1 || seconds > 10) {
+        Serial.println("[SDP] Invalid status period. Must be 1-10 seconds.");
+        logToDebugFile("[WARN] SDP: Invalid status period: %s", dataStr);
+        return;
+    }
+    int newPeriod = seconds * 1000;
+    statusPD.changePeriod(newPeriod);
+    Serial.printlnf("[SDP] Status period changed to %d ms", newPeriod);
+    logToDebugFile("[INFO] SDP: Status period changed to %d ms", newPeriod);
 }
 
 /**
@@ -754,6 +778,7 @@ void handleHelpCommand(const char* dataStr, uint8_t mode) {
     Serial.println("  cms [type]                          - Compass manager control");
     Serial.println("  sim [mode]                          - Simulation control (auto-logs to CSV)");
     Serial.println("  tbl                                 - Enable status table printing");
+    Serial.println("  sdp <seconds>                       - Set status update period (1-10 seconds)");
     Serial.println("  hlp                                 - Show this help");
     Serial.println("");
     Serial.println("Examples:");
@@ -1405,6 +1430,7 @@ void sendResponseData(){
 
 /** @brief Function to check if the status is updated based on a flag and then transmit it out to the CChub */
 void statusUpdate(){
+    static uint32_t lastLTESendTime = 0;
     if(statusReady){        //Check if status flag has been set by timer that calculates system status flags
         #ifdef VERBOSE
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
@@ -1413,10 +1439,16 @@ void statusUpdate(){
         int txCompassHead = compassHeading;    //Get the compass heading to send out over the status update
         if(txCompassHead < 0) txCompassHead += 360;   //If the heading is negative, add 360 to it to get a positive value
         sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent), txCompassHead);  //Print status flags, battery, latitude and logitude
-        if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){     //If BLE and XBee are not available, send status over LTE, but only 1 in LTE_STAT_PD updates (to not suck up data)
-            sendData(updateStr,0,false,false,true);     //Only send out over LTE
+        bool sentOverLTE = false;
+        if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
+            uint32_t now = millis();
+            if(now - lastLTESendTime >= 30000 || lastLTESendTime == 0){ // Only send over LTE every 30 seconds
+                sendData(updateStr,0,false,false,true);     //Only send out over LTE
+                lastLTESendTime = now;
+                sentOverLTE = true;
+            }
         }
-        else{
+        if(!sentOverLTE){
             if(XBeeAvail || BLEAvail) LTEStatusCount = LTE_MAX_STATUS;  //Otherwise, we're sending updates over BLE or XBee, reset counter for cellular
             sendData(updateStr,0,true,true,false);
         }
