@@ -230,7 +230,7 @@ uint8_t driveMode = DRIVE_MODE_MANUAL;                                  //Global
 CompassEKF compassEKF;                                                  //Extended Kalman Filter for compass heading fusion
 float filteredCompassHeading = 0.0;                                     //EKF-filtered compass heading
 float lastEKFUpdateTime = 0.0;                                          //Last time EKF was updated
-bool useEKF = true;                                                     //Flag to enable/disable EKF filtering
+bool useEKF = false;                                                     //Flag to enable/disable EKF filtering
 
                              
 
@@ -424,7 +424,7 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
         targetLat = latitude;  //Set target lat to current lat
         targetLon = longitude; //Set target lon to current lon
     }
-    else if(driveMode == DRIVE_MODE_AUTONOMOUS) {
+    else if(driveMode == DRIVE_MODE_AUTONOMOUS || driveMode == DRIVE_MODE_MANUAL) {
         //If the drive mode is autonomous, set the targets to the values received from the CC hub
         targetLat = atof(tLat);     //Convert latitude string to float
         targetLon = atof(tLon);     //Convert longitude string to float
@@ -1373,8 +1373,10 @@ void getPositionData(){
         
         // Use real GPS
         if(gps->isConnected()){                        //Only read from GPS if it is connected
-            latitude = gps->getLatitude();      //Get latitude in degrees
-            longitude = gps->getLongitude();    //Get longitude in degrees
+            float newLat = gps->getLatitude();      //Get latitude in degrees
+            float newLon = gps->getLongitude();  
+            if(newLat != -999.0f) latitude = newLat;
+            if(newLon != -999.0f) longitude = newLon;
             //Serial.printlnf("Lat: %0.7f Lon: %0.7f", latitude, longitude);
             GPSAvail = true;
         }
