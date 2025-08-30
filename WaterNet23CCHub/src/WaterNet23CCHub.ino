@@ -149,11 +149,14 @@ class WaterBot{
     bool warnedTelem = false;       //Flag to indicate that there has been a telemetry failure pop up for this bot, which is so the user is not spammed constantly with warnings
     bool dataRecording = true;      //Flag to indicate that sensor data is being recorded to the SD card
     bool offloading = false;        //Flag to indicate that SD card data is being offloaded
+    int leftMotorSpeed = 0;         //Current left motor speed from 0-180 (90 = idle)
+    int rightMotorSpeed = 0;        //Current right motor speed from 0-180 (90 = idle)
     float TargetLat = -999.0;       //Target latitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
     float TargetLon = -999.0;       //Target longitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
     float GPSLat = 0.0;             //Current GPS latitude sampled from onboard Ublox module
     float GPSLon= 0.0;              //Current GPS longitude sampled from onboard Ublox module
     uint16_t CompassHeading = 0.0;     //Current filtered compass heading from onboard module
+    uint16_t targetHeading = 0.0;   //Target heading for autonomous navigation mode, calculated from current GPS position and target GPS position. Received from vehicle
     bool requestCompCalibration = false; //Flag set true when the bot is requesting a compass calibration, which will pop up a warning on the menu
     bool calRequestAcknowledged = false; //Flag set true when the user has acknowledged the compass calibration request by clearing pop-up
     uint8_t reqActive = 0;         //Flag set true when a request should be made to get sensor data
@@ -218,6 +221,14 @@ MenuItem * SelectedItem;                        //Pointer to the currently selec
 std::vector<MenuItem> MenuItems;                //Vector of menu items in the system. Push items into this vector on startup and they will be automatically displayed and be modifiable
 
 
+//Command table structure for cleaner command processing
+typedef void (*CommandHandler)(const char* dataStr, uint8_t rxBotID, uint8_t mode);
+
+struct CommandEntry {
+    const char* command;
+    CommandHandler handler;
+};
+
 //Function prototypes
 void BLEScan(int BotNumber = -1);
 void XBeeHandler();
@@ -226,6 +237,12 @@ void dataLTEHandler(const char *event, const char *data);
 void createMenu();
 void startupPair();
 void rHandler(void);
+void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handleSensorCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handleHelloWorldCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handlePutStringCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handleLeakDetectionCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode);
+void handleLeakWarningCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode);
 
 void dataLTEHandler(const char *event, const char *data){           //Interrupt handler called anytime a message is received from a bot over LTE.
     processCommand(data, 4,false);                                  //Send the command to the dictionary function for processing
@@ -527,75 +544,76 @@ void printMenuItem(uint8_t id, bool highlighted, bool selected, uint16_t x, uint
 
 void updateMenu(){
     if(redrawMenu){
-        oled.fillRect(0,0,OLED_MAX_X,OLED_MAX_Y,0);             //Erase full screen
-        if(PopUps.size() != 0){                                 //Check if there is a queue of pop-ups to be displayed, print out the most-recent (back of vector) if any
-            oled.drawRect(1,1,126,62,1);                        //Draw outer rectangle of warning box
-            oled.drawRect(2,2,124,60,1);                        //Draw inner rectangle of warning box
-            oled.setTextColor(1);                               //Set text to white for all text inside the box
-            oled.setCursor(PopUps.back().primaryStart,4);       //Move cursor to the location for the main warning line of the top pop-up
-            oled.setTextSize(2);                                //Use larger text for main warning
-            oled.printf(PopUps.back().primaryLine);             //Print main warning text from the top pop-up string
-            oled.setCursor(PopUps.back().secondaryStart,22);    //Move cursor for second text line
-            oled.setTextSize(1);                                //Use smaller text for next two lines
-            oled.printf(PopUps.back().secondaryLine);           //Print out second warning text from top pop-up string
-            oled.setCursor(PopUps.back().tertiaryStart,32);     //Move cursor for third line
-            oled.setTextSize(1);                                //Continue using smaller text
-            oled.printf(PopUps.back().tertiaryLine);            //Print third line
-            oled.setCursor(48,45);                              //Move cursor for displaying "OK" prompt
-            oled.setTextSize(2);                                //Use large text for "OK" prompt
-            oled.fillRect(45,44,32,16,1);                       //Create a white rectangle to highlight the "OK" text
-            oled.setTextColor(0);                               //Set text color to black for printing in the white rectangle to display "OK" as highlighted
-            oled.printf("OK");                                  //Print "OK" to indicate the user should hit enter to dismiss this prompt
-            oled.display();                                     //Commit update to OLED screen
-            redrawMenu = false;                                 //Set flag to false so it isn't redrawn every time
-            return;                                             //Don't display the main menu if there is a pop-up active
+        oled.fillRect(0,0,OLED_MAX_X,OLED_MAX_Y,0);                 //Erase full screen
+        if(PopUps.size() != 0){                                     //Check if there is a queue of pop-ups to be displayed, print out the most-recent (back of vector) if any
+            oled.drawRect(1,1,126,62,1);                            //Draw outer rectangle of warning box
+            oled.drawRect(2,2,124,60,1);                            //Draw inner rectangle of warning box
+            oled.setTextColor(1);                                   //Set text to white for all text inside the box
+            oled.setCursor(PopUps.back().primaryStart,4);           //Move cursor to the location for the main warning line of the top pop-up
+            oled.setTextSize(2);                                    //Use larger text for main warning
+            oled.printf(PopUps.back().primaryLine);                 //Print main warning text from the top pop-up string
+            oled.setCursor(PopUps.back().secondaryStart,22);        //Move cursor for second text line
+            oled.setTextSize(1);                                    //Use smaller text for next two lines
+            oled.printf(PopUps.back().secondaryLine);               //Print out second warning text from top pop-up string
+            oled.setCursor(PopUps.back().tertiaryStart,32);         //Move cursor for third line
+            oled.setTextSize(1);                                    //Continue using smaller text
+            oled.printf(PopUps.back().tertiaryLine);                //Print third line
+            oled.setCursor(48,45);                                  //Move cursor for displaying "OK" prompt
+            oled.setTextSize(2);                                    //Use large text for "OK" prompt
+            oled.fillRect(45,44,32,16,1);                           //Create a white rectangle to highlight the "OK" text
+            oled.setTextColor(0);                                   //Set text color to black for printing in the white rectangle to display "OK" as highlighted
+            oled.printf("OK");                                      //Print "OK" to indicate the user should hit enter to dismiss this prompt
+            oled.display();                                         //Commit update to OLED screen
+            redrawMenu = false;                                     //Set flag to false so it isn't redrawn every time
         }
-        uint8_t menuSelect = 0;                                 //Counter used to find which index in the Water Bot vector the currently selected bot is at
-        for(uint8_t i = 0; i < WaterBots.size(); i++){          //Loop over all of the water bots that have been discovered and check if they are the selected one
-            if(WaterBots.at(i).botNum == botSelect){            //If it is the selected one, print it with a highlighted rectangle
-                oled.setCursor(5+18*i,4);                       //Set cursor to offset based on the item location in the list. Bots displayed in order they were discovered
-                oled.setTextSize(1);                            //Use small text for number inside of bot box
-                oled.setTextColor(0);                           //Set text to black on selected box since printing in white rectangle
-                oled.fillRect(1+i*18,1,14,14,1);                //Fill rectangle with white background for selected bot
-                oled.printf("%d",WaterBots.at(i).botNum);       //Then print the bot ID inside the box in black text
-                menuSelect = i;                                 //Get the vector location of the selected bot to get data to print more easily later
+        else{                                                       //No pop-ups to display, print the main menu interface  
+            uint8_t menuSelect = 0;                                 //Counter used to find which index in the Water Bot vector the currently selected bot is at
+            for(uint8_t i = 0; i < WaterBots.size(); i++){          //Loop over all of the water bots that have been discovered and check if they are the selected one
+                if(WaterBots.at(i).botNum == botSelect){            //If it is the selected one, print it with a highlighted rectangle
+                    oled.setCursor(5+18*i,4);                       //Set cursor to offset based on the item location in the list. Bots displayed in order they were discovered
+                    oled.setTextSize(1);                            //Use small text for number inside of bot box
+                    oled.setTextColor(0);                           //Set text to black on selected box since printing in white rectangle
+                    oled.fillRect(1+i*18,1,14,14,1);                //Fill rectangle with white background for selected bot
+                    oled.printf("%d",WaterBots.at(i).botNum);       //Then print the bot ID inside the box in black text
+                    menuSelect = i;                                 //Get the vector location of the selected bot to get data to print more easily later
+                }
+                else{                                               //If it is not the selected one, print with an empty rectangle
+                    oled.setCursor(5+18*i,4);                       //Set cursor to offset based on the item location in the list. Bots displayed in order they were discovered
+                    oled.setTextSize(1);                            //Use small text for bot ID printed in box
+                    oled.setTextColor(1);                           //Set white text for unselected bot as the background is black
+                    oled.drawRect(1+i*18,1,14,14,1);                //Only draw outside of rectangle as white since this bot is not selected
+                    oled.printf("%d",WaterBots.at(i).botNum);       //Print out the bot number in the box
+                }
             }
-            else{                                               //If it is not the selected one, print with an empty rectangle
-                oled.setCursor(5+18*i,4);                       //Set cursor to offset based on the item location in the list. Bots displayed in order they were discovered
-                oled.setTextSize(1);                            //Use small text for bot ID printed in box
-                oled.setTextColor(1);                           //Set white text for unselected bot as the background is black
-                oled.drawRect(1+i*18,1,14,14,1);                //Only draw outside of rectangle as white since this bot is not selected
-                oled.printf("%d",WaterBots.at(i).botNum);       //Print out the bot number in the box
+            if(menuItem == 0){      //If we are selecting the first menu item in the list, print it first (highlighted), then print the next two unhighlighted
+                //Serial.println("Menu item 0");
+                if(MenuItems.size() != 0) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as highlighted
+                uint8_t loopIter = MenuItems.size();                                                            //Get size of menu items (check if there are < 2)
+                if(loopIter > 2) loopIter = 2;                                                                  //Limit to max 3 printouts beyond first item
+                for(int mi = 1; mi <= loopIter; mi++){                                                          //Print out the items below this
+                    //Serial.printlnf("Menu item %d", mi);
+                    printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
+                }
             }
-        }
-        if(menuItem == 0){      //If we are selecting the first menu item in the list, print it first (highlighted), then print the next two unhighlighted
-            //Serial.println("Menu item 0");
-            if(MenuItems.size() != 0) printMenuItem(0,true,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as highlighted
-            uint8_t loopIter = MenuItems.size();                                                            //Get size of menu items (check if there are < 2)
-            if(loopIter > 2) loopIter = 2;                                                                  //Limit to max 3 printouts beyond first item
-            for(int mi = 1; mi <= loopIter; mi++){                                                          //Print out the items below this
-                //Serial.printlnf("Menu item %d", mi);
-                printMenuItem(mi,false,!selectingBots,0,16+(16*mi),WaterBots.at(menuSelect));
+            else if(menuItem == MenuItems.size() -1){  //If we are selecting the last menu item in the list, print it last (highlighted), then print the previous two unhighlighted
+                //Serial.printlnf("Menu item %d", menuItem);
+                printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));      //Print bottom menu item as highlighted
+                //Serial.printlnf("Menu item %d", menuItem-1);
+                printMenuItem(menuItem-1,false,!selectingBots,0,32,WaterBots.at(menuSelect));   //Print middle menu item as unhighlighted
+                //Serial.printlnf("Menu item %d", menuItem-2);
+                printMenuItem(menuItem-2,false,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as unhighlighted
             }
+            else{                                   //Otherwise, print the selected item in the middle of the list (highlighted) with one unhighlighted item before and after
+                //Serial.printlnf("Menu item %d", menuItem+1);
+                printMenuItem(menuItem+1,false,!selectingBots,0,48,WaterBots.at(menuSelect));   //Print bottom menu item as unhighlighted
+                //Serial.printlnf("Menu item %d", menuItem);
+                printMenuItem(menuItem,true,!selectingBots,0,32,WaterBots.at(menuSelect));      //Print middle menu item as highlighted
+                //Serial.printlnf("Menu item %d", menuItem-1);
+                printMenuItem(menuItem-1,false,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as unhighlighted
+            }
+            oled.display();         //Commit drawn menu to the OLED
+            redrawMenu = false;     //Clear flag so it isn't redrawn every time
         }
-        else if(menuItem == MenuItems.size() -1){  //If we are selecting the last menu item in the list, print it last (highlighted), then print the previous two unhighlighted
-            //Serial.printlnf("Menu item %d", menuItem);
-            printMenuItem(menuItem,true,!selectingBots,0,48,WaterBots.at(menuSelect));      //Print bottom menu item as highlighted
-            //Serial.printlnf("Menu item %d", menuItem-1);
-            printMenuItem(menuItem-1,false,!selectingBots,0,32,WaterBots.at(menuSelect));   //Print middle menu item as unhighlighted
-            //Serial.printlnf("Menu item %d", menuItem-2);
-            printMenuItem(menuItem-2,false,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as unhighlighted
-        }
-        else{                                   //Otherwise, print the selected item in the middle of the list (highlighted) with one unhighlighted item before and after
-            //Serial.printlnf("Menu item %d", menuItem+1);
-            printMenuItem(menuItem+1,false,!selectingBots,0,48,WaterBots.at(menuSelect));   //Print bottom menu item as unhighlighted
-            //Serial.printlnf("Menu item %d", menuItem);
-            printMenuItem(menuItem,true,!selectingBots,0,32,WaterBots.at(menuSelect));      //Print middle menu item as highlighted
-            //Serial.printlnf("Menu item %d", menuItem-1);
-            printMenuItem(menuItem-1,false,!selectingBots,0,16,WaterBots.at(menuSelect));   //Print top menu item as unhighlighted
-        }
-        oled.display();         //Commit drawn menu to the OLED
-        redrawMenu = false;     //Clear flag so it isn't redrawn every time
     }
 }
 
@@ -642,7 +660,199 @@ void updateBotControl(){                    //Function to send control packet to
         if(controlUpdateID < WaterBots.size()-1) controlUpdateID++; //Advance the pointer for the circular buffer so the next bot in the vector is sent next time
         else controlUpdateID = 0;
     }
+    static uint8_t lastBotCount = 0;                            //Static variable to hold the last number of bots discovered so we can check if the number of bots has changed
+    if(lastBotCount != WaterBots.size()){                       //Check if the number of bots has changed since last time
+        lastBotCount = WaterBots.size();                        //Update the last bot count to the current number of bots
+        char publishRateStr[20];                                //Create a string to hold the publish rate command
+        sprintf(publishRateStr,"CCABsdp%d", (int)lastBotCount); //Create the publish rate command string the publish rate will be one second delay for each bot in the system
+        sendData(publishRateStr,0,true,true,true);              //Send out the publish rate command over XBee and LTE if available
+    }
 }
+
+//Helper function to handle status update command
+void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode) {
+    for(WaterBot &w: WaterBots){                            //Loop over available bots in the Water Bot vector
+        if(rxBotID == w.botNum){                            //Find the bot in the vector that matches the source of the status update
+            unsigned int battpct;                                //Create local variables that the string will be parsed into
+            unsigned int statflags;
+            char testLat[12];                               //Have to use char arrays to copy in floats because C++ is not always smart
+            char testLon[12];
+            int panelPwr, battPwr;
+            int lSpeed, rSpeed;
+            unsigned int compassHeading, targetHeading;
+            sscanf(dataStr,"%u %u %s %s %d %d %u %u %d %d",
+                &battpct,
+                &statflags,
+                testLat,testLon, 
+                &battPwr, &panelPwr, 
+                &compassHeading, &targetHeading, 
+                &lSpeed, &rSpeed);       //Parse out the various pieced of data from the data string an put them in the local variables
+            w.battPercent = battpct;                        //Copy in battery percent from the status update
+            w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
+            w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
+            w.BLEAvail = (statflags >> 2) & 1;              //Bit 2 represents if BLE is available
+            w.lowBatt = (statflags >> 6) & 1;               //Bit 6 represents if this bot has low battery
+            w.GPSAvail = (statflags >> 8) & 1;              //Bit 8 represents if the GPS module is functional
+            w.CompassAvail = (statflags >> 9) & 1;          //Bit 9 represents if the Compass module is functional
+            w.SDAvail = (statflags >> 10) & 1;              //Bit 10 represents if the SD card is functional
+            w.GPSLat = atof(testLat);                       //Convert the decimal in string form to a floating point number for latitude
+            w.GPSLon = atof(testLon);                       //Convert the decimal in string form to a floating point number for longitude
+            w.panelPower = panelPwr;                        //Copy in the solar panel power measurement
+            w.battPower = battPwr;                          //Copy in the battery power measurement
+            w.updatedStatus = true;                         //Indicate that this bot has received new data for printing to menu
+            w.CompassHeading = compassHeading;              //Copy in the compass heading from the status update
+            w.targetHeading = targetHeading;                //Copy in the target heading from the status update
+            w.leftMotorSpeed = lSpeed;                      //Copy in the left motor speed from the status
+            w.rightMotorSpeed = rSpeed;                     //Copy in the right motor speed from the status
+            if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){      //Check the last time a status change was published to this bot, this prevents a status update from reverting a change the user made due to latency, ignore a status update for modifiable fields for some time
+                w.offloading = (statflags >> 3) & 1;                //Copy in offloading, drive mode and sensor data recording if it hasn't been sent out too recently
+                w.driveMode = (statflags >> 4) & 3;
+                w.dataRecording = (statflags >> 7) & 1;
+            }
+            if(w.lowBatt && !w.warnedLowBatt){              //Check the status of the power system for low battery, warn the user if this bot's battery is low
+                w.warnedLowBatt = true;                     //Set this flag after the user has been warned so they don't get spammed every status update
+                MenuPopUp m;                                //Create a pop-up for the low battery warning
+                sprintf(m.primaryLine,"Warning");         //Populate strings of the low battery warning with the bot number
+                sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                sprintf(m.tertiaryLine, "Low Battery: %d",w.battPercent);
+                m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
+                m.secondaryStart = 40;
+                m.tertiaryStart = 20;
+                PopUps.push_back(m);                        //Push the pop-up item onto the vector so the menu updater prints it
+                redrawMenu = true;                          //Set flag so the menu item updater draws it in
+                
+            }
+            if(!w.SDAvail && !w.warnedSDCard){              //Check if the SD card had a warning
+                w.warnedSDCard = true;                      //Set this flag after the user has been warned so they don't get spammed every status update
+                MenuPopUp m;                                //Create a pop-up for the SD card warning
+                sprintf(m.primaryLine,"Warning");         //Populate strings of the SD card warning
+                sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                sprintf(m.tertiaryLine, "SD Card Failed");
+                m.primaryStart = 20;                        //Calculated offsets so the text is centered in the box - determined by experimentation
+                m.secondaryStart = 40;
+                m.tertiaryStart = 20;
+                PopUps.push_back(m);                        //Push the pop-up item onto the vector so the menu updater prints it
+                redrawMenu = true;                          //Set flag so the menu item updater draws it in
+            }
+            if((!w.CompassAvail || !w.GPSAvail) && !w.warnedTelem){     //Check if the compass or GPS had an error
+                MenuPopUp m;                                            //Create a pop-up for them - see comments for SD card and battery warnings above for how the details of creating a pop-up
+                w.warnedTelem = true;
+                sprintf(m.primaryLine,"Warning");
+                sprintf(m.secondaryLine,"Bot %d", w.botNum);
+                sprintf(m.tertiaryLine, "GPS/Compass Error");
+                m.primaryStart = 20;
+                m.secondaryStart = 40;
+                m.tertiaryStart = 10;
+                PopUps.push_back(m);
+                redrawMenu = true;
+            }
+            if(botSelect == w.botNum) redrawMenu = true;        //Redraw the menu if the selected bot got the status update because it's telemetry got refreshed
+            logMessage("Status Update!");
+            /*Serial.println("##########################");
+            Serial.println("##     STATUS UPDATE    ##");
+            Serial.printlnf("##       Bot #: %1d      ##",w.botNum);
+            Serial.printlnf("##      Batt %: %03d     ##",w.battPercent);
+            Serial.println("##    LTE  BLE  XBee    ##");
+            Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
+            Serial.println("##  Latitude Longitude  ##");
+            Serial.printlnf("## %.6f %.6f ##",w.GPSLat,w.GPSLon);
+            Serial.println("##########################");*/
+        }
+    }
+}
+
+//Helper function to handle sensor command
+void handleSensorCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode) {
+    char GPSLatstr[12];         //Use strings for GPS latitude and longitude because scanf doesn't like scanning in floating point numbers
+    char GPSLonstr[12];
+    uint32_t do_in,pH_in,cond_in,mcond_in,temp_in;      //Variables to hold decimal-shifted sensor readings
+    sscanf(dataStr,"%s %s %lu %lu %lu %lu %lu",GPSLatstr,GPSLonstr,&do_in,&pH_in,&cond_in,&mcond_in,&temp_in);       //Scan in the sensor readings and the GPS locations
+    
+    // Find the target WaterBot using the rxBotID
+    for(WaterBot &w: WaterBots){
+        if(rxBotID == w.botNum){
+            w.DO = ((float)do_in)/1000.0;               //Update the bot object with the sensor readings - divide by 1000 to shift back the decimal
+            w.pH = ((float)pH_in)/1000.0;
+            w.Cond = ((float)cond_in)/1000.0;
+            w.MCond = ((float)mcond_in)/1000.0;
+            w.temp = ((float)temp_in)/1000.0;
+            #ifdef VERBOSE
+            Serial.printlnf("Bot #: %d Temp: %f", w.botNum, w.temp);
+            #endif
+            break;  // Found the bot, no need to continue looping
+        }
+    }
+}
+
+//Helper function to handle hello world command
+void handleHelloWorldCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode) {
+    bool newBot = true;          //Assumming this is probably a new bot since it should be on startup
+    for(WaterBot w: WaterBots){  //Just in case, check if this bot was already discovered, as the bot could have restarted somehow
+        if(rxBotID == w.botNum) newBot = false;     //Don't create a new bot if it was already discovered
+    }
+    if(newBot){
+        #ifdef VERBOSE
+        Serial.println("Found a new water bot ID");
+        #endif
+        WaterBot newWaterbot;                           //Create a new object for the discovered water bot
+        if(mode == 1) newWaterbot.BLEAvail = true;      //Check which mode of communication the hello world message was received over, assume that mode is available
+        else if(mode == 2) newWaterbot.XBeeAvail = true;
+        else if(mode == 3) newWaterbot.LTEAvail = true;
+        newWaterbot.botNum = rxBotID;                   //Copy in the bot number for display on the list
+        WaterBots.push_back(newWaterbot);               //Push this bot onto the main vector of bots since it's now discovered and set-up
+        PairBots.push_back(newWaterbot);
+        redrawMenu = true;                              //Redraw the menu since the top list of discovered bots will now have this one to show
+    }
+}
+
+//Helper function to handle put string command
+void handlePutStringCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode) {
+    if(!logFile.isOpen()){
+        logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
+        logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+        logFile.close();
+    }
+    else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
+}
+
+//Helper function to handle leak detection command (with shutoff)
+void handleLeakDetectionCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode) {
+    MenuPopUp m;                                            //Create pop-up item to warn the user
+    sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
+    sprintf(m.secondaryLine,"Bot %d", rxBotID);
+    sprintf(m.tertiaryLine, "Leak shutoff");
+    m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
+    m.secondaryStart = 40;
+    m.tertiaryStart = 30;
+    PopUps.push_back(m);                                    //Push onto the queue of warnings to be displayed
+    redrawMenu = true;                                      //Indicate to the menu drawer that we should update now
+}
+
+//Helper function to handle leak warning command (without shutoff)
+void handleLeakWarningCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode) {
+    MenuPopUp m;                                            //Create pop-up item to warn the user
+    sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
+    sprintf(m.secondaryLine,"Bot %d", rxBotID);
+    sprintf(m.tertiaryLine, "Leak detected");
+    m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
+    m.secondaryStart = 40;
+    m.tertiaryStart = 25;
+    PopUps.push_back(m);                                    //Push onto the queue of warnings to be displayed
+    redrawMenu = true;                                      //Indicate to the menu drawer that we should update now
+}
+
+// Command lookup table for cleaner command processing
+const CommandEntry commandTable[] = {
+    {"sup", handleStatusUpdateCommand},                 // Status update command
+    {"sns", handleSensorCommand},                       // Sensor reading command
+    {"hwd", handleHelloWorldCommand},                   // Hello World command
+    {"pts", handlePutStringCommand},                    // Put string command
+    {"ldt", handleLeakDetectionCommand},                // Leak detection with shutoff
+    {"ldb", handleLeakDetectionCommand},                // Battery leak detection with shutoff
+    {"wld", handleLeakWarningCommand},                  // Leak warning without shutoff
+    {"wlb", handleLeakWarningCommand}                   // Battery leak warning without shutoff
+};
+const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 
 //Dictionary function to process commands received from bots
 void processCommand(const char *command, uint8_t mode, bool sendAck){
@@ -678,12 +888,10 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             return;
         }
         bool newBot = true;                                         //Flag set true if a new bot id has been discovered from the command
-        WaterBot *TargetWB = nullptr;                               //Pointer in the Water Bot vector to the bot this message was received from - makes updating assets easier
         int index = 0;                                              //Index in the vector for the water bot this message was received from
         for(WaterBot w: WaterBots){                                 //Loop over the discovered Water Bots in the vector
             if(rxBotID == w.botNum){                                //Check if the received ID matches this one in the vector, if it does, then it's not a new bot - get the pointer to it
                 newBot = false;
-                TargetWB = &WaterBots.at(index);
             }
             index++;
         }
@@ -691,153 +899,28 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
             WaterBot newWaterbot;                                   //Create new object to put in vector    
             newWaterbot.botNum = rxBotID;                           //Update the object with the new bot's ID 
             WaterBots.push_back(newWaterbot);                       //Push it into the vector of Water Bots
-            TargetWB = &WaterBots.back();                           //Update the pointer to the modifying bot to this one
             redrawMenu = true;                                      //Set the menu redraw flag so the list of available bots will show this one on the next refresh
         }       
-        else if(!strcmp(cmdStr,"sup")){                             //Status update command, this is sent out by the bot periodically to give details about available communication methods, power data and location
-            for(WaterBot &w: WaterBots){                            //Loop over available bots in the Water Bot vector
-                if(rxBotID == w.botNum){                            //Find the bot in the vector that matches the source of the status update
-                    unsigned int battpct;                                //Create local variables that the string will be parsed into
-                    unsigned int statflags;
-                    char testLat[12];                               //Have to use char arrays to copy in floats because C++ is not always smart
-                    char testLon[12];
-                    int panelPwr;
-                    int battPwr;
-                    unsigned int compassHeading;
-                    sscanf(dataStr,"%u %u %s %s %d %d %u",&battpct,&statflags,testLat,testLon, &battPwr, &panelPwr, &compassHeading);       //Parse out the various pieced of data from the data string an put them in the local variables
-                    w.battPercent = battpct;                        //Copy in battery percent from the status update
-                    w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
-                    w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
-                    w.BLEAvail = (statflags >> 2) & 1;              //Bit 2 represents if BLE is available
-                    w.lowBatt = (statflags >> 6) & 1;               //Bit 6 represents if this bot has low battery
-                    w.GPSAvail = (statflags >> 8) & 1;              //Bit 8 represents if the GPS module is functional
-                    w.CompassAvail = (statflags >> 9) & 1;          //Bit 9 represents if the Compass module is functional
-                    w.SDAvail = (statflags >> 10) & 1;              //Bit 10 represents if the SD card is functional
-                    w.GPSLat = atof(testLat);                       //Convert the decimal in string form to a floating point number for latitude
-                    w.GPSLon = atof(testLon);                       //Convert the decimal in string form to a floating point number for longitude
-                    w.panelPower = panelPwr;                        //Copy in the solar panel power measurement
-                    w.battPower = battPwr;                          //Copy in the battery power measurement
-                    w.updatedStatus = true;                         //Indicate that this bot has received new data for printing to menu
-                    w.CompassHeading = compassHeading;              //Copy in the compass heading from the status update
-                    if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){      //Check the last time a status change was published to this bot, this prevents a status update from reverting a change the user made due to latency, ignore a status update for modifiable fields for some time
-                        w.offloading = (statflags >> 3) & 1;                //Copy in offloading, drive mode and sensor data recording if it hasn't been sent out too recently
-                        w.driveMode = (statflags >> 4) & 3;
-                        w.dataRecording = (statflags >> 7) & 1;
-                    }
-                    if(w.lowBatt && !w.warnedLowBatt){              //Check the status of the power system for low battery, warn the user if this bot's battery is low
-                        w.warnedLowBatt = true;                     //Set this flag after the user has been warned so they don't get spammed every status update
-                        MenuPopUp m;                                //Create a pop-up for the low battery warning
-                        sprintf(m.primaryLine,"Warning");         //Populate strings of the low battery warning with the bot number
-                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
-                        sprintf(m.tertiaryLine, "Low Battery: %d",w.battPercent);
-                        m.primaryStart = 20;                        //Calculated offsets so the strings are centered in the box - determined from experimentation
-                        m.secondaryStart = 40;
-                        m.tertiaryStart = 20;
-                        PopUps.push_back(m);                        //Push the pop-up item onto the vector so the menu updater prints it
-                        redrawMenu = true;                          //Set flag so the menu item updater draws it in
-                        
-                    }
-                    if(!w.SDAvail && !w.warnedSDCard){              //Check if the SD card had a warning
-                        w.warnedSDCard = true;                      //Set this flag after the user has been warned so they don't get spammed every status update
-                        MenuPopUp m;                                //Create a pop-up for the SD card warning
-                        sprintf(m.primaryLine,"Warning");         //Populate strings of the SD card warning
-                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
-                        sprintf(m.tertiaryLine, "SD Card Failed");
-                        m.primaryStart = 20;                        //Calculated offsets so the text is centered in the box - determined by experimentation
-                        m.secondaryStart = 40;
-                        m.tertiaryStart = 20;
-                        PopUps.push_back(m);                        //Push the pop-up item onto the vector so the menu updater prints it
-                        redrawMenu = true;                          //Set flag so the menu item updater draws it in
-                    }
-                    if((!w.CompassAvail || !w.GPSAvail) && !w.warnedTelem){     //Check if the compass or GPS had an error
-                        MenuPopUp m;                                            //Create a pop-up for them - see comments for SD card and battery warnings above for how the details of creating a pop-up
-                        w.warnedTelem = true;
-                        sprintf(m.primaryLine,"Warning");
-                        sprintf(m.secondaryLine,"Bot %d", w.botNum);
-                        sprintf(m.tertiaryLine, "GPS/Compass Error");
-                        m.primaryStart = 20;
-                        m.secondaryStart = 40;
-                        m.tertiaryStart = 10;
-                        PopUps.push_back(m);
-                        redrawMenu = true;
-                    }
-                    if(botSelect == w.botNum) redrawMenu = true;        //Redraw the menu if the selected bot got the status update because it's telemetry got refreshed
-                    logMessage("Status Update!");
-                    /*Serial.println("##########################");
-                    Serial.println("##     STATUS UPDATE    ##");
-                    Serial.printlnf("##       Bot #: %1d      ##",w.botNum);
-                    Serial.printlnf("##      Batt %: %03d     ##",w.battPercent);
-                    Serial.println("##    LTE  BLE  XBee    ##");
-                    Serial.printlnf("##     %d    %d     %d     ##",w.LTEAvail,w.BLEAvail,w.XBeeAvail);
-                    Serial.println("##  Latitude Longitude  ##");
-                    Serial.printlnf("## %.6f %.6f ##",w.GPSLat,w.GPSLon);
-                    Serial.println("##########################");*/
-                }
-
+        
+        // Route commands to appropriate helper functions using command table
+        bool commandFound = false;
+        for (int i = 0; i < commandTableSize; i++) {
+            if (!strcmp(cmdStr, commandTable[i].command)) {
+                // Call the appropriate handler function
+                commandTable[i].handler(dataStr, rxBotID, mode);
+                commandFound = true;
+                break;
             }
         }
-        if(!strcmp(cmdStr,"sns")){      //Sensor reading command - sent out from the bot upon request and contains a single-sample measurement of all water quality sensors
-            char GPSLatstr[12];         //Use strings for GPS latitude and longitude because scanf doesn't like scanning in floating point numbers
-            char GPSLonstr[12];
-            uint32_t do_in,pH_in,cond_in,mcond_in,temp_in;      //Variables to hold decimal-shifted sensor readings
-            sscanf(dataStr,"%s %s %lu %lu %lu %lu %lu",GPSLatstr,GPSLonstr,&do_in,&pH_in,&cond_in,&mcond_in,&temp_in);       //Scan in the sensor readings and the GPS locations
-            TargetWB->DO = ((float)do_in)/1000.0;               //Update the bot object with the sensor readings - divide by 1000 to shift back the decimal
-            TargetWB->pH = ((float)pH_in)/1000.0;
-            TargetWB->Cond = ((float)cond_in)/1000.0;
-            TargetWB->MCond = ((float)mcond_in)/1000.0;
-            TargetWB->temp = ((float)temp_in)/1000.0;
+        
+        // Log unknown commands for debugging
+        if (!commandFound) {
             #ifdef VERBOSE
-            Serial.printlnf("Bot #: %d Temp: %f", TargetWB->botNum,TargetWB->temp);
+            Serial.printlnf("Unknown command received: %s", cmdStr);
             #endif
-        }
-        else if(!strcmp(cmdStr,"hwd")){  //Hello World! - Received startup pairing message
-            bool newBot = true;          //Assumming this is probably a new bot since it should be on startup
-            for(WaterBot w: WaterBots){  //Just in case, check if this bot was already discovered, as the bot could have restarted somehow
-                if(rxBotID == w.botNum) newBot = false;     //Don't create a new bot if it was already discovered
-            }
-            if(newBot){
-                #ifdef VERBOSE
-                Serial.println("Found a new water bot ID");
-                #endif
-                WaterBot newWaterbot;                           //Create a new object for the discovered water bot
-                if(mode == 1) newWaterbot.BLEAvail = true;      //Check which mode of communication the hello world message was received over, assume that mode is available
-                else if(mode == 2) newWaterbot.XBeeAvail = true;
-                else if(mode == 3) newWaterbot.LTEAvail = true;
-                newWaterbot.botNum = rxBotID;                   //Copy in the bot number for display on the list
-                WaterBots.push_back(newWaterbot);               //Push this bot onto the main vector of bots since it's now discovered and set-up
-                PairBots.push_back(newWaterbot);
-                redrawMenu = true;                              //Redraw the menu since the top list of discovered bots will now have this one to show
-            }
-        }
-        else if(!strcmp(cmdStr,"pts")){                         //Debug command - put string. Prints out a string to the SD card log file to test communication
-            if(!logFile.isOpen()){
-                logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
-                logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
-                logFile.close();
-            }
-            else logFile.printlnf("[PUTS] Received String Command: %s",dataStr);
-        }
-        else if(!strcmp(cmdStr,"ldt") || !strcmp(cmdStr,"ldb")){    //Command for leak detection or battery detection shutoff - ldb = battery leak, ldt = main leak detect. Causes shutoff
-            MenuPopUp m;                                            //Create pop-up item to warn the user
-            sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
-            sprintf(m.secondaryLine,"Bot %d", rxBotID);
-            sprintf(m.tertiaryLine, "Leak shutoff");
-            m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
-            m.secondaryStart = 40;
-            m.tertiaryStart = 30;
-            PopUps.push_back(m);                                    //Push onto the queue of warnings to be displayed
-            redrawMenu = true;                                      //Indicate to the menu drawer that we should update now
-        }
-        else if(!strcmp(cmdStr,"wld") || !strcmp(cmdStr,"wlb")){    //Command for leak detection - like ltd but is only a warning, shutoff has been disabled on this bot
-            MenuPopUp m;                                            //Create pop-up item to warn the user
-            sprintf(m.primaryLine,"Warning");                     //Print warning strings into the pop-up item
-            sprintf(m.secondaryLine,"Bot %d", rxBotID);
-            sprintf(m.tertiaryLine, "Leak detected");
-            m.primaryStart = 20;                                    //Calculated offsets to center the text in the box
-            m.secondaryStart = 40;
-            m.tertiaryStart = 25;
-            PopUps.push_back(m);                                    //Push onto the queue of warnings to be displayed
-            redrawMenu = true;                                      //Indicate to the menu drawer that we should update now
+            char logMsg[50];
+            sprintf(logMsg, "[WARN] Unknown command: %s from bot %d", cmdStr, rxBotID);
+            logMessage(logMsg);
         }
     }
 }

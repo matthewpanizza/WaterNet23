@@ -1435,10 +1435,18 @@ void statusUpdate(){
         #ifdef VERBOSE
         Serial.println("Sending a status update!");     //Log to console (for debug purposes)
         #endif
-        char updateStr[55];                             //Create local string to hold status being sent out
+        char updateStr[70];                             //Create local string to hold status being sent out
         int txCompassHead = compassHeading;    //Get the compass heading to send out over the status update
         if(txCompassHead < 0) txCompassHead += 360;   //If the heading is negative, add 360 to it to get a positive value
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d",BOTNUM,battPercent,statusFlags,latitude,longitude,(int)(battVoltage * battCurrent),(int)(battVoltage * solarCurrent), txCompassHead);  //Print status flags, battery, latitude and logitude
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d %d %d %d",
+            BOTNUM,
+            battPercent,
+            statusFlags,
+            latitude, longitude,
+            (int)(battVoltage * battCurrent),
+            (int)(battVoltage * solarCurrent), 
+            txCompassHead, travelHeading,
+            (int)leftMotorSpeed, (int)rightMotorSpeed);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
         bool sentOverLTE = false;
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
             uint32_t now = millis();
