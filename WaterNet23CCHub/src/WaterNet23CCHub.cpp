@@ -391,7 +391,7 @@ void setup() {
     controlUpdateID = -1;
 
     Serial.begin(115200);                           //Set debug output serial port to use 115200 baud
-    Serial1.begin(9600);                            //Start serial for XBee module, using 9600 baud for long range
+    Serial1.begin(115200);                            //Start serial for XBee module, using 9600 baud for long range
     setupXBee();                                    //Setup XBee by sending bypass characters for XBee modules which have the integrated controller
 
 	BLE.on();                                       //Make sure bluetooth is on for the controller
@@ -993,10 +993,19 @@ void processRPiCommand(const char *command, uint8_t mode){
                 logFile.close();
             }
             else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
-            #ifdef VERBOSE
-            Serial.println("Warning, checksum does not match");
-            #endif
-            return;
+            //#ifdef VERBOSE
+            static bool checksumBypassed = false;   //Static variable to allow bypassing checksum for manual serial console operation
+            if(strcmp(cmdStr,"cbp") == 0){
+                checksumBypassed = !checksumBypassed;
+                if(checksumBypassed) Serial.println("Warning, checksum bypass enabled");
+                else Serial.println("Checksum enforced");
+            }
+            //#endif
+            if(!checksumBypassed){
+                int expectedChecksum = strlen(command);
+                Serial.printlnf("Warning, checksum does not match. Command ignored. Expected checksum of '%02x' at end", expectedChecksum);
+                return;               //Only return if checksum bypass is not enabled
+            }
         }
         if(!strcmp(cmdStr,"ctl")){                      //Control packet from raspberry pi. Takes new coordinates, drive mode, offloading mode, recording mode
             char idStr[10];
@@ -1220,7 +1229,7 @@ void RPiHandler(){                                          //Function to check 
                 if(!logFile.isOpen()) logFile.open(filenameMessages, O_RDWR | O_CREAT | O_AT_END);
                 logFile.printlnf("[INFO] Received Raspberry Pi Message: %s",data.c_str());
                 logFile.close();
-            }
+        }
     }
 }
 

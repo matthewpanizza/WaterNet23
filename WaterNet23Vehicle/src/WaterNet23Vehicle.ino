@@ -894,7 +894,7 @@ void setup(){
     ESCR.write(rightMotorSpeedSetpoint);                //Set the initial speed of the right motor
 
     Serial.begin(115200);                               //Start serial for USB debugging, 115200 baud rate
-    Serial1.begin(9600);                                //Start serial for XBee module
+    Serial1.begin(115200);                                //Start serial for XBee module
 
     setupBLE();                                         //Setup BLE module, which includes advertising and setting up the service and characteristics
     setupXBee();                                        //Setup XBee module
