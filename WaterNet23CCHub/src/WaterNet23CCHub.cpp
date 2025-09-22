@@ -81,7 +81,7 @@ int LTEInputCommand(String cmd);
 #define LTE_BKP_Time            100             //Send LTE request after 10 seconds if not connected to any bot
 #define LTE_CTL_PERIOD          29000           //Minimum time between sending LTE control packets periodically per bot
 #define MTR_LTE_PERIOD          3000            //Minimum time between sending mtr command over LTE
-#define MTR_UPDATE_TIME         750             //Frequency to send manual motor control packet in milliseconds
+#define MTR_UPDATE_TIME         250             //Frequency to send manual motor control packet in milliseconds
 #define CONTROL_PUB_TIME        5000            //Number of milliseconds between sending control packets to bots
 #define STOP_PUB_TIME           5000            //Time between sending stop messages when active
 #define WB_MOD_UPDATE_TIME      60000           //Timeout for when status update packets will modify the class, prevents immediate overwrite when changing control variables
@@ -152,6 +152,8 @@ uint8_t BLEBotNum;                              //Bot id of the bot currently co
 bool ctlSpeedDiff = false;                      //Flag set true when the motor has a significant enough speed change to warrant sending a new speed immediately
 uint8_t LSpeed, RSpeed;
 bool LTEConnected = false;                      //Flag set true if the user has allowed connection to LTE
+int targetTableBot = -1;                        //When printing out a table to the serial console, the bot number to target for the table
+uint32_t tableUpdateTime = 0;                   //Timer for periodically printing the status table
 
 //Menu variables
 uint8_t botSelect = 0;                          //Which bot in the menu is currently selected
@@ -272,6 +274,7 @@ void dataLTEHandler(const char *event, const char *data);
 void createMenu();
 void startupPair();
 void rHandler(void);
+void printStatusTable();
 void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
 void handleSensorCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
 void handleHelloWorldCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
@@ -388,6 +391,7 @@ void setup() {
     debounceTime = millis();                        //Initialize timers to current startup time so they are accuracte when the program starts
     controlUpdateTime = millis();
     rcTime = millis();
+    tableUpdateTime = millis();                     //Initialize table update timer
     controlUpdateID = -1;
 
     Serial.begin(115200);                           //Set debug output serial port to use 115200 baud
@@ -497,6 +501,7 @@ void loop() {
     RPiHandler();                                       //Check USB serial to see if Raspberry Pi or computer has sent a new control packet which contains the drive mode and target latitude and longitude
     XBeeLTEPairSet();                                   //Call pair function to see if any bots have come online after the initial pair sequence
     RPiStatusUpdate();                                  //Periodically send a status update for all of the bots to the Raspberry Pi so the user interface is populated with recent data and status
+    printStatusTable();                                 //Periodically print status table for the target bot
     calibrateCompass();                                 //Check if the compass calibration request has been set by a the menu interface, and if so, pop up an info screen to tell the user to calibrate the compass
     if(stopActive){                                     //If the user has pressed the stop button and has not yet cleared it, periodically publish the stop button in case the bot missed the previous message
         if(millis() - stopTime > STOP_PUB_TIME){        //Check timer to publish periodically, stops sending periodically after being cleared by hitting stop again
@@ -708,6 +713,7 @@ void updateBotControl(){                    //Function to send control packet to
 void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode) {
     for(WaterBot &w: WaterBots){                            //Loop over available bots in the Water Bot vector
         if(rxBotID == w.botNum){                            //Find the bot in the vector that matches the source of the status update
+            //Serial.printlnf("Status update: %s", dataStr);
             unsigned int battpct;                                //Create local variables that the string will be parsed into
             unsigned int statflags;
             char testLat[12];                               //Have to use char arrays to copy in floats because C++ is not always smart
@@ -876,6 +882,53 @@ void handleLeakWarningCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode)
     redrawMenu = true;                                      //Indicate to the menu drawer that we should update now
 }
 
+//Function to print a status table for the target bot, similar to the Vehicle code printStatusTable
+void printStatusTable() {
+    if(targetTableBot < 0) return;                         //Don't print if targetTableBot is negative
+    
+    if(millis() - tableUpdateTime >= 1000) {               //Print table once per second
+        tableUpdateTime = millis();                        //Update timer
+        
+        //Find the target bot in the WaterBots vector
+        WaterBot* targetBot = nullptr;
+        for(WaterBot &wb: WaterBots) {
+            if(wb.botNum == targetTableBot) {
+                targetBot = &wb;
+                break;
+            }
+        }
+        
+        if(targetBot == nullptr) return;                   //Target bot not found, don't print
+        
+        //Print status table header
+        Serial.println("##########################");
+        Serial.println("##   CCHUB STATUS TABLE ##");
+        Serial.printlnf("##       Bot #: %1d      ##", targetBot->botNum);
+        Serial.printlnf("##      Batt %%: %03d     ##", targetBot->battPercent);
+        Serial.println("##    LTE  BLE  XBee    ##");
+        Serial.printlnf("##     %d    %d     %d     ##", targetBot->LTEAvail, targetBot->BLEAvail, targetBot->XBeeAvail);
+        Serial.println("##  Latitude Longitude  ##");
+        Serial.printlnf("## %8.6f %8.6f ##", targetBot->GPSLat, targetBot->GPSLon);
+        Serial.println("##   Target Lat/Lon     ##");
+        Serial.printlnf("## %8.6f %8.6f ##", targetBot->TargetLat, targetBot->TargetLon);
+        Serial.println("## Drive Mode | Record  ##");
+        Serial.printlnf("##     %d      |   %d    ##", targetBot->driveMode, targetBot->dataRecording);
+        Serial.println("##   Motor Speeds L/R   ##");
+        Serial.printlnf("##    %3d     |  %3d   ##", targetBot->leftMotorSpeed, targetBot->rightMotorSpeed);
+        Serial.println("##     Compass/Target   ##");
+        Serial.printlnf("##    %3d°    | %3d°   ##", targetBot->CompassHeading, targetBot->targetHeading);
+        Serial.println("##      Water Quality   ##");
+        Serial.printlnf("## pH:%4.1f  DO:%4.1f  ##", targetBot->pH, targetBot->DO);
+        Serial.printlnf("## T:%4.1f°C Cond:%4.0f ##", targetBot->temp, targetBot->Cond);
+        Serial.println("##    Panel | Battery   ##");
+        Serial.printlnf("##   %4dW  |  %4dW   ##", targetBot->panelPower, targetBot->battPower);
+        Serial.println("##  GPS | Compass | SD  ##");
+        Serial.printlnf("##   %d  |    %d    | %d  ##", targetBot->GPSAvail, targetBot->CompassAvail, targetBot->SDAvail);
+        Serial.println("##########################");
+        Serial.println();
+    }
+}
+
 // Command lookup table for cleaner command processing
 const CommandEntry commandTable[] = {
     {"sup", handleStatusUpdateCommand},                 // Status update command
@@ -1002,7 +1055,7 @@ void processRPiCommand(const char *command, uint8_t mode){
             }
             //#endif
             if(!checksumBypassed){
-                int expectedChecksum = strlen(command);
+                int expectedChecksum = strlen(command) - 2;
                 Serial.printlnf("Warning, checksum does not match. Command ignored. Expected checksum of '%02x' at end", expectedChecksum);
                 return;               //Only return if checksum bypass is not enabled
             }
@@ -1034,6 +1087,16 @@ void processRPiCommand(const char *command, uint8_t mode){
                 }
             }
             //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
+        }
+        if(!strcmp(cmdStr,"tbl")){                      //Print table command
+            sscanf(dataStr, "%d", &targetTableBot);
+            if(targetTableBot > 0){
+                Serial.printlnf("Enabling table printing for bot %d", targetTableBot);
+            }
+            else{
+                Serial.printlnf("Disabling table printing");
+                targetTableBot = -1;
+            }
         }
     }
 }
@@ -1207,7 +1270,7 @@ void RPiStatusUpdate(){                         //Function to check if any water
             statusFlags |= wb.GPSAvail << 8;
             statusFlags |= wb.CompassAvail << 9;
             statusFlags |= wb.SDAvail << 10;
-            Serial.printlnf("CCRPsupB%d %d %0.6f %0.6f %d %d %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags,wb.battPower, wb.panelPower); //Print out status string to the Raspberry Pi over the USB port
+            //Serial.printlnf("CCRPsupB%d %d %0.6f %0.6f %d %d %d",wb.botNum, wb.battPercent, wb.GPSLat, wb.GPSLon, statusFlags,wb.battPower, wb.panelPower); //Print out status string to the Raspberry Pi over the USB port
             wb.updatedStatus = false;           //Indicate this bot is up to date, until the next status update is received
         }
     }

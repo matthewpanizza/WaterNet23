@@ -362,8 +362,8 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
     }
     else if(driveMode == DRIVE_MODE_AUTONOMOUS || driveMode == DRIVE_MODE_MANUAL) {
         //If the drive mode is autonomous, set the targets to the values received from the CC hub
-        targetLat = atof(tLat);     //Convert latitude string to float
-        targetLon = atof(tLon);     //Convert longitude string to float
+        targetLat = 35.766191f;//atof(tLat);     //Convert latitude string to float
+        targetLon = -78.677869f;//atof(tLon);     //Convert longitude string to float
     }
     #ifdef VERBOSE
     Serial.printlnf("New target GPS, Lat: %f Lon: %f", targetLat, targetLon);
@@ -1379,8 +1379,8 @@ void statusUpdate(){
             latitude, longitude,
             (int)(battVoltage * battCurrent),
             (int)(battVoltage * solarCurrent), 
-            txCompassHead, travelHeading,
-            (int)leftMotorSpeed, (int)rightMotorSpeed);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
+            txCompassHead, (int)travelHeading,
+            leftMotorSpeed, rightMotorSpeed);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
         bool sentOverLTE = false;
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
             uint32_t now = millis();
@@ -1454,8 +1454,8 @@ void updateMotors(){
     // The second PID controller is for controlling the vehicle rotation based on the compass heading
     // When operating autonomously, we want to smooth out the rotation of the vehicle to the correct heading
     // The error signal will be calculated by the current compass heading vs the target compass heading
-    const float kp_angle = 0.1f;
-    const float ki_angle = 0.1f;
+    const float kp_angle = 0.15f;
+    const float ki_angle = 0.15f;
     const float kd_angle = 0.0f;
     
     const uint8_t int_angle_count = 15;                          // Number of samples for the integral term
@@ -1492,8 +1492,8 @@ void updateMotors(){
     
 
     // Now feed in the output of the speed PID to the rotation differential PID to get the output motor speed
-    float leftMotorSpeedF = leftMotorSpeedSet + leftRightDifferential;
-    float rightMotorSpeedF = rightMotorSpeedSet - leftRightDifferential;
+    float leftMotorSpeedF = leftMotorSpeedSet - leftRightDifferential;
+    float rightMotorSpeedF = rightMotorSpeedSet + leftRightDifferential;
 
     leftMotorSpeed = (uint8_t)leftMotorSpeedF;                  // Convert back to int to command ESC
     rightMotorSpeed = (uint8_t)rightMotorSpeedF;                // Convert back to int to command ESC

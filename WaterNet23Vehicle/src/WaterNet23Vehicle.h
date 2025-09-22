@@ -106,8 +106,8 @@
 #define MTR_RAMP_SPD        3               //Rate to ramp motor speed to target speed (step size for going between a value somewhere between 0 and 180)
 #define MTR_RAMP_TIME       50              //Time between ramp iterations
 #define MTR_TRAVEL_SPD      140             //Autonomous movement base speed
-#define MTR_CUTOFF_RAD      1.5             //Radius to consider "arrived" at a target point
-#define SENTRY_IDLE_RAD     4.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
+#define MTR_CUTOFF_RAD      4.0             //Radius to consider "arrived" at a target point
+#define SENTRY_IDLE_RAD     8.0             //Radius to keep motors off in sentry mode after reaching the cutoff radius
 #define GPS_POLL_TIME       990             //Rate to poll the GPS and calculate the distance
 #define COMP_POLL_TIME      250             //Rate to poll the Compass and calculate the target heading
 
