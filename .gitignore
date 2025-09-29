@@ -1,3 +1,5 @@
 /WaterNet23Vehicle/target
 /WaterNet23CCHub/target
 PCB/WaterNet23BotPCB/Extra Models/desktop.ini
+WaterNet23CCHub/src/WaterNet23CCHub.cpp
+WaterNet23CCHub/.DS_Store

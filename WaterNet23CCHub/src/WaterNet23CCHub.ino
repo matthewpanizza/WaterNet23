@@ -247,6 +247,16 @@ void handlePutStringCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
 void handleLeakDetectionCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode);
 void handleLeakWarningCommand(const char *cmdStr, uint8_t rxBotID, uint8_t mode);
 
+// RPi command helpers (cbp, ctl, tbl)
+void handleRPiChecksumBypassCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handleRPiControlCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+void handleRPiTableCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode);
+// Prints a help menu of available commands to the Serial console
+void printHelpMenu();
+
+// Global flag controlling whether RPi checksum is enforced (toggled by cbp)
+static bool rpiChecksumBypassed = true;
+
 void dataLTEHandler(const char *event, const char *data){           //Interrupt handler called anytime a message is received from a bot over LTE.
     processCommand(data, 4,false);                                  //Send the command to the dictionary function for processing
     if(logMessages){                                                //Log the incoming message to the SD card if enabled
@@ -907,6 +917,14 @@ const CommandEntry commandTable[] = {
 };
 const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 
+// RPi command lookup table for cleaner RPi command processing
+const CommandEntry rpiCommandTable[] = {
+    {"cbp", handleRPiChecksumBypassCommand}, // Toggle checksum bypass
+    {"ctl", handleRPiControlCommand},        // Control packet from Raspberry Pi/computer
+    {"tbl", handleRPiTableCommand}           // Enable/disable status table printing
+};
+const int rpiCommandTableSize = sizeof(rpiCommandTable) / sizeof(CommandEntry);
+
 //Dictionary function to process commands received from bots
 void processCommand(const char *command, uint8_t mode, bool sendAck){
     //Process if command is addressed to this bot "Bx" or all bots "AB"
@@ -997,11 +1015,20 @@ void processRPiCommand(const char *command, uint8_t mode){
         #ifdef VERBOSE
         Serial.printlnf("Checksum: %02x, %03d, Checkstr: %s",checksum,checksum,command);
         #endif
-        for(uint8_t i = 4; i < strlen(command)-2;i++){  //Copy in data characters to data string
+        uint8_t terminationCharacters = rpiChecksumBypassed ? 0 : 2; // Adjust for checksum characters if not bypassed
+        for(uint8_t i = 4; i < strlen(command) - terminationCharacters;i++){  //Copy in data characters to data string
             if(i < 7) cmdStr[i-4] = command[i];
             else dataStr[i-7] = command[i];
         }
-        if(checksum != strlen(command)-2){              //Compare checksum, reject command if the checksum does not match
+
+        // Handle cbp command before checksum enforcement
+        if(!strcmp(cmdStr,"cbp")){
+            handleRPiChecksumBypassCommand(dataStr, 0, mode);
+            return;
+        }
+
+        // Enforce checksum unless bypassed via cbp
+        if(checksum != strlen(command)-2 && !rpiChecksumBypassed){              //Compare checksum, reject command if the checksum does not match
             #ifdef VERBOSE
             Serial.printlnf("String Len: %d, Checksum: %d",strlen(command)-2,checksum);
             #endif
@@ -1011,58 +1038,92 @@ void processRPiCommand(const char *command, uint8_t mode){
                 logFile.close();
             }
             else logFile.printlnf("[WARN] RPi Message Checksum Does Not Match!: %s",command);
-            //#ifdef VERBOSE
-            static bool checksumBypassed = false;   //Static variable to allow bypassing checksum for manual serial console operation
-            if(strcmp(cmdStr,"cbp") == 0){
-                checksumBypassed = !checksumBypassed;
-                if(checksumBypassed) Serial.println("Warning, checksum bypass enabled");
-                else Serial.println("Checksum enforced");
-            }
-            //#endif
-            if(!checksumBypassed){
-                int expectedChecksum = strlen(command) - 2;
-                Serial.printlnf("Warning, checksum does not match. Command ignored. Expected checksum of '%02x' at end", expectedChecksum);
-                return;               //Only return if checksum bypass is not enabled
+            int expectedChecksum = strlen(command) - 2;
+            Serial.printlnf("Warning, checksum does not match. Command ignored. Expected checksum of '%02x' at end", expectedChecksum);
+            return;               //Only return if checksum bypass is not enabled
+        }
+
+        // Route commands to appropriate helper functions using RPi command table
+        bool commandFound = false;
+        for (int i = 0; i < rpiCommandTableSize; i++) {
+            if (!strcmp(cmdStr, rpiCommandTable[i].command)) {
+                rpiCommandTable[i].handler(dataStr, 0, mode);
+                commandFound = true;
+                break;
             }
         }
-        if(!strcmp(cmdStr,"ctl")){                      //Control packet from raspberry pi. Takes new coordinates, drive mode, offloading mode, recording mode
-            char idStr[10];
-            char GPSLatstr[12];
-            char GPSLonstr[12];
-            unsigned int offloading, drivemode, recording, signal;
-            sscanf(dataStr,"%s %s %s %u %u %u %u",idStr,GPSLatstr,GPSLonstr,&drivemode,&offloading,&recording,&signal);
-            char botChar[2] = {command[8], '\0'};       //String to hold the bot identifier of the control packet
-            uint8_t targetBot = atoi(botChar);
+        
+        // Log unknown commands for debugging
+        if (!commandFound) {
             #ifdef VERBOSE
-            Serial.printlnf("Got a command packet from Pi for Bot %d",targetBot);
+            Serial.printlnf("Unknown RPi command received: %s", cmdStr);
             #endif
-            for(WaterBot &wb: WaterBots){               //Loop over discovered water bots and look for the target water bot this control packet addresses
-                if(wb.botNum == targetBot){             //Found the one we are targeting
-                    wb.TargetLat = atof(GPSLatstr);     //Extract the latitude and longitude from the scanf statement
-                    wb.TargetLon = atof(GPSLonstr);     
-                    wb.driveMode = drivemode;           //Extract the target drive mode from the message
-                    wb.offloading = offloading;         //Check if we have requested an SD card data offload from the Pi
-                    wb.dataRecording = recording;       //Check if we should be recording data from sensors
-                    wb.signal = signal;                 //Check if user wants to signal the LED
-                    wb.LTEInitialStatus = true;         //Flag for sending over LTE since the status has changed
-                    if(botSelect == wb.botNum) redrawMenu = true;   //Redraw the menu if this is updating data of the displayed bot
-                    wb.updatedControl = true;           //Indicate this bot had had its control updated, this triggers a control packet to be sent to the modified bot
-                    updateControl = true;               //Signal to control publisher that a bot has been updated
-                    return;
-                }
-            }
-            //RPCCctlB%d %0.6f %0.6f %d %d %d  //Botnumber, target lat, target lon, drive mode, offloading, data recording
+            char logMsg[50];
+            sprintf(logMsg, "[WARN] Unknown RPi command: %s", cmdStr);
+            logMessage(logMsg);
         }
-        if(!strcmp(cmdStr,"tbl")){                      //Print table command
-            sscanf(dataStr, "%d", &targetTableBot);
-            if(targetTableBot > 0){
-                Serial.printlnf("Enabling table printing for bot %d", targetTableBot);
-            }
-            else{
-                Serial.printlnf("Disabling table printing");
-                targetTableBot = -1;
-            }
+    }
+}
+
+// RPi helper: Toggle checksum bypass
+void handleRPiChecksumBypassCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode){
+    rpiChecksumBypassed = !rpiChecksumBypassed;
+    if(rpiChecksumBypassed) Serial.println("Warning, checksum bypass enabled");
+    else Serial.println("Checksum enforced");
+}
+
+// RPi helper: Control packet from Raspberry Pi
+void handleRPiControlCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode){
+    //RPCCctl B0 34.123456 -118.123456 0 0 0 0
+    char idStr[10] = {0};
+    char GPSLatstr[12] = {0};
+    char GPSLonstr[12] = {0};
+    unsigned int offloading = 0, drivemode = 0, recording = 0, signal = 0;
+    int parsed = sscanf(dataStr, "%9s %11s %11s %u %u %u %u", idStr, GPSLatstr, GPSLonstr, &drivemode, &offloading, &recording, &signal);
+    if (parsed != 7) {
+        Serial.println("Error: invalid ctl payload from RPi");
+        return;
+    }
+    // idStr is expected as "B#"; fall back to numeric if not in that form
+    uint8_t targetBot = 0;
+    if (idStr[0] == 'B' || idStr[0] == 'b') targetBot = (uint8_t)atoi(&idStr[1]);
+    else targetBot = (uint8_t)atoi(idStr);
+
+    #ifdef VERBOSE
+    Serial.printlnf("Got a command packet from Pi for Bot %d", targetBot);
+    #endif
+
+    for(WaterBot &wb: WaterBots){               //Loop over discovered water bots and look for the target water bot this control packet addresses
+        if(wb.botNum == targetBot){             //Found the one we are targeting
+            wb.TargetLat = atof(GPSLatstr);     //Extract the latitude and longitude
+            wb.TargetLon = atof(GPSLonstr);
+            wb.driveMode = drivemode;           //Update control fields
+            wb.offloading = offloading;         //Request SD card data offload
+            wb.dataRecording = recording;       //Enable/disable data recording
+            wb.signal = signal;                 //Signal LED
+            wb.LTEInitialStatus = true;         //Flag for sending over LTE since the status has changed
+            if(botSelect == wb.botNum) redrawMenu = true;   //Redraw the menu if this is the displayed bot
+            wb.updatedControl = true;           //Trigger control packet send to the modified bot
+            updateControl = true;               //Signal to control publisher that a bot has been updated
+            // Print out the new control values for this vehicle
+            Serial.printlnf(
+                "CTL updated B%u: lat=%0.6f lon=%0.6f drive=%u offload=%u record=%u signal=%u",
+                wb.botNum, wb.TargetLat, wb.TargetLon, wb.driveMode, wb.offloading, wb.dataRecording, wb.signal
+            );
+            return;
         }
+    }
+}
+
+// RPi helper: Enable/disable status table printing on Serial
+void handleRPiTableCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode){
+    sscanf(dataStr, "%d", &targetTableBot);
+    if(targetTableBot >= 0){
+        Serial.printlnf("Enabling table printing for bot %d", targetTableBot);
+    }
+    else{
+        Serial.printlnf("Disabling table printing");
+        targetTableBot = -1;
     }
 }
 
@@ -1790,4 +1851,29 @@ int LTEInputCommand(String cmd){
         logFile.close();
     }
     return 1;
+}
+
+// Print a concise help menu with available commands and descriptions
+void printHelpMenu(){
+    Serial.println();
+    Serial.println("==== CCHub Command Help ====");
+    Serial.println("Bot -> Hub commands (from WaterBots):");
+    Serial.println("  sup  - Status update (telemetry/state)");
+    Serial.println("  sns  - Sensor reading packet");
+    Serial.println("  hwd  - Hello World / handshake");
+    Serial.println("  pts  - Put string (debug/message)");
+    Serial.println("  ldt  - Leak detected (shutoff)");
+    Serial.println("  ldb  - Battery leak detected (shutoff)");
+    Serial.println("  wld  - Leak warning (no shutoff)");
+    Serial.println("  wlb  - Battery leak warning (no shutoff)");
+    Serial.println();
+    Serial.println("RPi -> Hub commands (from Raspberry Pi/USB):");
+    Serial.println("  cbp  - Toggle checksum bypass for RPi commands");
+    Serial.println("  ctl  - Apply control: <ID> <lat> <lon> <drive> <offload> <record> <signal>");
+    Serial.println("          Example: ctl B3 42.123456 -83.123456 1 0 1 0");
+    Serial.println("  tbl  - Enable/disable Serial status table printing for a bot");
+    Serial.println("          Example: tbl 3   (enable for bot 3) | tbl -1 (disable)");
+    Serial.println();
+    Serial.println("Note: RPi commands are prefixed and include a checksum. 'cbp' toggles enforcement.");
+    Serial.println("============================");
 }
