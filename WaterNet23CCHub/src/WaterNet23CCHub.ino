@@ -167,6 +167,9 @@ class WaterBot{
     float DO = 0.0;                 //Dissolved Oxygen sensor reading, populated when a sensor request ("sns" command) is made
     float Cond = 0.0;               //Conductivity sensor reading, populated when a sensor request ("sns" command) is made
     float MCond = 0.0;              //Mini-conductivity sensor reading, populated when a sensor request ("sns" command) is made
+    bool motorTareReceived = false; //Flag set true when a motor tare value has been received from the bot, which will allow editing on the menu
+    uint16_t lastMotorTare = 100;   //Last motor tare value sent to the bot, used to prevent sending duplicate values
+    uint16_t motorTare = 100;       //Motor tare 0-200, default of 100 which is no tare.
     uint16_t panelPower = 0;        //Solar panel power (in Watts) sampled from the onboard shunt and voltage divider
     uint16_t battPower = 0;         //Battery power draw (in Watts) sampled from the onboard shunt and voltage divider
     uint32_t publishTime = 0;       //A timer used to handle a data "hazard", which prevents the bot from updating this class with variables controllable in both locations for a short period of time, to not have a "loop"
@@ -478,6 +481,7 @@ void loop() {
     RPiStatusUpdate();                                  //Periodically send a status update for all of the bots to the Raspberry Pi so the user interface is populated with recent data and status
     printStatusTable();                                 //Periodically print status table for the target bot
     calibrateCompass();                                 //Check if the compass calibration request has been set by a the menu interface, and if so, pop up an info screen to tell the user to calibrate the compass
+    sendTareData();                                     //Check if a new motor tare value has been set by the menu interface, and if so, send it to the bot
     if(stopActive){                                     //If the user has pressed the stop button and has not yet cleared it, periodically publish the stop button in case the bot missed the previous message
         if(millis() - stopTime > STOP_PUB_TIME){        //Check timer to publish periodically, stops sending periodically after being cleared by hitting stop again
             stopTime = millis();
@@ -695,14 +699,15 @@ void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mod
             char testLon[12];
             int panelPwr, battPwr;
             int lSpeed, rSpeed;
+            unsigned int rxMotorTare;
             unsigned int compassHeading, targetHeading;
-            sscanf(dataStr,"%u %u %s %s %d %d %u %u %d %d",
+            sscanf(dataStr,"%u %u %s %s %d %d %u %u %d %d %u",
                 &battpct,
                 &statflags,
                 testLat,testLon, 
                 &battPwr, &panelPwr, 
                 &compassHeading, &targetHeading, 
-                &lSpeed, &rSpeed);       //Parse out the various pieced of data from the data string an put them in the local variables
+                &lSpeed, &rSpeed, &rxMotorTare);       //Parse out the various pieced of data from the data string an put them in the local variables
             w.battPercent = battpct;                        //Copy in battery percent from the status update
             w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
             w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
@@ -720,6 +725,14 @@ void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mod
             w.targetHeading = targetHeading;                //Copy in the target heading from the status update
             w.leftMotorSpeed = lSpeed;                      //Copy in the left motor speed from the status
             w.rightMotorSpeed = rSpeed;                     //Copy in the right motor speed from the status
+            if(rxMotorTare >= 0 && rxMotorTare <= 200) {
+                w.motorTare = rxMotorTare;                  //Copy in the motor tare value from the status update, but only if it is a valid number
+                if(!w.motorTareReceived){                   //If this is the first valid motor tare value received, update the last tare value so we don't immediately retransmit
+                    w.lastMotorTare = rxMotorTare;
+                }
+                w.motorTareReceived = true;                 //Set the flag indicating a valid motor tare value has been received
+            }
+
             if(millis() - w.publishTime > WB_MOD_UPDATE_TIME){      //Check the last time a status change was published to this bot, this prevents a status update from reverting a change the user made due to latency, ignore a status update for modifiable fields for some time
                 w.offloading = (statflags >> 3) & 1;                //Copy in offloading, drive mode and sensor data recording if it hasn't been sent out too recently
                 w.driveMode = (statflags >> 4) & 3;
@@ -1484,6 +1497,21 @@ void calibrateCompass(){
     }
 }
 
+/// @brief Function to send out motor tare commands to the bots that have had their motor tared changed by the menu
+void sendTareData(){
+    for(WaterBot &wb: WaterBots){
+        if(wb.motorTare != wb.lastMotorTare){
+            wb.lastMotorTare = wb.motorTare;            //Update the last motor tare value
+            char tareStr[15];                           //String to hold the motor tare command
+            sprintf(tareStr,"CCB%dtar%03d",wb.botNum,wb.motorTare);   //Create the command string to send out
+            sendData(tareStr,0,(!wb.XBeeAvail),true,(!wb.BLEAvail && !wb.XBeeAvail));        //Send the command out to the bot
+            #ifdef VERBOSE
+            Serial.printlnf("Sending motor tare command to Bot %d, tare: %d",wb.botNum, wb.motorTare);
+            #endif
+        }
+    }
+}
+
 //Interrupt handler that is called when BLE data is received from the bot
 static void BLEDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
     char btBuf[len+1];      //Received as a byte array over BLE, take and convert to a char array for string operations
@@ -1642,6 +1670,11 @@ void createMenu(){
     battPwr.statOnly = true;                                //Only a statistic, not modifiable
     battPwr.MethodPointer = &WaterBot::battPower;           //Source data from the battPower variable for the selected bot
 
+    MenuItem motorTareItem;                                 //Create item for the motor tare value
+    motorTareItem.init(1,0,200,false,"MtrTare");             //Range 0-200
+    motorTareItem.statOnly = false;                         //This is a modifiable field
+    motorTareItem.MethodPointer = &WaterBot::motorTare;     //Source data from the motorTare variable for the selected bot
+
     MenuItem compHead;                                       //Create item for the compass heading
     compHead.init(1,0,359,false,"Compass");                  //Range 0-359
     compHead.statOnly = true;                                //Only a statistic, not modifiable
@@ -1659,6 +1692,7 @@ void createMenu(){
     MenuItems.push_back(signalToggle);
     MenuItems.push_back(solStat);
     MenuItems.push_back(battPwr);
+    MenuItems.push_back(motorTareItem);
     MenuItems.push_back(compHead);
     MenuItems.push_back(compassCal);
 

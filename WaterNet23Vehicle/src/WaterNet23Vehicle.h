@@ -18,7 +18,7 @@
 #define EEPROM_KEY1             (uint8_t)0x23           //Key for the first byte of the EEPROM, used to check if the EEPROM is valid
 #define EEPROM_KEY2             (uint8_t)0x129          //Key for the second byte of the EEPROM, used to check if the EEPROM is valid
 #define EEPROM_COMP_CAL_LOC     0x02                    //Location of the compass calibration in EEPROM, used to store the calibration values for the compass
-
+#define EEPROM_TARE_LOC         0x06                    //Location of the motor tare value in EEPROM, used to store the tare value for the motors
 
 ///////////////////////
 // Pin Configuration //

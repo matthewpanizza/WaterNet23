@@ -2,7 +2,7 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "c:/Users/mligh/OneDrive/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
+#line 1 "/Users/matthewpanizza/Library/CloudStorage/OneDrive-Personal/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
 /*
  * Project WaterNet23PreAlpha
  * Description: Initial code for B404 with GPS and serial communications
@@ -38,6 +38,7 @@ void handleCompassCommand(const char* dataStr, uint8_t mode);
 void handleSimulationCommand(const char* dataStr, uint8_t mode);
 void handleHelpCommand(const char* dataStr, uint8_t mode);
 void handleTableCommand(const char* dataStr, uint8_t mode);
+void handleTareCommand(const char* dataStr, uint8_t mode);
 void initializeLogFiles();
 void updateSimulationData();
 void logSimulationData();
@@ -81,7 +82,7 @@ void buttonHandler();
 void LEDHandler();
 int LTEInputCommand(String cmd);
 void printStatusTable();
-#line 19 "c:/Users/mligh/OneDrive/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
+#line 19 "/Users/matthewpanizza/Library/CloudStorage/OneDrive-Personal/Particle/WaterNet23-GY511/WaterNet23Vehicle/src/WaterNet23Vehicle.ino"
 #define ARDUINO 0
 #include "SparkFun_u-blox_GNSS_Arduino_Library.h"
 #include <Adafruit_Sensor.h>
@@ -221,6 +222,8 @@ bool doCompassCal = false;                                              //Flag t
 bool GPSAvail = false;                                                  //Flag to indicate that the GPS is available
 bool CompassAvail = false;                                              //Flag to indicate that the compass is available
 
+uint16_t motorTare = 100;                                               //Tare value for the motors, used to calibrate the ESCs when one motor is faster than the other
+
 uint32_t lastTelemTime = 0;
 uint32_t lastCalibrationTime = 0;                                       //Timer for when the last compass calibration occurred 
 uint32_t lastAutonomousLogTime = 0;                                     //Timer for when the last autonomous navigation data was logged
@@ -291,6 +294,7 @@ uint16_t buttonPressCount = 0;                                          //Counte
 const CommandEntry commandTable[] = {
     {"ctl", handleControlCommand},
     {"mtr", handleMotorCommand},
+    {"tar", handleTareCommand},
     {"req", handleDataRequest},
     {"pts", handlePrintString},
     {"spc", handleStatusCommand},
@@ -766,6 +770,7 @@ void handleHelpCommand(const char* dataStr, uint8_t mode) {
     Serial.println("Available Commands:");
     Serial.println("  ctl <lat> <lon> <mode> <log> <led>  - Control/navigation command");
     Serial.println("  mtr <lspeed><rspeed>                - Motor control (3 digits each)");
+    Serial.println("  tar <value>                         - Set motor tare (000-200, 100 = no tare)");
     Serial.println("  req                                 - Request sensor data");
     Serial.println("  pts <message>                       - Print string to console/log");
     Serial.println("  spc                                 - Status/ping command");
@@ -804,6 +809,30 @@ void handleTableCommand(const char* dataStr, uint8_t mode) {
     Serial.println("Status table printing enabled");
     // Clear the screen and immediately print the table
     printStatusTable();
+}
+
+/**
+ * @brief Tare Command - set motor tare scaling value (0-200, 100 = no tare)
+ * Format from CC Hub: "tar%03d" (e.g., tar105)
+ * @param dataStr The data string containing a 3-digit tare value
+ * @param mode Communication mode the command was received from
+ */
+void handleTareCommand(const char* dataStr, uint8_t mode) {
+    if (strlen(dataStr) < 3) {
+        Serial.println("Warning: Tare command data too short");
+        logToDebugFile("[WARN] Tare command too short: %s", dataStr);
+        return;
+    }
+    // Parse first three characters as integer
+    char tStr[4] = {0};
+    strncpy(tStr, dataStr, 3);
+    int val = atoi(tStr);
+    // Clamp to [0, 200]
+    if (val < 0) val = 0;
+    if (val > 200) val = 200;
+    motorTare = (uint16_t)val;
+    Serial.printlnf("[TAR] Motor tare set to %d", motorTare);
+    logToDebugFile("[INFO] Motor tare set to %d", motorTare);
 }
 
 /// @brief Creates files on the SD card for logging purposes. This function is called once at startup to create the files needed for logging
@@ -1099,9 +1128,11 @@ void readEEPROM(){
     //Check if the EEPROM has been configured for use by the CAN analyzer. Read memory items if the keys match
     if(EEPROM.read(EEPROM_KEY1_LOC) == EEPROM_KEY1 && EEPROM.read(EEPROM_KEY2_LOC) == EEPROM_KEY2){
         EEPROM.get(EEPROM_COMP_CAL_LOC, compOffset);    //Read the compass calibration
+        EEPROM.get(EEPROM_TARE_LOC, motorTare);         //Read the motor tare value
     }
     //Otherwise, write the default values and the keys for the CAN Analyzer so the EEPROM is set up for the next time
     else{
+        EEPROM.put(EEPROM_TARE_LOC, (uint16_t)100);     //Write the default tare value of 100 to the EEPROM
         EEPROM.put(EEPROM_COMP_CAL_LOC, compOffset);    //Write the compass calibration value to the EEPROM
         EEPROM.write(EEPROM_KEY1_LOC, EEPROM_KEY1);
         EEPROM.write(EEPROM_KEY2_LOC, EEPROM_KEY2);
@@ -1110,6 +1141,7 @@ void readEEPROM(){
 
 void writeEEPROM(){
     EEPROM.put(EEPROM_COMP_CAL_LOC, compOffset);    //Write the compass calibration
+    EEPROM.put(EEPROM_TARE_LOC, motorTare);         //Write the motor tare value
 }
 
 /**
@@ -1438,7 +1470,7 @@ void statusUpdate(){
         char updateStr[70];                             //Create local string to hold status being sent out
         int txCompassHead = compassHeading;    //Get the compass heading to send out over the status update
         if(txCompassHead < 0) txCompassHead += 360;   //If the heading is negative, add 360 to it to get a positive value
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d %d %d %d",
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d %d %d %d %u",
             BOTNUM,
             battPercent,
             statusFlags,
@@ -1446,7 +1478,7 @@ void statusUpdate(){
             (int)(battVoltage * battCurrent),
             (int)(battVoltage * solarCurrent), 
             txCompassHead, (int)travelHeading,
-            leftMotorSpeed, rightMotorSpeed);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
+            leftMotorSpeed, rightMotorSpeed, motorTare);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
         bool sentOverLTE = false;
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
             uint32_t now = millis();
@@ -1561,14 +1593,39 @@ void updateMotors(){
     float leftMotorSpeedF = leftMotorSpeedSet - leftRightDifferential;
     float rightMotorSpeedF = rightMotorSpeedSet + leftRightDifferential;
 
+    // Now do motor taring to account for differences in motors, ESCs and propellers
+    // The ESC command range is [0..180] with 90 as neutral. Apply scaling to the deviation from 90 so
+    // neutral remains unchanged and both forward (>90) and reverse (<90) are reduced proportionally.
+    // Linear scaling:
+    //  - motorTare > 100: slow LEFT motor to (2.0 - motorTare/100) of its deviation from 90 (e.g., 105 -> 0.95x)
+    //  - motorTare < 100: slow RIGHT motor to (motorTare/100) of its deviation from 90 (e.g., 90 -> 0.90x)
+    //  - motorTare == 100: no change
+    {
+        float leftDelta = leftMotorSpeedF - 90.0f;
+        float rightDelta = rightMotorSpeedF - 90.0f;
+        if (motorTare > 100) {
+            float scale = 2.0f - ((float)motorTare / 100.0f);
+            if (scale < 0.0f) scale = 0.0f;
+            if (scale > 1.0f) scale = 1.0f;
+            leftDelta *= scale;
+        } else if (motorTare < 100) {
+            float scale = ((float)motorTare) / 100.0f;
+            if (scale < 0.0f) scale = 0.0f;
+            if (scale > 1.0f) scale = 1.0f;
+            rightDelta *= scale;
+        }
+        leftMotorSpeedF = 90.0f + leftDelta;
+        rightMotorSpeedF = 90.0f + rightDelta;
+    }
+
+    // Clamp motor speeds to [0, 180] before casting to uint8 to avoid wrap
+    if (leftMotorSpeedF < 0.0f) leftMotorSpeedF = 0.0f;
+    else if (leftMotorSpeedF > 180.0f) leftMotorSpeedF = 180.0f;
+    if (rightMotorSpeedF < 0.0f) rightMotorSpeedF = 0.0f;
+    else if (rightMotorSpeedF > 180.0f) rightMotorSpeedF = 180.0f;
+
     leftMotorSpeed = (uint8_t)leftMotorSpeedF;                  // Convert back to int to command ESC
     rightMotorSpeed = (uint8_t)rightMotorSpeedF;                // Convert back to int to command ESC
-
-    // Clamp motor speeds to [0, 180]
-    if (leftMotorSpeed < 0) leftMotorSpeed = 0;
-    else if (leftMotorSpeed > 180) leftMotorSpeed = 180;
-    if (rightMotorSpeed < 0) rightMotorSpeed = 0;
-    else if (rightMotorSpeed > 180) rightMotorSpeed = 180;
 
     if(!stopActive){                    //If there has not been a stop command, then update the ESC
         ESCL.write(180-leftMotorSpeed);
