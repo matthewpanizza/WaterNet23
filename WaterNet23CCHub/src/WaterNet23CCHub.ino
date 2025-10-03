@@ -65,6 +65,11 @@
 #define JOY_MIN             1                   //ADC reading when the joystick is fully backward
 #define LTE_MIN_DIFF        3                   //Minimum difference in motor speed to send an update over LTE
 
+//Drive mode parameters
+#define DRIVE_MODE_MANUAL      0               //Drive mode where the user has full control of the motors
+#define DRIVE_MODE_SENTRY      1               //Drive mode where the bot autonomously navigates to a fixed waypoint and holds one spot
+#define DRIVE_MODE_AUTONOMOUS  2               //Drive mode where the bot autonomously navigates through a list of waypoints
+
 //Development Parameters
 //#define VERBOSE
 
@@ -153,12 +158,17 @@ class WaterBot{
     bool offloading = false;        //Flag to indicate that SD card data is being offloaded
     int leftMotorSpeed = 0;         //Current left motor speed from 0-180 (90 = idle)
     int rightMotorSpeed = 0;        //Current right motor speed from 0-180 (90 = idle)
-    float TargetLat = -999.0;       //Target latitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
-    float TargetLon = -999.0;       //Target longitude sourced from either the current location (captured for sentry mode) or from the raspberry pi
+    bool waypointArrived = false;   //Flag set true when the bot has arrived at a waypoint, use this to advance to the next waypoint
+    uint16_t botWaypointIndex = 0;  //Index of the current waypoint the bot is navigating to in autonomous mode
+    int waypointIndex = 0;          //Index of the current waypoint the bot is navigating to in autonomous mode
+    std::vector<float> waypointsLat; //Vector of latitudes for waypoints in autonomous mode
+    std::vector<float> waypointsLon; //Vector of longitudes for waypoints in autonomous mode
+    float lastWaypointLat = -999.0f; //Latitude of the last waypoint reached, used to prevent repeated waypoint arrival messages
+    float lastWaypointLon = -999.0f; //Longitude of the last waypoint reached, used to prevent repeated waypoint arrival messages
     float GPSLat = 0.0;             //Current GPS latitude sampled from onboard Ublox module
     float GPSLon= 0.0;              //Current GPS longitude sampled from onboard Ublox module
     uint16_t CompassHeading = 0.0;     //Current filtered compass heading from onboard module
-    uint16_t targetHeading = 0.0;   //Target heading for autonomous navigation mode, calculated from current GPS position and target GPS position. Received from vehicle
+    uint16_t targetHeading = 0.0;   //Target heading for autonomous navigation mode, calculated from current GPS position and target GPS position. Received from vehicle    
     bool requestCompCalibration = false; //Flag set true when the bot is requesting a compass calibration, which will pop up a warning on the menu
     bool calRequestAcknowledged = false; //Flag set true when the user has acknowledged the compass calibration request by clearing pop-up
     uint8_t reqActive = 0;         //Flag set true when a request should be made to get sensor data
@@ -636,7 +646,29 @@ void updateMenu(){
     }
 }
 
+// Small helpers to avoid repeating control packet construction logic
+static void computeTargetLatLon(const WaterBot &wb, float &lat, float &lon) {
+    lat = -999.0f;
+    lon = -999.0f;
+    if (wb.waypointsLat.size() > wb.waypointIndex && wb.waypointsLon.size() > wb.waypointIndex) {
+        lat = wb.waypointsLat.at(wb.waypointIndex);
+        lon = wb.waypointsLon.at(wb.waypointIndex);
+    }
+}
+
+static void buildControlPacket(const WaterBot &wb, char *outBuf, size_t outLen) {
+    float lat, lon;
+    computeTargetLatLon(wb, lat, lon);
+    snprintf(outBuf, outLen, "CCB%dctl%0.6f %0.6f %d %d %d",
+             wb.botNum, lat, lon, wb.driveMode, wb.dataRecording, wb.signal);
+}
+
 void updateBotControl(){                    //Function to send control packet to bot periodically and when updated by user. 
+    for(WaterBot &wb: WaterBots){           //Loop over all discovered water bots and check for waypoint update
+        if(wb.waypointArrived && wb.waypointIndex == wb.botWaypointIndex && wb.waypointIndex < wb.waypointsLat.size()-1 && wb.driveMode == DRIVE_MODE_AUTONOMOUS){ //Check if the bot has arrived at its current waypoint and there are more waypoints to go to
+            wb.waypointIndex++;          //Increment waypoint index to move to next waypoint if the bot has arrived at the current waypoint
+        }
+    }
     if(updateControl){                      //Check flag that is set when menu items are modified
         updateControl = false;              //Clear flag to not constantly publish updates
         //ControlledBot = nullptr;
@@ -646,7 +678,7 @@ void updateBotControl(){                    //Function to send control packet to
                 wb.updatedControl = false;  //Clear flags for this bot
                 wb.publishTime = millis();  //Inidicate the last time this bot had its control packet sent
                 char statusStr[42];         //String to hold the control packet
-                sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum, wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);     //Print characteristics to string
+                buildControlPacket(wb, statusStr, sizeof(statusStr)); //Build control packet string
                 #ifdef VERBOSE
                 Serial.printlnf("Control Packet: %s",statusStr);
                 #endif
@@ -669,7 +701,7 @@ void updateBotControl(){                    //Function to send control packet to
         if(controlUpdateID > WaterBots.size()-1) controlUpdateID = 0;   //Go around the vector of water bots circularly so each one is published at some point.
         WaterBot wb = WaterBots.at(controlUpdateID);                    //Get a copy of the water bot in the vector that is at the circular pointer location
         char statusStr[42];                                             //Create a status string
-        sprintf(statusStr,"CCB%dctl%0.6f %0.6f %d %d %d",wb.botNum,wb.TargetLat, wb.TargetLon, wb.driveMode, wb.dataRecording, wb.signal);  //Populate string with command packet
+        buildControlPacket(wb, statusStr, sizeof(statusStr));           //Populate string with command packet
         bool sendLTEStat = false;                               //Determine if we should send LTE on this go-around, limits periodic publishing over LTE to reduce usage
         if(!wb.XBeeAvail && !wb.BLEAvail && (millis() - wb.LTELastStatTime > LTE_CTL_PERIOD)){  //Determine if LTE should be used based on the availability of other communication modes
             sendLTEStat = true;                                 //Set flag true if we should use LTE
@@ -701,13 +733,15 @@ void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mod
             int lSpeed, rSpeed;
             unsigned int rxMotorTare;
             unsigned int compassHeading, targetHeading;
-            sscanf(dataStr,"%u %u %s %s %d %d %u %u %d %d %u",
+            unsigned int currentWaypointIndex;
+            sscanf(dataStr,"%u %u %s %s %d %d %u %u %d %d %u %u",
                 &battpct,
                 &statflags,
                 testLat,testLon, 
                 &battPwr, &panelPwr, 
                 &compassHeading, &targetHeading, 
-                &lSpeed, &rSpeed, &rxMotorTare);       //Parse out the various pieced of data from the data string an put them in the local variables
+                &lSpeed, &rSpeed, &rxMotorTare,
+                &currentWaypointIndex);                     //Parse the status update string into the local variables
             w.battPercent = battpct;                        //Copy in battery percent from the status update
             w.LTEAvail = statflags & 1;                     //Statflags is a bit-masked number to transmit multiple booleans using an integer. Bit 0 in the number represents if LTE is available
             w.XBeeAvail = (statflags >> 1) & 1;             //Bit 1 represents if XBee is available
@@ -716,6 +750,8 @@ void handleStatusUpdateCommand(const char *dataStr, uint8_t rxBotID, uint8_t mod
             w.GPSAvail = (statflags >> 8) & 1;              //Bit 8 represents if the GPS module is functional
             w.CompassAvail = (statflags >> 9) & 1;          //Bit 9 represents if the Compass module is functional
             w.SDAvail = (statflags >> 10) & 1;              //Bit 10 represents if the SD card is functional
+            w.waypointArrived = (statflags >> 11) & 1;      //Bit 11 represents if the bot has arrived at its waypoint
+            w.botWaypointIndex = currentWaypointIndex;      //Copy in the current waypoint index from the status update
             w.GPSLat = atof(testLat);                       //Convert the decimal in string form to a floating point number for latitude
             w.GPSLon = atof(testLon);                       //Convert the decimal in string form to a floating point number for longitude
             w.panelPower = panelPwr;                        //Copy in the solar panel power measurement
@@ -888,6 +924,12 @@ void printStatusTable() {
         
         if(targetBot == nullptr) return;                   //Target bot not found, don't print
         
+        float lat, lon;
+        if(targetBot->waypointsLat.size() > targetBot->waypointIndex && targetBot->waypointsLon.size() > targetBot->waypointIndex) {
+            lat = targetBot->waypointsLat.at(targetBot->waypointIndex);
+            lon = targetBot->waypointsLon.at(targetBot->waypointIndex);
+        }
+
         //Print status table header
         Serial.println("##########################");
         Serial.println("##   CCHUB STATUS TABLE ##");
@@ -898,7 +940,7 @@ void printStatusTable() {
         Serial.println("##  Latitude Longitude  ##");
         Serial.printlnf("## %8.6f %8.6f ##", targetBot->GPSLat, targetBot->GPSLon);
         Serial.println("##   Target Lat/Lon     ##");
-        Serial.printlnf("## %8.6f %8.6f ##", targetBot->TargetLat, targetBot->TargetLon);
+        Serial.printlnf("## %8.6f %8.6f ##", lat, lon);
         Serial.println("## Drive Mode | Record  ##");
         Serial.printlnf("##     %d      |   %d    ##", targetBot->driveMode, targetBot->dataRecording);
         Serial.println("##   Motor Speeds L/R   ##");
@@ -934,6 +976,7 @@ const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 const CommandEntry rpiCommandTable[] = {
     {"cbp", handleRPiChecksumBypassCommand}, // Toggle checksum bypass
     {"ctl", handleRPiControlCommand},        // Control packet from Raspberry Pi/computer
+    {"wyp", handleRPiAddWaypointCommand},     // Add waypoint command
     {"tbl", handleRPiTableCommand}           // Enable/disable status table printing
 };
 const int rpiCommandTableSize = sizeof(rpiCommandTable) / sizeof(CommandEntry);
@@ -1092,7 +1135,7 @@ void handleRPiControlCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode)
     char GPSLatstr[12] = {0};
     char GPSLonstr[12] = {0};
     unsigned int offloading = 0, drivemode = 0, recording = 0, signal = 0;
-    int parsed = sscanf(dataStr, "%9s %11s %11s %u %u %u %u", idStr, GPSLatstr, GPSLonstr, &drivemode, &offloading, &recording, &signal);
+    int parsed = sscanf(dataStr, "%9s %u %u %u %u", idStr, &drivemode, &offloading, &recording, &signal);
     if (parsed != 7) {
         Serial.println("Error: invalid ctl payload from RPi");
         return;
@@ -1108,8 +1151,6 @@ void handleRPiControlCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode)
 
     for(WaterBot &wb: WaterBots){               //Loop over discovered water bots and look for the target water bot this control packet addresses
         if(wb.botNum == targetBot){             //Found the one we are targeting
-            wb.TargetLat = atof(GPSLatstr);     //Extract the latitude and longitude
-            wb.TargetLon = atof(GPSLonstr);
             wb.driveMode = drivemode;           //Update control fields
             wb.offloading = offloading;         //Request SD card data offload
             wb.dataRecording = recording;       //Enable/disable data recording
@@ -1120,9 +1161,44 @@ void handleRPiControlCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode)
             updateControl = true;               //Signal to control publisher that a bot has been updated
             // Print out the new control values for this vehicle
             Serial.printlnf(
-                "CTL updated B%u: lat=%0.6f lon=%0.6f drive=%u offload=%u record=%u signal=%u",
-                wb.botNum, wb.TargetLat, wb.TargetLon, wb.driveMode, wb.offloading, wb.dataRecording, wb.signal
+                "CTL updated B%u: drive=%u offload=%u record=%u signal=%u",
+                wb.botNum, wb.driveMode, wb.offloading, wb.dataRecording, wb.signal
             );
+            return;
+        }
+    }
+}
+
+void handleRPiAddWaypointCommand(const char *dataStr, uint8_t rxBotID, uint8_t mode){
+    char idStr[10] = {0};
+    char GPSLatstr[12] = {0};
+    char GPSLonstr[12] = {0};
+    int parsed = sscanf(dataStr, "%9s %11s %11s", idStr, GPSLatstr, GPSLonstr);
+    if (parsed != 3) {
+        Serial.println("Error: invalid add waypoint payload from RPi");
+        return;
+    }
+    // idStr is expected as "B#"; fall back to numeric if not in that form
+    uint8_t targetBot = 0;
+    if (idStr[0] == 'B' || idStr[0] == 'b') targetBot = (uint8_t)atoi(&idStr[1]);
+    else targetBot = (uint8_t)atoi(idStr);
+
+    float lat = atof(GPSLatstr);
+    float lon = atof(GPSLonstr);
+    if(lat < -90.0f || lat > 90.0f || lon < -180.0f || lon > 180.0f){
+        Serial.println("Error: invalid latitude or longitude");
+        return;
+    }
+
+    #ifdef VERBOSE
+    Serial.printlnf("Got an add waypoint command from Pi for Bot %d", targetBot);
+    #endif
+
+    for(WaterBot &wb: WaterBots){               //Loop over discovered water bots and look for the target water bot this control packet addresses
+        if(wb.botNum == targetBot){             //Found the one we are targeting
+            wb.waypointsLat.push_back(lat);     //Add the new waypoint to the list
+            wb.waypointsLon.push_back(lon);
+            Serial.printlnf("Added waypoint to B%u: lat=%f lon=%f", wb.botNum, lat, lon);
             return;
         }
     }

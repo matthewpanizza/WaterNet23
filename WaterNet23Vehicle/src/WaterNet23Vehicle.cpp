@@ -215,6 +215,8 @@ float travelHeading, headingDelta;                                      //Compas
 float targetLat, targetLon;                                             //Globals to hold the latitude and longitude sent from the CC for where the bot should target
 float travelDistance;                                                   //Global to hold the distance between the current latitude and longitude and the target latitude and longitude
 bool telemetryAvail = false;                                            //Boolean global to check if the compass and GPS are available
+bool waypointArrived = false;                                           //Flag to indicate that the waypoint has been reached
+uint16_t waypointIndex = 0;                                             //Index of the waypoint this bot is currently targeting
 
 double varCompassHead;
 int compOffset = COMP_OFFSET;                                           //Offset for the compass calibration. Degrees off north to add to the compass reading to calibrate it to true north
@@ -414,16 +416,23 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
     char tLat[10];              //String buffer for latitude, as sscanf doesn't handle floats well
     char tLon[10];              //String buffer for longitude, as sscanf doesn't handle floats well
     uint8_t lastDriveMode = driveMode;  //Store the last drive mode to check if it has changed
-    
+    static float lastTargetLat = -1000.0f, lastTargetLon = -1000.0f; //Store the last target lat and lon to check if they have changed
+
     // Use temporary variables with correct types for sscanf
-    unsigned int tempDriveMode;
+    unsigned int tempDriveMode, tempWaypointIndex;
     int tempLogSensors, tempSignalLED;
-    sscanf(dataStr,"%s %s %u %d %d",tLat,tLon,&tempDriveMode,&tempLogSensors,&tempSignalLED);    //Target lat, target lon, drive mode, dataRecord, signal
+    sscanf(dataStr,"%s %s %u %d %d %u",
+        tLat,tLon,
+        &tempDriveMode,
+        &tempLogSensors,
+        &tempSignalLED,
+        &tempWaypointIndex);
     
     // Assign to actual variables
     driveMode = (uint8_t)tempDriveMode;
     logSensors = (bool)tempLogSensors;
     signalLED = (bool)tempSignalLED;
+    waypointIndex = (uint16_t)tempWaypointIndex;
     
     if(lastDriveMode != DRIVE_MODE_SENTRY && driveMode == DRIVE_MODE_SENTRY) {
         //If the drive mode has changed to sentry, reset the target lat and lon
@@ -434,6 +443,13 @@ void handleControlCommand(const char* dataStr, uint8_t mode) {
         //If the drive mode is autonomous, set the targets to the values received from the CC hub
         targetLat = 35.766191f;//atof(tLat);     //Convert latitude string to float
         targetLon = -78.677869f;//atof(tLon);     //Convert longitude string to float
+    }
+
+    if(targetLat != lastTargetLat || targetLon != lastTargetLon) {
+        //If the target lat or lon has changed, reset the waypointArrived flag
+        waypointArrived = false; //Clear waypoint arrived flag
+        lastTargetLat = targetLat;
+        lastTargetLon = targetLon;
     }
     #ifdef VERBOSE
     Serial.printlnf("New target GPS, Lat: %f Lon: %f", targetLat, targetLon);
@@ -1470,7 +1486,7 @@ void statusUpdate(){
         char updateStr[70];                             //Create local string to hold status being sent out
         int txCompassHead = compassHeading;    //Get the compass heading to send out over the status update
         if(txCompassHead < 0) txCompassHead += 360;   //If the heading is negative, add 360 to it to get a positive value
-        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d %d %d %d %u",
+        sprintf(updateStr,"B%dABsup%d %d %0.6f %0.6f %d %d %d %d %d %d %u %u",
             BOTNUM,
             battPercent,
             statusFlags,
@@ -1478,7 +1494,8 @@ void statusUpdate(){
             (int)(battVoltage * battCurrent),
             (int)(battVoltage * solarCurrent), 
             txCompassHead, (int)travelHeading,
-            leftMotorSpeed, rightMotorSpeed, motorTare);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
+            leftMotorSpeed, rightMotorSpeed, motorTare,
+            waypointIndex);  //Print status flags, battery, latitude and logitude, compass heading and motor speeds to string
         bool sentOverLTE = false;
         if(!BLEAvail && !XBeeAvail && LTEStatusCount && (LTEStatusCount%LTE_STAT_PD == 0)){
             uint32_t now = millis();
@@ -1523,11 +1540,13 @@ void updateMotors(){
     if(driveMode == DRIVE_MODE_SENTRY || driveMode == DRIVE_MODE_AUTONOMOUS){
         doCompassPID = true;
         if(travelDistance < MTR_CUTOFF_RAD || (travelDistance < SENTRY_IDLE_RAD && pointArrived)){            //If the bot is close enough to the center when in autonomous and sentry, then disable motors and float there
+            waypointArrived = true;                     //Set flag to indicate that the waypoint has been reached
             pointArrived = true;                        //Indicate that the bot has arrived at the target point, which acts as a disable until it drifts out of the larger radius
             leftMotorSpeedSetpoint = 90;
             rightMotorSpeedSetpoint = 90;
         }
         else{                                           //Otherwise, we are outside the radius of both circles
+            waypointArrived = false;                    //Clear the waypoint arrived flag
             pointArrived = false;
             leftMotorSpeedSetpoint = MTR_TRAVEL_SPD;
             rightMotorSpeedSetpoint = MTR_TRAVEL_SPD;
@@ -1673,18 +1692,19 @@ void printBLE(const char *dataOut){
 
 /** @brief ISR Function to calculate bitmasked status number and signal to the main loop that the status is ready */
 void StatusHandler(){
-    statusFlags = 0;                    //Reset status flags to 0, then add up the individual flags
-    statusFlags = LTEAvail;             //Bit 0 indicates LTE is available
-    statusFlags |= XBeeAvail << 1;      //Bit 1 indicates XBee is available
-    statusFlags |= BLEAvail << 2;       //Bit 2 indicates BLE is available
-    statusFlags |= offloadMode << 3;    //Bit 3 indicates bot is currently offloading
-    statusFlags |= driveMode << 4;      //Bit 4 indicates the current drive mode
-    statusFlags |= lowBattery << 6;     //Bit 6 indicates that the battery is low
-    statusFlags |= logSensors << 7;     //Bit 7 indicates that the Atlas sensors are being logged to the SD card
-    statusFlags |= GPSAvail << 8;       //Bit 8 indicates neo-m8u GPS is available and receiving non-null data
-    statusFlags |= CompassAvail << 9;   //Bit 9 indicates the LIS3MDL compass is connected and providing dat
-    statusFlags |= SDAvail << 10;       //Bit 10 indicates the SD card is functional and can record data
-    statusReady = true;                 //Set flag true, so the main loop will transmit out status to CChub
+    statusFlags = 0;                        //Reset status flags to 0, then add up the individual flags
+    statusFlags = LTEAvail;                 //Bit 0 indicates LTE is available
+    statusFlags |= XBeeAvail << 1;          //Bit 1 indicates XBee is available
+    statusFlags |= BLEAvail << 2;           //Bit 2 indicates BLE is available
+    statusFlags |= offloadMode << 3;        //Bit 3 indicates bot is currently offloading
+    statusFlags |= driveMode << 4;          //Bit 4 indicates the current drive mode
+    statusFlags |= lowBattery << 6;         //Bit 6 indicates that the battery is low
+    statusFlags |= logSensors << 7;         //Bit 7 indicates that the Atlas sensors are being logged to the SD card
+    statusFlags |= GPSAvail << 8;           //Bit 8 indicates neo-m8u GPS is available and receiving non-null data
+    statusFlags |= CompassAvail << 9;       //Bit 9 indicates the LIS3MDL compass is connected and providing data
+    statusFlags |= SDAvail << 10;           //Bit 10 indicates the SD card is functional and can record data
+    statusFlags |= waypointArrived << 11;   //Bit 11 indicates that the bot has arrived at the target waypoint
+    statusReady = true;                     //Set flag true, so the main loop will transmit out status to CChub
     //Serial.println("Sending a status update!");
 }
 
