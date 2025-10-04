@@ -247,7 +247,6 @@ const CommandEntry commandTable[] = {
 };
 const int commandTableSize = sizeof(commandTable) / sizeof(CommandEntry);
 
-// Helper function to log to logFile with printf-style arguments (no vprintf in File, so use buffer)
 /**
  * @brief Helper function to log messages to debug file with printf-style formatting
  * @param fmt Format string (printf-style)
@@ -338,7 +337,6 @@ void processCommand(const char *command, uint8_t mode, bool sendAck){
     }
 }
 
-// Individual command handler functions for cleaner organization
 /**
  * @brief Control command from CC that contains data about the drive mode, target latitude and longitude, and offloading
  * @param dataStr The data string containing control parameters
