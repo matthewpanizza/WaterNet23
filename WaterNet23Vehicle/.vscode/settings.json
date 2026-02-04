@@ -10,9 +10,13 @@
         "istream": "cpp",
         "cmath": "cpp",
         "ios": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "ostream": "cpp",
+        "initializer_list": "cpp",
+        "xhash": "cpp",
+        "xutility": "cpp"
     },
     "particle.targetPlatform": "bsom",
     "particle.firmwareVersion": "4.0.0",
-    "particle.targetDevice": "gerbil_pirate"
+    "particle.targetDevice": "e00fce68476ea817dacf8d77"
 }
